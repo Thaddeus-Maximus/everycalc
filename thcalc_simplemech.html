@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+<script>
+	var vchart = null, vchart_options = null;
+	var xchart = null, xchart_options = null;
+
+	google.charts.load('current', {'packages':['corechart', 'scatter', 'line']});
+    google.charts.setOnLoadCallback(drawStuff);
+
+
+    function drawStuff() {
+      vchart = new google.visualization.LineChart(document.getElementById('vchart_div'));
+      var vchartDiv = document.getElementById('vchart_div');
+
+      vchart_options = {
+          curveType: 'function',
+          legend: 'none',
+          vAxes: {
+          	0: {title: 'Linear Velocity (m/s)'},
+          	1: {title: 'Linear Position (m)'}
+          },
+          series: {
+          	0: {targetAxisIndex: 0},
+          	1: {targetAxisIndex: 1}
+          },
+          vAxis: {
+	          viewWindow: {
+	            min: 0
+	          }
+	        }
+
+      };
+
+      var vdata = new google.visualization.DataTable();
+      vdata.addColumn('number', 'Time (s)');
+      vdata.addColumn('number', 'Linear Velocity (m/s)');
+      vdata.addColumn('number', 'Linear Position (m)');
+      vdata.addRows([]);
+
+      vchart.draw(vdata, vchart_options);
+
+      xchart = new google.visualization.LineChart(document.getElementById('xchart_div'));
+      var xchartDiv = document.getElementById('xchart_div');
+
+      xchart_options = {
+          curveType: 'function',
+          legend: 'none',
+          vAxes: {
+          	0: {title: 'Angular Velocity (RPM)'},
+          	1: {title: 'Rotational Position (Rev)'}
+          },
+          series: {
+          	0: {targetAxisIndex: 0},
+          	1: {targetAxisIndex: 1}
+          },
+          vAxis: {
+	          viewWindow: {
+	            min: 0
+	          }
+	        }
+
+      };
+
+      var xdata = new google.visualization.DataTable();
+      xdata.addColumn('number', 'Time (s)');
+      xdata.addColumn('number', 'Angular Velocity (RPM)');
+      xdata.addColumn('number', 'Rotational Position (Rev)');
+      xdata.addRows([]);
+
+      xchart.draw(xdata, xchart_options);
+    };
+
+
+
+
+	var motor_data = {
+		"neo": {
+			"max_rpm": 5880,
+			"free_current": 1.3,
+			"max_power": 516,
+			"stall_torque": 3.36,
+			"stall_current": 166
+		},
+
+		"cim": {
+			"max_rpm": 5330,
+			"free_current": 2.7,
+			"max_power": 337,
+			"stall_torque": 2.41,
+			"stall_current": 131
+		}
+	}
+
+	function get_motor_data(motor,key){
+		return motor_data[motor][key];
+	}
+
+	function gidv(id) {
+		return parseFloat(document.getElementById(id).value);
+	}
+
+	function thload() {
+		drawStuff();
+		calc_ratio();
+		motortype_select(document.getElementById("motortype"));
+		
+	}
+
+	function compute() {
+		var dt = 0.001;
+		// overall, solve: alpha = (T-Mres)/I
+		// make x, v, theta, omega available
+		var r = gidv("radius");
+		var m = gidv("mass");
+		var Ts = gidv("motor_stall_current_adj");
+		var wf = gidv("motor_max_rpm_adj") * 2*Math.PI/60; // convert to rad/s!
+		var If = gidv("motor_free_current_adj");
+		var Is = gidv("motor_stall_current_adj");
+		var G = gidv("G");
+
+		//console.log(r,m,Ts,wf,If,Is,G);
+
+		load_expr = document.getElementById("load").value;
+		end_expr = document.getElementById("endcond").value;
+
+		if(end_expr == "") end_expr = "0";
+
+		I = m*r*r;
+
+		t = [0];
+
+		omega_ar = [0];
+		theta_ar = [0];
+		t_ar = [0];
+
+		omega=0; theta=0;
+
+		cur_cons = 0;
+
+		alpha_o = NaN;
+
+		var vdata = new google.visualization.DataTable();
+		vdata.addColumn('number', 'Time (s)');
+      	vdata.addColumn('number', 'Linear Velocity (m/s)');
+      	vdata.addColumn('number', 'Linear Position (m)');
+      	vdata.addRows([[0,0,0]]);
+
+      	var xdata = new google.visualization.DataTable();
+		xdata.addColumn('number', 'Time (s)');
+      	xdata.addColumn('number', 'Angular Velocity (RPM)');
+      	xdata.addColumn('number', 'Rotational Position (rev)');
+      	xdata.addRows([[0,0,0]]);
+      	i=0;
+		while(1) {
+			omega = omega_ar[omega_ar.length-1];
+			theta = theta_ar[theta_ar.length-1];
+			t = t_ar[t_ar.length-1];
+			x = theta*r;
+			v = omega*r;
+
+
+
+			T = G*Ts*(wf-omega*G)/wf;
+			Mres = eval(load_expr)*r;
+			if(isNaN(Mres)) Mres = 0;
+			alpha = (T-Mres) / I;
+			if(isNaN(alpha_o)) alpha_o = alpha;
+			omega_ar.push(omega+alpha*dt);
+			t_ar.push(t_ar[t_ar.length-1]+dt);
+			theta_ar.push(theta_ar[theta_ar.length-1] + omega*dt);
+
+			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega*G)/wf);
+
+			vdata.addRows([[t_ar[t_ar.length-1], omega_ar[omega_ar.length-1]*r, r*theta_ar[theta_ar.length-1]]]);
+			xdata.addRows([[t_ar[t_ar.length-1], 60/2/Math.PI*omega_ar[omega_ar.length-1], 2/Math.PI*theta_ar[theta_ar.length-1]]])
+
+			theta *= 2/Math.PI;
+			omega *= 60/2/Math.PI;
+
+			if (i > 1000 || eval(end_expr)) break;
+
+			dt = Math.max(0.005,Math.min(0.1,0.001*wf/G/alpha));
+			i++;
+		}
+
+		vchart.draw(vdata, vchart_options);
+      	xchart.draw(xdata, xchart_options);
+
+      	document.getElementById("endcond_met").value = eval(end_expr) ? t_ar[t_ar.length-1]:"NOT MET";
+      	document.getElementById("current_cons").value = cur_cons;
+      	document.getElementById("current_end").value = (If + (Is-If)*(wf-G*omega_ar[omega_ar.length-1])/wf);
+	}
+
+	function motortype_select() {
+		e=document.getElementById("motortype");
+		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		props.forEach(function(a) {
+			
+			document.getElementById("motor_"+a).value=get_motor_data(e.value, a);
+			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
+			if (a=="stall_torque")
+				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+			if (a=="free_current" || a=="stall_current" )
+				adjVal *= gidv("motornum");
+			document.getElementById("motor_"+a+"_adj").value=adjVal;
+		});
+
+		compute();
+	}
+
+	function NaNto1(x) {
+		if (isNaN(x))
+			return 1;
+		return x;
+	}
+
+	function calc_ratio() {
+		var G = 1;
+		G *= NaNto1(gidv("G1B"));
+		G *= NaNto1(gidv("G2B"));
+		G *= NaNto1(gidv("G3B"));
+		G *= NaNto1(gidv("G4B"));
+		G /= NaNto1(gidv("G1A"));
+		G /= NaNto1(gidv("G2A"));
+		G /= NaNto1(gidv("G3A"));
+		G /= NaNto1(gidv("G4A"));
+
+		document.getElementById("G").value = G;
+
+		compute();
+	}
+
+</script>
+
+<html>
+<body onload="thload()">
+	<div style="width: 500px; float: left;">
+	<h1>Thad's Mechanism Calculator</h1>
+
+
+
+	<table>
+		<tr>
+			<th>Number of Motors</th>
+			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
+			<td></td>
+		</tr><tr>
+			<th>Voltage</th>
+			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
+			<td>V</td>
+		</tr><tr>
+			<th>Efficiency</th>
+			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
+			<td>%</td>
+		</tr>
+	</table>
+
+
+	
+
+	<table>
+		<tr>
+			<th>Motor</th>
+			<td><select id="motortype" oninput="motortype_select()">
+	  <option value="cim">CIM</option>
+	  <option value="neo">REV NEO</option>
+	  <option value="neo550">REV NEO550</option>
+	  <option value="falcon500">VEX Falcon 500</option>
+	</select></td>
+</tr>
+		<tr>
+			<th>Free Speed</th>
+			<td><input id="motor_max_rpm" /></td>
+			<td><input id="motor_max_rpm_adj" disabled /></td>
+			<td>RPM</td>
+		</tr><tr>
+			<th>Stall Torque</th>
+			<td><input id="motor_stall_torque" /></td>
+			<td><input id="motor_stall_torque_adj" disabled /></td>
+			<td>N-m</td>
+		</tr><tr>
+			<th>Free Current</th>
+			<td><input id="motor_free_current" /></td>
+			<td><input id="motor_free_current_adj" disabled /></td>
+			<td>A</td>
+		</tr><tr>
+			<th>Stall Current</th>
+			<td><input id="motor_stall_current" /></td>
+			<td><input id="motor_stall_current_adj" disabled /></td>
+			<td>A</td>
+		</tr>
+	</table>
+
+	<table>
+		<tr>
+			<th>Gear Ratio</th>
+			<td></td>
+			<td><input id="G" disabled/></td>
+		</tr><tr>
+			<td><input id="G1A" oninput="calc_ratio()" /></td>
+			<td>:</td>
+			<td><input id="G1B" oninput="calc_ratio()" /></td>
+		</tr><tr>
+			<td><input id="G2A" oninput="calc_ratio()" /></td>
+			<td>:</td>
+			<td><input id="G2B" oninput="calc_ratio()" /></td>
+		</tr><tr>
+			<td><input id="G3A" oninput="calc_ratio()" /></td>
+			<td>:</td>
+			<td><input id="G3B" oninput="calc_ratio()" /></td>
+		</tr><tr>
+			<td><input id="G4A" oninput="calc_ratio()" /></td>
+			<td>:</td>
+			<td><input id="G4B" oninput="calc_ratio()" /></td>
+		</tr>
+	</table>
+
+	<table>
+		<tr>
+			<th>Radius</th>
+			<td><input id="radius" oninput="compute()" value=0.1 /></td>
+		</tr><tr>
+			<th>Load Equation</th>
+			<td><input id="load" oninput="compute()" /></td>
+		</tr><tr>
+			<th>Mass</th>
+			<td><input id="mass" oninput="compute()" value=1.0 /></td>
+		</tr><tr>
+			<th>End Condition</th>
+			<td><input id="endcond" oninput="compute()" /></td>
+		</tr>
+	</table>
+
+	<table>
+		<tr>
+			<th>End Condition Met in t=</th>
+			<td><input id="endcond_met" disabled /></td>
+		</tr><tr>
+			<th>Current Used</th>
+			<td><input id="current_cons" disabled /></td>
+			<td>A-s</td>
+		</tr><tr>
+			<th>Current At End</th>
+			<td><input id="current_end" disabled /></td>
+			<td>A</td>
+		</tr>
+	</table>
+
+</div><div style="margin-left: 520px;">
+	 <div id="vchart_div" style="width: 900px; height: 500px"></div>
+	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
+	</div>
+</body>
+</html>
