@@ -130,11 +130,12 @@
 		T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
 		Mres = eval(load_expr)*r;
 		if(isNaN(Mres)) Mres = 0;
-		// T = Mres -> G*Ts - G*Ts*omega*G/wf = Mres -> omega = (G*Ts - Mres)/(G*G*Ts/wf)
-		omega_theor = (G*Ts - Mres)/(G*G*Ts/wf);
-		document.getElementById("theor_freespd").value = r*omega_theor;
-		document.getElementById("theor_stall_force").value = Ts/r * (wf-0)/wf;
-		document.getElementById("theor_stall_current").value = If + (Is-If) * (wf-omega_theor)/wf;
+		// T = Mres -> G*Ts - G*Ts*omega_m/wf = Mres -> omega_m = (G*Ts - Mres)/(G*Ts/wf)
+		omega_m_theor = (G*Ts - Mres)/(G*Ts/wf);
+		document.getElementById("theor_freespd").value = r*wf/G;
+		document.getElementById("theor_runspd").value = r*omega_m_theor/G;
+		document.getElementById("theor_stall_force").value = G*Ts/r;
+		document.getElementById("theor_stall_current").value = If + (Is-If) * (wf-omega_m_theor)/wf;
 
 		cur_cons = 0;
 
@@ -376,8 +377,12 @@
 			<td class="unit">A</td>
 		</tr>
 		<tr>
-			<th class="rowlabel">** Running Speed</th>
+			<th class="rowlabel">No Load Speed</th>
 			<td><input id="theor_freespd" disabled /></td>
+			<td class="unit">m/s</td>
+		</tr><tr>
+			<th class="rowlabel">** Running Speed</th>
+			<td><input id="theor_runspd" disabled /></td>
 			<td class="unit">m/s</td>
 		</tr><tr>
 			<th class="rowlabel">** Stall Force</th>
