@@ -85,5 +85,25 @@ var motor_data = {
 			"max_power": 190,
 			"stall_torque": 0.38,
 			"stall_current": 84
+		},
+
+		"nxt_nimh": {
+			"plain_name": "Mindstorms NXT Motor, NiMH",
+			"max_rpm": 130,
+			"free_current": 60e-3, 
+			"max_power": 1.07,
+			"stall_torque": 28e-2,
+			"stall_current": 950e-3
+			// from https://www.philohome.com/nxtmotor/nxtmotor.htm
+		},
+
+		"nxt_9v": {
+			"plain_name": "Mindstorms NXT Motor, 9V",
+			"max_rpm": 165,
+			"free_current": 60e-3, 
+			"max_power": 1.7,
+			"stall_torque": 37e-2,
+			"stall_current": 1350e-3
+			// from https://www.philohome.com/nxtmotor/nxtmotor.htm
 		}
 	}

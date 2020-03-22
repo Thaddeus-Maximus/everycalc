@@ -94,6 +94,16 @@
 		    }
 		}
 
+		select = document.getElementById("motortype");
+		i=0;
+		for(motor in motor_data) {
+			i++;
+			opt = document.createElement('option');
+			opt.innerHTML = motor_data[motor]["plain_name"];
+			opt.value = motor;
+			select.appendChild(opt);
+		}
+
 		drawStuff();
 		calc_ratio();
 		motortype_select(document.getElementById("motortype"));
@@ -158,8 +168,8 @@
 			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
 			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
-			x = theta*r;
-			v = omega*r;
+			x = theta_ar[theta_ar.length-1]*r;
+			v = omega_ar[omega_ar.length-1]*r;
 			omega_m = omega*G;
 			theta_m = theta*G;
 
@@ -274,7 +284,7 @@
 			<th>Motor</th>
 			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
 			  
-			  <option value="neo">REV NEO</option>
+			  <!--<option value="neo">REV NEO</option>
 			  <option value="neo550">REV NEO550</option>
 			  <option value="falcon500">VEX Falcon 500</option>
 			  <option value="cim">CIM</option>
@@ -283,7 +293,7 @@
 			  <option value="775pro">775Pro / Redline</option>
 			  <option value="am9015">AndyMark 9015</option>
 			  <option value="neverest">AndyMark NeveRest</option>
-			  <option value="rs550">BaneBots RS-550</option>
+			  <option value="rs550">BaneBots RS-550</option>-->
 			</select></td>
 		</tr>
 		<tr>
