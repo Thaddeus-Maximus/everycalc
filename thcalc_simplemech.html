@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<link rel="stylesheet" href="style.css"> 
 
-<script>
+<script type="text/javascript">
 	var vchart = null, vchart_options = null;
 	var xchart = null, xchart_options = null;
 
@@ -15,7 +16,7 @@
 
       vchart_options = {
           curveType: 'function',
-          legend: 'none',
+          legend: {position: 'top'},
           vAxes: {
           	0: {title: 'Linear Velocity (m/s)'},
           	1: {title: 'Linear Position (m)'}
@@ -45,7 +46,7 @@
 
       xchart_options = {
           curveType: 'function',
-          legend: 'none',
+          legend: {position: 'top'},
           vAxes: {
           	0: {title: 'Angular Velocity (RPM)'},
           	1: {title: 'Rotational Position (Rev)'}
@@ -81,6 +82,12 @@
 			"max_power": 516,
 			"stall_torque": 3.36,
 			"stall_current": 166
+		},"neo550": {
+			"max_rpm": 11000,
+			"free_current": 1.4,
+			"max_power": 279,
+			"stall_torque": 0.97,
+			"stall_current": 100
 		},
 
 		"cim": {
@@ -89,6 +96,62 @@
 			"max_power": 337,
 			"stall_torque": 2.41,
 			"stall_current": 131
+		},
+
+		"falcon500": {
+			"max_rpm": 6380,
+			"free_current": 1.5,
+			"max_power": 783,
+			"stall_torque": 4.69,
+			"stall_current": 257
+		},
+
+		"minicim": {
+			"max_rpm": 5840,
+			"free_current": 3,
+			"max_power": 215,
+			"stall_torque": 1.41,
+			"stall_current": 89
+		},
+
+		"bag": {
+			"max_rpm": 13180,
+			"free_current": 1.8,
+			"max_power": 149,
+			"stall_torque": 0.43,
+			"stall_current": 53
+		},
+
+		"775pro": {
+			"max_rpm": 18730,
+			"free_current": 0.7,
+			"max_power": 347,
+			"stall_torque": 0.71,
+			"stall_current": 134
+		},
+
+		"am9015": {
+			"max_rpm": 14270,
+			"free_current": 3.7,
+			"max_power": 134,
+			"stall_torque": 0.36,
+			"stall_current": 71
+		},
+
+		"neverest": {
+			"max_rpm": 5480,
+			"free_current": 0.4,
+			"max_power": 25,
+			"stall_torque": 0.17,
+			"stall_current": 10
+		},
+
+		"rs550": {
+			"max_rpm": 19000,
+			"free_current": 0.4,
+			"max_power": 190,
+			"stall_torque": 0.38,
+			"stall_current": 84
 		}
 	}
 
@@ -108,12 +171,12 @@
 	}
 
 	function compute() {
-		var dt = 0.001;
+		var dt = 0;
 		// overall, solve: alpha = (T-Mres)/I
 		// make x, v, theta, omega available
 		var r = gidv("radius");
 		var m = gidv("mass");
-		var Ts = gidv("motor_stall_current_adj");
+		var Ts = gidv("motor_stall_torque_adj");
 		var wf = gidv("motor_max_rpm_adj") * 2*Math.PI/60; // convert to rad/s!
 		var If = gidv("motor_free_current_adj");
 		var Is = gidv("motor_stall_current_adj");
@@ -130,7 +193,8 @@
 
 		t = [0];
 
-		omega_ar = [0];
+		alpha_ar = [0,0];
+		omega_ar = [0,0];
 		theta_ar = [0];
 		t_ar = [0];
 
@@ -153,36 +217,44 @@
       	xdata.addRows([[0,0,0]]);
       	i=0;
 		while(1) {
-			omega = omega_ar[omega_ar.length-1];
-			theta = theta_ar[theta_ar.length-1];
+			console.log(dt);
+			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
+			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
 			x = theta*r;
 			v = omega*r;
+			omega_m = omega*G;
+			theta_m = theta*G;
 
-
-
-			T = G*Ts*(wf-omega*G)/wf;
+			T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
 			Mres = eval(load_expr)*r;
 			if(isNaN(Mres)) Mres = 0;
 			alpha = (T-Mres) / I;
+			//console.log(T, Mres, alpha);
 			if(isNaN(alpha_o)) alpha_o = alpha;
-			omega_ar.push(omega+alpha*dt);
+
+			alpha_ar.push(alpha);
+
+			// Use Adams-Bradforth Method
+			theta_ar.push(theta_ar[theta_ar.length-1] + omega_ar[omega_ar.length-1]*dt*3/2 - omega_ar[omega_ar.length-2]*dt*1/2);
+			omega_ar.push(omega_ar[omega_ar.length-1] + alpha_ar[alpha_ar.length-1]*dt*3/2 - alpha_ar[alpha_ar.length-2]*dt*1/2);
 			t_ar.push(t_ar[t_ar.length-1]+dt);
-			theta_ar.push(theta_ar[theta_ar.length-1] + omega*dt);
+			
 
-			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega*G)/wf);
+			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf);
 
-			vdata.addRows([[t_ar[t_ar.length-1], omega_ar[omega_ar.length-1]*r, r*theta_ar[theta_ar.length-1]]]);
-			xdata.addRows([[t_ar[t_ar.length-1], 60/2/Math.PI*omega_ar[omega_ar.length-1], 2/Math.PI*theta_ar[theta_ar.length-1]]])
-
-			theta *= 2/Math.PI;
-			omega *= 60/2/Math.PI;
+			vdata.addRows([[t_ar[t_ar.length-1], omega_ar[omega_ar.length-1]*r, 			r*theta_ar[theta_ar.length-1]]]);
+			xdata.addRows([[t_ar[t_ar.length-1], 60/2/Math.PI*omega_ar[omega_ar.length-1], 	2/Math.PI*theta_ar[theta_ar.length-1]]])
 
 			if (i > 1000 || eval(end_expr)) break;
 
-			dt = Math.max(0.005,Math.min(0.1,0.001*wf/G/alpha));
+			dt = Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/30);
 			i++;
 		}
+
+		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth purposes
+
+		console.log(vdata, xdata);
 
 		vchart.draw(vdata, vchart_options);
       	xchart.draw(xdata, xchart_options);
@@ -235,119 +307,163 @@
 
 <html>
 <body onload="thload()">
-	<div style="width: 500px; float: left;">
-	<h1>Thad's Mechanism Calculator</h1>
+	<div style="width: 400px; float: left;">
+	<h3>Thad's Mechanism Calculator</h3>
 
 
 
-	<table>
+	<div class="odd">
+		<table>
 		<tr>
-			<th>Number of Motors</th>
+			<th class="rowlabel">Number of Motors</th>
 			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
-			<td></td>
+			<td class="unit"></td>
 		</tr><tr>
-			<th>Voltage</th>
+			<th class="rowlabel">Voltage</th>
 			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
-			<td>V</td>
+			<td class="unit">V</td>
 		</tr><tr>
-			<th>Efficiency</th>
+			<th class="rowlabel">Efficiency</th>
 			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
-			<td>%</td>
+			<td class="unit">%</td>
 		</tr>
 	</table>
-
+</div>
 
 	
 
-	<table>
+	<div class="even">
+		<table>
 		<tr>
 			<th>Motor</th>
-			<td><select id="motortype" oninput="motortype_select()">
-	  <option value="cim">CIM</option>
-	  <option value="neo">REV NEO</option>
-	  <option value="neo550">REV NEO550</option>
-	  <option value="falcon500">VEX Falcon 500</option>
-	</select></td>
-</tr>
+			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
+			  
+			  <option value="neo">REV NEO</option>
+			  <option value="neo550">REV NEO550</option>
+			  <option value="falcon500">VEX Falcon 500</option>
+			  <option value="cim">CIM</option>
+			  <option value="minicim">MiniCIM</option>
+			  <option value="bag">Vex BAG</option>
+			  <option value="775pro">775Pro / Redline</option>
+			  <option value="am9015">AndyMark 9015</option>
+			  <option value="neverest">AndyMark NeveRest</option>
+			  <option value="rs550">BaneBots RS-550</option>
+			</select></td>
+		</tr>
 		<tr>
-			<th>Free Speed</th>
+			<th></th>
+			<th class="collabel">Raw Motor</th>
+			<th class="collabel">Adjusted</th>
+			<th></th>
+		</tr>
+		<tr>
+			<th class="rowlabel">Free Speed</th>
 			<td><input id="motor_max_rpm" /></td>
 			<td><input id="motor_max_rpm_adj" disabled /></td>
-			<td>RPM</td>
+			<td class="unit">RPM</td>
 		</tr><tr>
 			<th>Stall Torque</th>
 			<td><input id="motor_stall_torque" /></td>
 			<td><input id="motor_stall_torque_adj" disabled /></td>
-			<td>N-m</td>
+			<td class="unit">N-m</td>
 		</tr><tr>
-			<th>Free Current</th>
+			<th class="rowlabel">Free Current</th>
 			<td><input id="motor_free_current" /></td>
 			<td><input id="motor_free_current_adj" disabled /></td>
-			<td>A</td>
+			<td class="unit">A</td>
 		</tr><tr>
-			<th>Stall Current</th>
+			<th class="rowlabel">Stall Current</th>
 			<td><input id="motor_stall_current" /></td>
 			<td><input id="motor_stall_current_adj" disabled /></td>
-			<td>A</td>
+			<td class="unit">A</td>
 		</tr>
 	</table>
-
-	<table>
+</div>
+	<div class="odd">
+		<table>
 		<tr>
-			<th>Gear Ratio</th>
-			<td></td>
+			<th class="rowlabel">Gear Ratio</th>
+			<td class="tiny"></td>
 			<td><input id="G" disabled/></td>
 		</tr><tr>
 			<td><input id="G1A" oninput="calc_ratio()" /></td>
-			<td>:</td>
+			<td class="tiny">:</td>
 			<td><input id="G1B" oninput="calc_ratio()" /></td>
 		</tr><tr>
 			<td><input id="G2A" oninput="calc_ratio()" /></td>
-			<td>:</td>
+			<td class="tiny">:</td>
 			<td><input id="G2B" oninput="calc_ratio()" /></td>
 		</tr><tr>
 			<td><input id="G3A" oninput="calc_ratio()" /></td>
-			<td>:</td>
+			<td class="tiny">:</td>
 			<td><input id="G3B" oninput="calc_ratio()" /></td>
 		</tr><tr>
 			<td><input id="G4A" oninput="calc_ratio()" /></td>
-			<td>:</td>
+			<td class="tiny">:</td>
 			<td><input id="G4B" oninput="calc_ratio()" /></td>
 		</tr>
 	</table>
-
-	<table>
+</div>
+	<div class="even">
+		<table>
 		<tr>
-			<th>Radius</th>
+			<th class="rowlabel">Radius</th>
 			<td><input id="radius" oninput="compute()" value=0.1 /></td>
+			<td class="unit">m</td>
 		</tr><tr>
-			<th>Load Equation</th>
+			<th class="rowlabel">* Load Equation</th>
 			<td><input id="load" oninput="compute()" /></td>
+			<td class="unit">N</td>
 		</tr><tr>
-			<th>Mass</th>
+			<th class="rowlabel">Mass</th>
 			<td><input id="mass" oninput="compute()" value=1.0 /></td>
+			<td class="unit">kg</td>
 		</tr><tr>
-			<th>End Condition</th>
+			<th class="rowlabel">* End Condition</th>
 			<td><input id="endcond" oninput="compute()" /></td>
 		</tr>
 	</table>
-
+</div>
+<div  class="output">
 	<table>
 		<tr>
-			<th>End Condition Met in t=</th>
+			<th class="rowlabel">End Condition Met in t=</th>
 			<td><input id="endcond_met" disabled /></td>
+			<td class="unit">s</td>
 		</tr><tr>
-			<th>Current Used</th>
+			<th class="rowlabel">Current Used</th>
 			<td><input id="current_cons" disabled /></td>
-			<td>A-s</td>
+			<td class="unit">A-s</td>
 		</tr><tr>
-			<th>Current At End</th>
+			<th class="rowlabel">Current At End</th>
 			<td><input id="current_end" disabled /></td>
-			<td>A</td>
+			<td class="unit">A</td>
+		</tr>
+		<tr>
+			<th class="rowlabel">** Free Speed</th>
+			<td><input id="theor_freespd" disabled /></td>
+			<td class="unit">m/s</td>
+		</tr><tr>
+			<th class="rowlabel">** Stall Force</th>
+			<td><input id="theor_stall_torque" disabled /></td>
+			<td class="unit">N-m</td>
+		</tr><tr>
+			<th class="rowlabel">** Stall Current</th>
+			<td><input id="theor_stall_current" disabled /></td>
+			<td class="unit">A</td>
 		</tr>
 	</table>
+</div>
+<div class="even">
+	<p>* Input of expressions with variables t, v, x, omega, and theta is permitted in order to model complex physics.</p>
+	<p>** These values assume that the aforementioned variables are set to zero.</p>
+</div>
 
-</div><div style="margin-left: 520px;">
+<!--<div class="even">
+	<button type="button" onclick="compute()">CALCULATE!</button>
+</div>-->
+
+</div><div style="margin-left: 420px;">
 	 <div id="vchart_div" style="width: 900px; height: 500px"></div>
 	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
 	</div>
