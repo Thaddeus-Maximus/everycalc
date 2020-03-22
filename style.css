@@ -55,11 +55,23 @@ select, input {
 }
 
 .odd {
+	margin: none;
+	padding: none;
 	background-color: #ddf;
 }
 .even {
+	margin: none;
+	padding: none;
 	background-color: #ccf;
 }
 .output {
+	margin: none;
+	padding: none;
 	background-color: #fca;
+}
+
+
+.container {
+	float: left;
+	margin: 0;
 }

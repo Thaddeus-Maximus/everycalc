@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <link rel="stylesheet" href="style.css"> 
-
+<script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
 	var vchart = null, vchart_options = null;
 	var xchart = null, xchart_options = null;
@@ -72,89 +72,6 @@
       xchart.draw(xdata, xchart_options);
     };
 
-
-
-
-	var motor_data = {
-		"neo": {
-			"max_rpm": 5880,
-			"free_current": 1.3,
-			"max_power": 516,
-			"stall_torque": 3.36,
-			"stall_current": 166
-		},"neo550": {
-			"max_rpm": 11000,
-			"free_current": 1.4,
-			"max_power": 279,
-			"stall_torque": 0.97,
-			"stall_current": 100
-		},
-
-		"cim": {
-			"max_rpm": 5330,
-			"free_current": 2.7,
-			"max_power": 337,
-			"stall_torque": 2.41,
-			"stall_current": 131
-		},
-
-		"falcon500": {
-			"max_rpm": 6380,
-			"free_current": 1.5,
-			"max_power": 783,
-			"stall_torque": 4.69,
-			"stall_current": 257
-		},
-
-		"minicim": {
-			"max_rpm": 5840,
-			"free_current": 3,
-			"max_power": 215,
-			"stall_torque": 1.41,
-			"stall_current": 89
-		},
-
-		"bag": {
-			"max_rpm": 13180,
-			"free_current": 1.8,
-			"max_power": 149,
-			"stall_torque": 0.43,
-			"stall_current": 53
-		},
-
-		"775pro": {
-			"max_rpm": 18730,
-			"free_current": 0.7,
-			"max_power": 347,
-			"stall_torque": 0.71,
-			"stall_current": 134
-		},
-
-		"am9015": {
-			"max_rpm": 14270,
-			"free_current": 3.7,
-			"max_power": 134,
-			"stall_torque": 0.36,
-			"stall_current": 71
-		},
-
-		"neverest": {
-			"max_rpm": 5480,
-			"free_current": 0.4,
-			"max_power": 25,
-			"stall_torque": 0.17,
-			"stall_current": 10
-		},
-
-		"rs550": {
-			"max_rpm": 19000,
-			"free_current": 0.4,
-			"max_power": 190,
-			"stall_torque": 0.38,
-			"stall_current": 84
-		}
-	}
-
 	function get_motor_data(motor,key){
 		return motor_data[motor][key];
 	}
@@ -164,6 +81,19 @@
 	}
 
 	function thload() {
+		var inputs, index;
+
+		inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
+		    inputs[index].onkeyup = function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+
+		    	if (key==13) {
+		    		compute();
+		    	}
+		    }
+		}
+
 		drawStuff();
 		calc_ratio();
 		motortype_select(document.getElementById("motortype"));
@@ -191,14 +121,20 @@
 
 		I = m*r*r;
 
-		t = [0];
-
 		alpha_ar = [0,0];
 		omega_ar = [0,0];
 		theta_ar = [0];
 		t_ar = [0];
 
-		omega=0; theta=0;
+		omega=0; theta=0; theta_m=0; omega_m=0; v=0; x=0; t=0;
+		T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
+		Mres = eval(load_expr)*r;
+		if(isNaN(Mres)) Mres = 0;
+		// T = Mres -> G*Ts - G*Ts*omega*G/wf = Mres -> omega = (G*Ts - Mres)/(G*G*Ts/wf)
+		omega_theor = (G*Ts - Mres)/(G*G*Ts/wf);
+		document.getElementById("theor_freespd").value = r*omega_theor;
+		document.getElementById("theor_stall_force").value = Ts/r * (wf-0)/wf;
+		document.getElementById("theor_stall_current").value = If + (Is-If) * (wf-omega_theor)/wf;
 
 		cur_cons = 0;
 
@@ -277,8 +213,6 @@
 				adjVal *= gidv("motornum");
 			document.getElementById("motor_"+a+"_adj").value=adjVal;
 		});
-
-		compute();
 	}
 
 	function NaNto1(x) {
@@ -299,16 +233,15 @@
 		G /= NaNto1(gidv("G4A"));
 
 		document.getElementById("G").value = G;
-
-		compute();
 	}
 
 </script>
 
 <html>
 <body onload="thload()">
-	<div style="width: 400px; float: left;">
+	<div style="width: 400px; float: left;" class="container">
 	<h3>Thad's Mechanism Calculator</h3>
+	<center><a href="./">Back To Index</a></center>
 
 
 
@@ -408,19 +341,19 @@
 		<table>
 		<tr>
 			<th class="rowlabel">Radius</th>
-			<td><input id="radius" oninput="compute()" value=0.1 /></td>
+			<td><input id="radius" oninput="" value=0.1 /></td>
 			<td class="unit">m</td>
 		</tr><tr>
 			<th class="rowlabel">* Load Equation</th>
-			<td><input id="load" oninput="compute()" /></td>
+			<td><input id="load" oninput="" /></td>
 			<td class="unit">N</td>
 		</tr><tr>
 			<th class="rowlabel">Mass</th>
-			<td><input id="mass" oninput="compute()" value=1.0 /></td>
+			<td><input id="mass" oninput="" value=1.0 /></td>
 			<td class="unit">kg</td>
 		</tr><tr>
 			<th class="rowlabel">* End Condition</th>
-			<td><input id="endcond" oninput="compute()" /></td>
+			<td><input id="endcond" oninput="" /></td>
 		</tr>
 	</table>
 </div>
@@ -440,22 +373,22 @@
 			<td class="unit">A</td>
 		</tr>
 		<tr>
-			<th class="rowlabel">** Free Speed</th>
+			<th class="rowlabel">** Running Speed</th>
 			<td><input id="theor_freespd" disabled /></td>
 			<td class="unit">m/s</td>
 		</tr><tr>
 			<th class="rowlabel">** Stall Force</th>
-			<td><input id="theor_stall_torque" disabled /></td>
-			<td class="unit">N-m</td>
+			<td><input id="theor_stall_force" disabled /></td>
+			<td class="unit">N</td>
 		</tr><tr>
-			<th class="rowlabel">** Stall Current</th>
+			<th class="rowlabel">** Running Current</th>
 			<td><input id="theor_stall_current" disabled /></td>
 			<td class="unit">A</td>
 		</tr>
 	</table>
 </div>
 <div class="even">
-	<p>* Input of expressions with variables t, v, x, omega, and theta is permitted in order to model complex physics.</p>
+	<p>* Input of expressions with variables G, m, I, r, t, v, x, omega_m, theta_m, omega, and theta is permitted in order to model complex physics.</p>
 	<p>** These values assume that the aforementioned variables are set to zero.</p>
 </div>
 
@@ -463,7 +396,7 @@
 	<button type="button" onclick="compute()">CALCULATE!</button>
 </div>-->
 
-</div><div style="margin-left: 420px;">
+</div><div style="margin-left: 0px;" class="container">
 	 <div id="vchart_div" style="width: 900px; height: 500px"></div>
 	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
 	</div>
