@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<link rel="stylesheet" href="style.css"> 
+<script type="text/javascript" src="specs.js"></script>
+<script type="text/javascript">
+	function get_motor_data(motor,key){
+		return motor_data[motor][key];
+	}
+
+	function thload() {
+		table = document.getElementById("motor_data_table");
+		i=0;
+		for(motor in motor_data) {
+			i++;
+			row = table.insertRow(i);
+			row.innerHTML = "<th class='rowlabel'>" + motor_data[motor]["plain_name"] + "</th><td>" 
+				+ motor_data[motor]["max_rpm"] + "</td><td>"
+				+ motor_data[motor]["stall_torque"] + "</td><td>"
+				+ motor_data[motor]["max_power"] + "</td><td>"
+				+ motor_data[motor]["free_current"] + "</td><td>"
+				+ motor_data[motor]["stall_current"] + "</td>";
+		}
+	}
+</script>
+
+<html>
+<body onload="thload()">
+<div style="width: 400px; float: left;" class="container">
+	<h3>Thad's Mechanism Calculator</h3>
+	<center><a href="./">Back To Index</a></center>
+
+	<div class="even">
+		<table id="motor_data_table">
+			<tr>
+				<th class="collabel">Motor Name</th>
+				<th class="collabel">Free/Max RPM</th>
+				<th class="collabel">Stall/Max Torque (Nm)</th>
+				<th class="collabel">Max Power (W)</th>
+				<th class="collabel">Free/Min Current (A)</th>
+				<th class="collabel">Stall/Max Current (A)</th>
+			</tr>
+		</table>
+	</div>
+
+</div>
+</body>
+</html>

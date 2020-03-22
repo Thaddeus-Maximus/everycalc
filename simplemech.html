@@ -153,7 +153,7 @@
       	xdata.addRows([[0,0,0]]);
       	i=0;
 		while(1) {
-			console.log(dt);
+			//console.log(dt);
 			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
 			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
@@ -190,7 +190,7 @@
 
 		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth purposes
 
-		console.log(vdata, xdata);
+		//console.log(vdata, xdata);
 
 		vchart.draw(vdata, vchart_options);
       	xchart.draw(xdata, xchart_options);
@@ -213,6 +213,8 @@
 				adjVal *= gidv("motornum");
 			document.getElementById("motor_"+a+"_adj").value=adjVal;
 		});
+
+		compute();
 	}
 
 	function NaNto1(x) {
@@ -291,22 +293,22 @@
 		</tr>
 		<tr>
 			<th class="rowlabel">Free Speed</th>
-			<td><input id="motor_max_rpm" /></td>
+			<td><input id="motor_max_rpm" disabled /></td>
 			<td><input id="motor_max_rpm_adj" disabled /></td>
 			<td class="unit">RPM</td>
 		</tr><tr>
 			<th>Stall Torque</th>
-			<td><input id="motor_stall_torque" /></td>
+			<td><input id="motor_stall_torque" disabled /></td>
 			<td><input id="motor_stall_torque_adj" disabled /></td>
 			<td class="unit">N-m</td>
 		</tr><tr>
 			<th class="rowlabel">Free Current</th>
-			<td><input id="motor_free_current" /></td>
+			<td><input id="motor_free_current" disabled /></td>
 			<td><input id="motor_free_current_adj" disabled /></td>
 			<td class="unit">A</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Current</th>
-			<td><input id="motor_stall_current" /></td>
+			<td><input id="motor_stall_current" disabled /></td>
 			<td><input id="motor_stall_current_adj" disabled /></td>
 			<td class="unit">A</td>
 		</tr>
