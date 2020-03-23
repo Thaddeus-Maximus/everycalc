@@ -53,7 +53,13 @@
 	}
 
 	function compute() {
-		pitch = gidv('pitch') / 25.4;
+		var uconv = 1;
+
+		if (document.getElementById('unit_inch').checked) uconv = 25.4;
+		else if (document.getElementById('unit_mm').checked) uconv = 1;
+		else return;
+
+		pitch = gidv('pitch') / uconv;
 		p1 = gidv('p1_n') * pitch / Math.PI;	
 		p2 = gidv('p2_n') * pitch / Math.PI;
 
@@ -63,8 +69,8 @@
 		document.getElementById("p2_pd").value = p2;
 
 		if (gidv('pitch')==5) {
-			od1 = p1 + .045;
-			od2 = p2 + .045;
+			od1 = p1 + 1.1/uconv;
+			od2 = p2 + 1.1/uconv;
 			document.getElementById('p1_od').value = od1;
 			document.getElementById('p2_od').value = od2;
 		} else {
@@ -173,8 +179,16 @@
 	<h3>Thad's Belt Calculator</h3>
 	<center>
 		<a href="./">Back To Index</a>
-		<i>Units in inches unless otherwise specified</i>
 	</center>
+
+	<div class="even">
+		<center>
+			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="compute()"  checked>
+			  <label for="inch">Inches</label><br>
+			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="compute()" >
+			  <label for="mm">Millimeters</label><br>
+		</center>
+	</div>
 
 	<div class="odd">
 	
