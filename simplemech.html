@@ -195,7 +195,7 @@
 
 			if (i > 1000 || eval(end_expr)) break;
 
-			dt = Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/30);
+			dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/30));
 			i++;
 		}
 

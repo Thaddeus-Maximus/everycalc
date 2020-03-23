@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="style.css"> 
+<script type="text/javascript" src="specs.js"></script>
+<script type="text/javascript">
+	function thload() {
+		vendor_select();
+		driver_select();
+	}
+
+	function gidv(id) {
+		return parseFloat(document.getElementById(id).value);
+	}
+
+	function calc_l (cc, d1t, d2t) {
+		d1 = Math.min(d1t, d2t);
+		d2 = Math.max(d1t, d2t);
+		theta = Math.asin((d2-d1)/2/cc);
+		//console.log('theta: ', theta)
+		return 2*cc*Math.sqrt(1-((d2-d1)/2/cc)*((d2-d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2-d1);
+	}
+
+	function wrap_1(d1, d2, cc, pitch) {
+		theta = Math.asin((d2-d1)/2/cc);
+		return d1/2*(Math.PI - 2*theta)/pitch;
+	}
+
+	function wrap_2(d1, d2, cc, pitch) {
+		theta = Math.asin((d2-d1)/2/cc);
+		return d2/2*(Math.PI + 2*theta)/pitch;
+	}
+
+	function calc_cc (l, d1, d2) {
+		a = l;
+		b = (d1+d2)/2;
+		c = (a+b)/2;
+		n = 0;
+		while (n<100) {
+			n++;
+			c = (a+b)/2;
+			fa = calc_l(a, d1, d2) - l;
+			fb = calc_l(b, d1, d2) - l;
+			fc = calc_l(c, d1, d2) - l;
+
+			if (Math.abs(fc)<1e-4) {
+				break;
+			}
+
+			if (fc*fa > 0)	a = c;
+			else			b = c;
+		}
+		//console.log('found', c, 'in', n);
+		return c;
+	}
+
+	function compute() {
+		pitch = gidv('pitch') / 25.4;
+		p1 = gidv('p1_n') * pitch / Math.PI;	
+		p2 = gidv('p2_n') * pitch / Math.PI;
+
+		document.getElementById("p1_pd").value = p1;
+		document.getElementById("p2_pd").value = p2;
+
+		if (gidv('pitch')==5) {
+			od1 = p1 + .045;
+			od2 = p2 + .045;
+			document.getElementById('p1_od').value = od1;
+			document.getElementById('p2_od').value = od2;
+		} else {
+			document.getElementById('p1_od').value = '';
+			document.getElementById('p2_od').value = '';
+		}
+
+
+		v = document.getElementById("driver").value;
+		//console.log(v);
+		if(v == "teeth") {
+			nb = gidv('driver_val');
+			l = nb*pitch;
+			cc = calc_cc(l, p1, p2) + gidv("center_add");
+			//console.log("center-center: ", cc);
+			document.getElementById("n_teeth_s").value = nb;
+			document.getElementById("l_s")		.value = l;
+			document.getElementById("cc_s")		.value = cc;
+			document.getElementById("p1_s")		.value = 0;
+			document.getElementById("p2_s")		.value = 0;
+		} else {
+			cc = gidv('driver_val') - gidv("center_add");
+			l = calc_l(cc, p1, p2);
+			nb = l/pitch;
+
+			vendor = document.getElementById('vendor').value;
+			if (vendor == 'raw') {
+				inc = gidv('raw_inc');
+				nb_s = Math.floor(nb/inc)*inc;
+				nb_l = nb_s + inc;
+			} else {
+				//console.log(vendor);
+				var belts_opts = belts_data[vendor][document.getElementById('pitch').value+"mm"];
+				i=0;
+				nb_s = NaN;
+				nb_l = NaN;
+				for(;i<belts_opts.length;i++) {
+					if(belts_opts[i] > nb) {
+						break;
+					}
+				}
+				nb_s = belts_opts[i-1];
+				nb_l = belts_opts[i];
+			}
+			
+			l_s = nb_s*pitch;
+			l_l = nb_l*pitch;
+			cc_s = calc_cc(l_s, p1, p2) + gidv("center_add");
+			cc_l = calc_cc(l_l, p1, p2) + gidv("center_add");
+
+			document.getElementById("n_teeth_l").value = nb_l;
+			document.getElementById("l_l")		.value = l_l;
+			document.getElementById("cc_l")		.value = cc_l;
+			document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch);
+			document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch);
+			document.getElementById("n_teeth_s").value = nb_s;
+			document.getElementById("l_s")		.value = l_s;
+			document.getElementById("cc_s")		.value = cc_s;
+			document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch);
+			document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch);
+		}
+	}
+
+	function vendor_select() {
+		v = document.getElementById("vendor").value
+		//console.log(v);
+		if(v == "raw") {
+			document.getElementById("raw_inc").style.display="inline-block";
+			document.getElementById("raw_inc_label").style.display="inline-block";
+		}else {
+			document.getElementById("raw_inc").style.display="none";
+			document.getElementById("raw_inc_label").style.display="none";
+		}
+
+		compute();
+	}
+
+	function driver_select() {
+		v = document.getElementById("driver").value;
+		//console.log(v);
+		if(v == "teeth") {
+			document.getElementById("n_teeth_l").style.display="none";
+			document.getElementById("l_l").style.display="none";
+			document.getElementById("cc_l").style.display="none";
+			document.getElementById("p1_l").style.display="none";
+			document.getElementById("p2_l").style.display="none";
+			document.getElementById("sm_lrg_label").style.display="none";
+			document.getElementById("src_label").style.display="none";
+		}else {
+			document.getElementById("n_teeth_l").style.display="inline-block";
+			document.getElementById("l_l").style.display="inline-block";
+			document.getElementById("cc_l").style.display="inline-block";
+			document.getElementById("p1_l").style.display="inline-block";
+			document.getElementById("p2_l").style.display="inline-block";
+			document.getElementById("sm_lrg_label").style.display="table-row";
+			document.getElementById("src_label").style.display="table-row";
+		}
+
+		compute();
+	}
+</script>
+
+<html>
+<body onload="thload()">
+<div style="float: left;" class="container">
+	<h3>Thad's Belt Calculator</h3>
+	<center>
+		<a href="./">Back To Index</a>
+		<i>Units in inches unless otherwise specified</i>
+	</center>
+
+	<div class="odd">
+	
+	<table>
+		<tr>
+			<th class="collabel" colspan=6>
+				Pitch: <input id="pitch" value=5 onchange="compute()" /> mm
+			</th>
+		</tr>
+		<tr>
+			<th class="collabel" colspan=2>Pulley 1</th>
+			<th class="collabel" colspan=2>Pulley 2</th>
+			<th class="collabel" colspan=2>Center</th>
+		</tr><tr>
+			<th class="rowlabel"># Teeth</th>
+			<th><input id="p1_n" value=24 onchange="compute()" /></th>
+			<th class="rowlabel"># Teeth</th>
+			<th><input id="p2_n" value=18 onchange="compute()" /></th>
+			<th id="des_cc" class="rowlabel">
+				<select id="driver" onchange="driver_select()">
+					<option value="teeth">Belt Teeth</option>
+					<option value="cc" selected="selected">Desired C-C</option>
+				</select>
+			</th>
+			<th><input id="driver_val" value=5 onchange="compute()" /></th>
+			<!--<th id="des_teeth_label" class="rowlabel" style="display:none">Belt Teeth</th>
+			<th><input id="des_teeth" value=500 style="display:none" /></th>-->
+		</tr><tr>
+			<th class="rowlabel">OD</th>
+			<th><input id="p1_od" disabled /></th>
+			<th class="rowlabel">OD</th>
+			<th><input id="p2_od" disabled /></th>
+			<th id="center_add_label" class="rowlabel">Center Add</th>
+			<th><input id="center_add" value=0.000  onchange="compute()" /></th>
+		</tr><tr>
+			<th class="rowlabel">PD</th>
+			<th><input id="p1_pd" disabled /></th>
+			<th class="rowlabel">PD</th>
+			<th><input id="p2_pd" disabled /></th>
+			<th class="rowlabel">Ratio</th>
+			<th><input id="ratio" disabled /></th>
+		</tr>
+	</table>
+	</div><div class="even" id="results_table">
+		<center>
+		<table>
+			<tr  id="src_label">
+				<th class="collabel" colspan=3>
+					Belting Option Source: <select id="vendor" onchange="vendor_select()">
+						<option value="vex">VexPro</option>
+						<option value="am">AndyMark</option>
+						<option value="raw" selected="selected">Increments of</option>
+					</select>
+					<input id="raw_inc" value=1  onchange="compute()" /><span id="raw_inc_label">Teeth</span>
+				</th>
+			</tr><tr id="sm_lrg_label">
+				<th class="collabel"></th>
+				<th class="collabel">Smaller</th>
+				<th class="collabel">Larger</th>
+			</tr><tr>
+				<th class="rowlabel"># of Teeth</th>
+				<td><input id="n_teeth_s" disabled /></td>
+				<td><input id="n_teeth_l" disabled /></td>
+			</tr><tr>
+				<th class="rowlabel">Length</th>
+				<td><input id="l_s" disabled /></td>
+				<td><input id="l_l" disabled /></td>
+			</tr><tr>
+				<th class="rowlabel">Center-Center</th>
+				<td><input id="cc_s" disabled /></td>
+				<td><input id="cc_l" disabled /></td>
+			</tr><tr>
+				<th class="rowlabel">P1 Teeth In Mesh</th>
+				<td><input id="p1_s" disabled /></td>
+				<td><input id="p1_l" disabled /></td>
+			</tr><tr>
+				<th class="rowlabel">P2 Teeth In Mesh</th>
+				<td><input id="p2_s" disabled /></td>
+				<td><input id="p2_l" disabled /></td>
+			</tr>
+		</table>
+	</center>
+	</div>
+	</div>
+</div>
+</body>
+</html>
