@@ -86,11 +86,19 @@
 			l = nb*pitch;
 			cc = calc_cc(l, p1, p2) + gidv("center_add");
 			//console.log("center-center: ", cc);
-			document.getElementById("n_teeth_s").value = nb;
-			document.getElementById("l_s")		.value = l;
-			document.getElementById("cc_s")		.value = cc;
-			document.getElementById("p1_s")		.value = 0;
-			document.getElementById("p2_s")		.value = 0;
+			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
+				document.getElementById("n_teeth_s").value = 'pulleys';
+				document.getElementById("l_s")		.value = 'are';
+				document.getElementById("cc_s")		.value = 'too';
+				document.getElementById("p1_s")		.value = 'close';
+				document.getElementById("p2_s")		.value = '!';
+			} else {
+				document.getElementById("n_teeth_s").value = nb;
+				document.getElementById("l_s")		.value = l;
+				document.getElementById("cc_s")		.value = cc;
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,pitch);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,pitch);
+			}
 		} else {
 			cc = gidv('driver_val') - gidv("center_add");
 			l = calc_l(cc, p1, p2);
@@ -121,16 +129,33 @@
 			cc_s = calc_cc(l_s, p1, p2) + gidv("center_add");
 			cc_l = calc_cc(l_l, p1, p2) + gidv("center_add");
 
-			document.getElementById("n_teeth_l").value = nb_l;
-			document.getElementById("l_l")		.value = l_l;
-			document.getElementById("cc_l")		.value = cc_l;
-			document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch);
-			document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch);
-			document.getElementById("n_teeth_s").value = nb_s;
-			document.getElementById("l_s")		.value = l_s;
-			document.getElementById("cc_s")		.value = cc_s;
-			document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch);
-			document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch);
+			if (isNaN(cc_l) || cc_l <= (p1+p2)/2*1.01) {
+				document.getElementById("n_teeth_l").value = 'no';
+				document.getElementById("l_l")		.value = 'options';
+				document.getElementById("cc_l")		.value = '';
+				document.getElementById("p1_l")		.value = '';
+				document.getElementById("p2_l")		.value = '!';
+			} else {
+				document.getElementById("n_teeth_l").value = nb_l;
+				document.getElementById("l_l")		.value = l_l;
+				document.getElementById("cc_l")		.value = cc_l;
+				document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch);
+				document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch);
+			}
+
+			if (isNaN(cc_s) || cc_s <= (p1+p2)/2*1.01) {
+				document.getElementById("n_teeth_s").value = 'no';
+				document.getElementById("l_s")		.value = 'options';
+				document.getElementById("cc_s")		.value = '';
+				document.getElementById("p1_s")		.value = '';
+				document.getElementById("p2_s")		.value = '!';
+			} else {
+				document.getElementById("n_teeth_s").value = nb_s;
+				document.getElementById("l_s")		.value = l_s;
+				document.getElementById("cc_s")		.value = cc_s;
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch);
+			}
 		}
 	}
 
@@ -242,7 +267,7 @@
 						<option value="am">AndyMark</option>
 						<option value="raw" selected="selected">Increments of</option>
 					</select>
-					<input id="raw_inc" value=1  onchange="compute()" /><span id="raw_inc_label">Teeth</span>
+					<input id="raw_inc" value=5 onchange="compute()" /><span id="raw_inc_label">Teeth</span>
 				</th>
 			</tr><tr id="sm_lrg_label">
 				<th class="collabel"></th>
