@@ -141,6 +141,16 @@
       	xdata.addColumn('number', 'Rotational Position (rev)');
       	xdata.addRows([[0,0,0]]);
       	i=0;
+
+      	t_endstop = NaN;
+      	v_endstop = NaN;
+      	E_endstop = NaN;
+      	t_ss	  = NaN;
+      	air_cons  = 0;
+
+      	termcrit = document.getElementById('termcrit').value;
+      	if (termcrit == '') termcrit = 0;
+
 		while(i<3000) {
 			P_s = m_s/(x*A+V_extra)*R*T_s;
 			V_in = sign(P_in-P_s)*0.0197862*Math.pow(Math.pow(d_line,5)*(P_in-P_atm)*Math.abs(P_in-P_s)/l_line, 20/37);
@@ -158,13 +168,30 @@
 			t += dt;
 			x += dx*dt;
 			v += dv*dt;
+			air_cons += m_in*dt;
 			if (x <= 0) {x = 0; v = Math.max(v,0);}
-			if (x >= xf) {x = xf; v = 0}
+			if (x >= xf) {
+				if (isNaN(t_endstop)) {
+					t_endstop = t;
+					v_endstop = v;
+					E_endstop = M*v*v/2;
+				}
+				x = xf; v = 0;
+			}
 			T_s += dT_s*dt;
 			m_s += dm_s*dt;
 
-			if (x >= xf && P_s >= P_in)
+			if (x >= xf && P_s >= P_in) {
+				if (isNaN(t_endstop)) {
+					t_endstop = t;
+					v_endstop = v;
+					E_endstop = M*v*v/2;
+				}
+				t_ss = t;
 				break;
+			}
+
+			if (eval(termcrit)) break;
 
 			//data.push([t,x,v,P_s,T_s,m_s]);
 			chartdata.push([t,x,(P_s-P_atm)/1000]); //,T_s,m_s
@@ -176,6 +203,15 @@
 		poschart.draw(posdata, poschart_options);
       	//xchart.draw(xdata, xchart_options);
       	document.getElementById('charts').style.background='transparent';
+      	document.getElementById('t_endstop').value = NaNtoerr(t_endstop);
+      	document.getElementById('t_steady').value  = NaNtoerr(t_ss);
+      	document.getElementById('v_endstop').value = NaNtoerr(v_endstop);
+      	document.getElementById('E_endstop').value = NaNtoerr(E_endstop);
+      	document.getElementById('air_cons').value  = air_cons*1000;
+	}
+
+	function NaNtoerr(x) {
+		if (isNaN(x)) return '-'; return x;
 	}
 
 
@@ -236,9 +272,36 @@
 				<th class="rowlabel">Mass</th>
 				<td><input id="mass" value=0.7></td>
 				<td class="unit">kg</td>
+			</tr><tr>
+				<th class="rowlabel">Alt. Termination Criteria</th>
+				<td><input id="termcrit" value=''></td>
 			</tr>
 		</table>
-	</div>
+		</div><div class="output">
+			<table>
+				<tr>
+					<th class='rowlabel'>Time to Reach Endstop</th>
+					<td><input id='t_endstop' disabled /></td>
+					<td class='unit'>[s]</td>
+				</tr><tr>
+					<th class='rowlabel'>Time to Reach Steady-State</th>
+					<td><input id='t_steady' disabled /></td>
+					<td class='unit'>[s]</td>
+				</tr><tr>
+					<th class='rowlabel'>Velocity Hitting Endstop</th>
+					<td><input id='v_endstop' disabled /></td>
+					<td class='unit'>[m/s]</td>
+				</tr><tr>
+					<th class='rowlabel'>Kinetic Energy Hitting Endstop</th>
+					<td><input id='E_endstop' disabled /></td>
+					<td class='unit'>[J]</td>
+				</tr><tr>
+					<th class='rowlabel'>Air Consumption</th>
+					<td><input id='air_cons' disabled /></td>
+					<td class='unit'>[g]</td>
+				</tr>
+			</table>
+		</div>
 	</div><div style="margin-left: 0px;" class="container" id="charts">
 	 <div id="poschart_div" style="width: 900px; height: 500px"></div>
 	</div>
