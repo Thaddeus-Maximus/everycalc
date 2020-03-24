@@ -76,6 +76,12 @@ select, input {
 	margin: 0;
 }
 
+.container-oall {
+	float: center;
+	text-align: center;
+	margin: 0;
+}
+
 
 .rowlabel {
   position: relative;

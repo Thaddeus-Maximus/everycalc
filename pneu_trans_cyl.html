@@ -4,11 +4,19 @@
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
 	var poschart = null, poschart_options = null;
-	var xchart = null, xchart_options = null;
 
 	google.charts.load('current', {'packages':['corechart', 'scatter', 'line']});
     google.charts.setOnLoadCallback(drawStuff);
 
+
+    direction_push = true;
+    function setDirection(push) {
+    	direction_push = push;
+    	document.getElementById('direction_push').disabled = push;
+    	document.getElementById('direction_pull').disabled = !push;
+
+    	compute(true);
+    }
 
     function drawStuff() {
       poschart = new google.visualization.LineChart(document.getElementById('poschart_div'));
@@ -20,15 +28,15 @@
           legend: {position: 'top'},
           vAxes: {
           	//0: {title: 'Linear Velocity (m/s)'},
-          	1: {title: 'Linear Position (m)'},
-          	2: {title: 'Pressure'}
+          	0: {title: 'Linear Position (m)'},
+          	1: {title: 'Cylinder Inst. Pressure (kPa)'}
           	//3: {title: 'Temperature'},
           	//4: {title: 'Mass'}
           },
           series: {
           	//0: {targetAxisIndex: 1},
-          	1: {targetAxisIndex: 1},
-          	2: {targetAxisIndex: 0}
+          	0: {targetAxisIndex: 0},
+          	1: {targetAxisIndex: 1}
           	//3: {targetAxisIndex: 0},
           	//4: {targetAxisIndex: 1}
           },
@@ -42,42 +50,11 @@
 
       var posdata = new google.visualization.DataTable();
       posdata.addColumn('number', 'Time (s)');
-      posdata.addColumn('number', 'Linear Velocity (m/s)');
       posdata.addColumn('number', 'Linear Position (m)');
+      posdata.addColumn('number', 'Cylinder Inst. Pressure (kPa)');
       posdata.addRows([]);
 
       poschart.draw(posdata, poschart_options);
-
-      xchart = new google.visualization.LineChart(document.getElementById('xchart_div'));
-      var xchartDiv = document.getElementById('xchart_div');
-
-      xchart_options = {
-          backgroundColor: { fill:'transparent' },
-          curveType: 'function',
-          legend: {position: 'top'},
-          vAxes: {
-          	0: {title: 'Angular Velocity (RPM)'},
-          	1: {title: 'Rotational Position (Rev)'}
-          },
-          series: {
-          	0: {targetAxisIndex: 0},
-          	1: {targetAxisIndex: 1}
-          },
-          vAxis: {
-	          viewWindow: {
-	            min: 0
-	          }
-	        }
-
-      };
-
-      var xdata = new google.visualization.DataTable();
-      xdata.addColumn('number', 'Time (s)');
-      xdata.addColumn('number', 'Angular Velocity (RPM)');
-      xdata.addColumn('number', 'Rotational Position (Rev)');
-      xdata.addRows([]);
-
-      xchart.draw(xdata, xchart_options);
     };
 
 	function get_motor_data(motor,key){
@@ -91,42 +68,60 @@
 	function thload() {
 		drawStuff();
 
-		compute();
+		setDirection(true);
+		
+
+		var inputs, index;
+
+		inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
+		    inputs[index].onkeyup = function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+
+		    	if (key==13) {
+		    		compute(true);
+		    	} else {
+		    		compute(false);
+		    	}
+		    }
+		}
+	}
+
+		
+	function sign(x) {
+		if (x>0) return 1;
+		if (x<0) return -1;
+		return 0;
 	}
 
 	function compute(simulate) {
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 
-		dt = 0.0001;
-
+		// Constants
+		dt = 0.0005;
 		P_atm = 101e3;
-		
 		R = 287.05; // J/kg-K
 		c_p = 1010; // J/kg-K
 		c_v = c_p - R;
 
-		T_in = 20 + 273; // K
-		P_in = 413e3+P_atm; //Pa; 60psi
-		C = 1.093333333e-8; //m^3/s/Pa
-		V_in = C*P_in;
-		A = Math.pow(25e-3,2)*Math.PI/4; // m^2
-		xf = 0.2; // m
-		F = 10; // N
+		// Variables
+		T_in = gidv('T_src') + 273; // K
+		P_in = gidv('P_src')*1000+P_atm; //Pa; 60psi (conversion between gague and abs pressure)
+		A = (Math.pow(gidv('d_bore')/1000,2)-
+					(direction_push ? 0 : Math.pow(gidv('d_rod')/1000,2)))*Math.PI/4; // m^2
+		xf = gidv('stroke')/1000; // m
+		
+		d_line = gidv('d_line')/1000;
+		l_line = gidv('l_line');
+		V_extra = Math.PI/4*Math.pow(d_line,2)*l_line;
+		M = gidv('mass'); // kg
 
+		// State variables (autocomputed)
 		t = 0;
 		T_s = T_in;
 		x = 0;
 		v = 0;
-		V_extra = (1*A);
-		m_s = V_extra*1.2; // rho = 1.2 kg/m^3
-
-		
-
-		M = 0.01; // kg
-
-		cur_cons = 0;
-
-		alpha_o = NaN;
+		m_s = P_atm*V_extra/R/T_s; // rho = 1.2 kg/m^3
 
 		data = [];
 		chartdata = [];
@@ -146,9 +141,13 @@
       	xdata.addColumn('number', 'Rotational Position (rev)');
       	xdata.addRows([[0,0,0]]);
       	i=0;
-		while(i<1000) {
-			P_s = Math.min(m_s/(x*A+V_extra)*R*T_s, P_in);
+		while(i<3000) {
+			P_s = m_s/(x*A+V_extra)*R*T_s;
+			V_in = sign(P_in-P_s)*0.0197862*Math.pow(Math.pow(d_line,5)*(P_in-P_atm)*Math.abs(P_in-P_s)/l_line, 20/37);
 			m_in = P_in/R/T_in*V_in;
+
+			F = eval(document.getElementById('load').value); // N
+			//console.log(F);
 
 			dT_s = (-c_p*T_s*m_in - P_s*A*v + m_in*c_v*T_in)/c_p/m_s;
 			dm_s = m_in;
@@ -168,22 +167,15 @@
 				break;
 
 			//data.push([t,x,v,P_s,T_s,m_s]);
-			chartdata.push([t,x,P_s/100]); //,T_s,m_s
+			chartdata.push([t,x,(P_s-P_atm)/1000]); //,T_s,m_s
 			i++;
 		}
 
-		console.log(chartdata);
 		posdata.addRows(chartdata);
-
-		// omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth purposes
-
-		// console.log(posdata, xdata);
 
 		poschart.draw(posdata, poschart_options);
       	//xchart.draw(xdata, xchart_options);
       	document.getElementById('charts').style.background='transparent';
-
-      	console.log("thanks for coming");
 	}
 
 
@@ -199,10 +191,56 @@
 <html>
 <body onload="thload()">
 	<div style="width: 420px; float: left;" class="container">
-		
+		<h3>Thad's Pneumatic Piston Calculator</h3>
+		<center><a href="./">Back To Index</a></center>
+
+		<div class="odd">
+		<table>
+			<tr>
+				<th class='rowlabel'>Tank Pressure</th>
+				<td><input id='P_src' value=400></td>
+				<td class='unit'>kPa</td>
+			</tr><tr>
+				<th class="rowlabel">Tank Temperature</th>
+				<td><input id="T_src" value=20></td>
+				<td class="unit">C</td>
+			</tr><tr>
+				<th class='rowlabel'>Line Diameter</th>
+				<td><input id='d_line' value=5></td>
+				<td class="unit">mm</td>
+			</tr><tr>
+				<th class="rowlabel">Line Length</th>
+				<td><input id="l_line" value=1.5></td>
+				<td class="unit">m</td>
+			</tr><tr>
+				<th class="rowlabel">Bore Diameter</th>
+				<td><input id="d_bore" value=20></td>
+				<td class="unit">mm</td>
+			</tr><tr>
+				<th class="rowlabel">Rod Diameter</th>
+				<td><input id="d_rod" value=6></td>
+				<td class="unit">mm</td>
+			</tr><tr>
+				<th class="rowlabel">Direction</th>
+				<td colspan=2><button id="direction_push" onclick="setDirection(true)" disabled >PUSH</button>
+					<button id="direction_pull" onclick="setDirection(false)" >PULL</button></td>
+			</tr><tr>
+				<th class="rowlabel">Stroke</th>
+				<td><input id="stroke" value=100></td>
+				<td class="unit">mm</td>
+			</tr><tr>
+				<th class="rowlabel">Load</th>
+				<td><input id="load" value=50></td>
+				<td class="unit">N</td>
+			</tr><tr>
+				<th class="rowlabel">Mass</th>
+				<td><input id="mass" value=0.7></td>
+				<td class="unit">kg</td>
+			</tr>
+		</table>
+	</div>
 	</div><div style="margin-left: 0px;" class="container" id="charts">
 	 <div id="poschart_div" style="width: 900px; height: 500px"></div>
-	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
 	</div>
 </body>
 </html>
