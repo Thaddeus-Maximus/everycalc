@@ -15,6 +15,7 @@
       var vchartDiv = document.getElementById('vchart_div');
 
       vchart_options = {
+          backgroundColor: { fill:'transparent' },
           curveType: 'function',
           legend: {position: 'top'},
           vAxes: {
@@ -45,6 +46,7 @@
       var xchartDiv = document.getElementById('xchart_div');
 
       xchart_options = {
+          backgroundColor: { fill:'transparent' },
           curveType: 'function',
           legend: {position: 'top'},
           vAxes: {
@@ -77,7 +79,7 @@
 	}
 
 	function gidv(id) {
-		return parseFloat(document.getElementById(id).value);
+		return eval(document.getElementById(id).value);
 	}
 
 	function thload() {
@@ -89,7 +91,9 @@
 		    	var key = e.keyCode ? e.keyCode : e.which;
 
 		    	if (key==13) {
-		    		compute();
+		    		compute(true);
+		    	} else {
+		    		compute(false);
 		    	}
 		    }
 		}
@@ -110,7 +114,9 @@
 		
 	}
 
-	function compute() {
+	function compute(simulate) {
+		simulate = typeof simulate !== 'undefined' ? simulate : true;
+		document.getElementById('charts').style.background='#fdd';
 		var dt = 0;
 		// overall, solve: alpha = (T-Mres)/I
 		// make x, v, theta, omega available
@@ -146,6 +152,27 @@
 		document.getElementById("theor_runspd").value = r*omega_m_theor/G;
 		document.getElementById("theor_stall_force").value = G*Ts/r;
 		document.getElementById("theor_stall_current").value = If + (Is-If) * (wf-omega_m_theor)/wf;
+
+		enc_plc = document.getElementById('encoder_placement').value;
+		//console.log(enc_plc);
+		enc_els = document.getElementsByClassName('encoder_detail');
+		if (enc_plc == 'none') {
+			for (i=0;i<enc_els.length;i++) {
+				enc_els[i].style.display = 'none';
+			}
+		} else {
+			for (i=0;i<enc_els.length;i++) {
+				enc_els[i].style.display = 'table-row';
+			}
+
+			cpx = gidv('encoder_cpr')/NaNto1(gidv('encoder_reduction'))/(r*2*Math.PI);
+			if(enc_plc == 'motor') cpx *= G;
+
+			document.getElementById('encoder_cpx').value = cpx;
+			document.getElementById('encoder_max_cps').value = cpx*r*wf/G;
+		}
+
+		if (!simulate) return; // YARRR, NO MORE PLAIN CALCS BEYOND THIS POINT
 
 		cur_cons = 0;
 
@@ -205,6 +232,7 @@
 
 		vchart.draw(vdata, vchart_options);
       	xchart.draw(xdata, xchart_options);
+      	document.getElementById('charts').style.background='transparent';
 
       	document.getElementById("endcond_met").value = eval(end_expr) ? t_ar[t_ar.length-1]:"NOT MET";
       	document.getElementById("current_cons").value = cur_cons;
@@ -252,7 +280,7 @@
 
 <html>
 <body onload="thload()">
-	<div style="width: 400px; float: left;" class="container">
+	<div style="width: 420px; float: left;" class="container">
 	<h3>Thad's Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
@@ -261,17 +289,16 @@
 	<div class="odd">
 		<table>
 		<tr>
-			<th class="rowlabel">Number of Motors</th>
+			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
 			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
-			<td class="unit"></td>
 		</tr><tr>
-			<th class="rowlabel">Voltage</th>
+			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
 			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
-			<td class="unit">V</td>
+			<td class="unit">[V]</td>
 		</tr><tr>
-			<th class="rowlabel">Efficiency</th>
+			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
 			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
-			<td class="unit">%</td>
+			<td class="unit">[%]</td>
 		</tr>
 	</table>
 </div>
@@ -303,32 +330,32 @@
 			<th></th>
 		</tr>
 		<tr>
-			<th class="rowlabel">Free Speed</th>
+			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
 			<td><input id="motor_max_rpm" disabled /></td>
 			<td><input id="motor_max_rpm_adj" disabled /></td>
-			<td class="unit">RPM</td>
+			<td class="unit">[RPM]</td>
 		</tr><tr>
-			<th>Stall Torque</th>
+			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 			<td><input id="motor_stall_torque" disabled /></td>
 			<td><input id="motor_stall_torque_adj" disabled /></td>
-			<td class="unit">N-m</td>
+			<td class="unit">[N-m]</td>
 		</tr><tr>
-			<th class="rowlabel">Free Current</th>
+			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 			<td><input id="motor_free_current" disabled /></td>
 			<td><input id="motor_free_current_adj" disabled /></td>
-			<td class="unit">A</td>
+			<td class="unit">[A]</td>
 		</tr><tr>
-			<th class="rowlabel">Stall Current</th>
+			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
 			<td><input id="motor_stall_current" disabled /></td>
 			<td><input id="motor_stall_current_adj" disabled /></td>
-			<td class="unit">A</td>
+			<td class="unit">[A]</td>
 		</tr>
 	</table>
 </div>
 	<div class="odd">
 		<table>
 		<tr>
-			<th class="rowlabel">Gear Ratio</th>
+			<th class="rowlabel">Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
 			<td class="tiny"></td>
 			<td><input id="G" disabled/></td>
 		</tr><tr>
@@ -349,24 +376,45 @@
 			<td><input id="G4B" oninput="calc_ratio()" /></td>
 		</tr>
 	</table>
-</div>
-	<div class="even">
+</div><div class="even">
+	<table>
+		<tr>
+			<th class="rowlabel" colspan=2>Encoder Relativity <span class="ttt">(Optional) Where is the encoder placed - on (or in) the motor, or on the output shaft?</span>
+				<select id="encoder_placement" onchange="compute(false)">
+				<option value="none">No Encoder</option>
+				<option value="motor">To Motor</option>
+				<option value="output">To Output</option>
+			</select></td>
+		</tr><tr class='encoder_detail'>
+			<th class="rowlabel">CPR<span class="ttt">Encoder Counts Per Revolution<br/>(you can also put ticks, and ticks will be computed. Math is the same)</span></th>
+			<td><input id="encoder_cpr" onchange="compute(false)" value=1 /></td>
+			<th class="rowlabel">C/x<span class="ttt">Encoder Counts Per Distance Traveled<br/>(how many encoder counts per unit distance traveled)</span></th>
+			<td><input id="encoder_cpx" value=1 disabled /></td>
+			<td class="unit">[m^-1]</td>
+		</tr><tr class='encoder_detail'>
+			<th class="rowlabel">Reduction<span class="ttt">Additional reduction applied between the shaft and the encoder</span></th>
+			<td><input id="encoder_reduction" onchange="compute(false)" value='' /></td>
+			<th class="rowlabel">Max CPS<span class="ttt">Maximum Counts per Second, at free speed</span></th>
+			<td><input id="encoder_max_cps" value=1 disabled /></td>
+		</tr>
+	</table></div>
+	<div class="odd">
 		<table>
 		<tr>
-			<th class="rowlabel">Radius</th>
+			<th class="rowlabel">Radius <span class="ttt">Radius of the output.<br/>If this is an arm, input the length of the arm.<br/>If this is an elevator, input the radius of the spool.<br/>If this is a drivetrain, input the radius of the wheel.</span></th>
 			<td><input id="radius" oninput="" value=0.1 /></td>
-			<td class="unit">m</td>
+			<td class="unit">[m]</td>
 		</tr><tr>
-			<th class="rowlabel">* Load Equation</th>
+			<th class="rowlabel">Load Equation<span class="ttt">(Optional) Load equation. You can put a simple number here, or you can put an expression.<br/>If you put an expression, you can use any javascript operators (+,-,*,/,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
 			<td><input id="load" oninput="" /></td>
-			<td class="unit">N</td>
+			<td class="unit">[N]</td>
 		</tr><tr>
-			<th class="rowlabel">Mass</th>
+			<th class="rowlabel">Mass<span class="ttt">(Optional) [Equivalent] Mass.<br/>If you're running a linear device, you can just put its mass in here.<br/>If you are analyzing a rotational device, you can put the moment of inertia, divided by the radius squared here.</span></th>
 			<td><input id="mass" oninput="" value=1.0 /></td>
-			<td class="unit">kg</td>
+			<td class="unit">[kg]</td>
 		</tr><tr>
-			<th class="rowlabel">* End Condition</th>
-			<td><input id="endcond" oninput="" /></td>
+			<th class="rowlabel">End Condition<span class="ttt">(Optional) End condition. Must be an expression that logically evaluates.<br/>You can use any javascript operators/comparators (+,-,*,/,>,<,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
+			<td><input id="endcond" oninput="" value="t > 5"/></td>
 		</tr>
 	</table>
 	<button type="button" onclick="compute()">Compute!</button>
@@ -374,47 +422,59 @@
 <div  class="output">
 	<table>
 		<tr>
-			<th class="rowlabel">End Condition Met in t=</th>
+			<th class="rowlabel">End Condition Met in t=<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet.</span></th>
 			<td><input id="endcond_met" disabled /></td>
-			<td class="unit">s</td>
+			<td class="unit">[s]</td>
 		</tr><tr>
-			<th class="rowlabel">Current Used</th>
+			<th class="rowlabel">Current Used<span class="ttt">Total electrical consumption in the simulation period</span></th>
 			<td><input id="current_cons" disabled /></td>
-			<td class="unit">A-s</td>
+			<td class="unit">[A-s]</td>
 		</tr><tr>
-			<th class="rowlabel">Current At End</th>
+			<th class="rowlabel">Current At End<span class="ttt">Current drawn at the end of the simulation period</span></th>
 			<td><input id="current_end" disabled /></td>
-			<td class="unit">A</td>
+			<td class="unit">[A]</td>
 		</tr>
 		<tr>
-			<th class="rowlabel">No Load Speed</th>
+			<th class="rowlabel">No Load Speed<span class="ttt">Speed without any load on the system.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_freespd" disabled /></td>
-			<td class="unit">m/s</td>
+			<td class="unit">[m/s]</td>
 		</tr><tr>
-			<th class="rowlabel">** Running Speed</th>
+			<th class="rowlabel">Running Speed<span class="ttt">Speed while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_runspd" disabled /></td>
-			<td class="unit">m/s</td>
+			<td class="unit">[m/s]</td>
 		</tr><tr>
-			<th class="rowlabel">** Stall Force</th>
+			<th class="rowlabel">Stall Force<span class="ttt">Force produced while at stall (ignoring external load/mass)<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_stall_force" disabled /></td>
-			<td class="unit">N</td>
+			<td class="unit">[N]</td>
 		</tr><tr>
-			<th class="rowlabel">** Running Current</th>
+			<th class="rowlabel">Running Current<span class="ttt">Current consumption while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_stall_current" disabled /></td>
-			<td class="unit">A</td>
+			<td class="unit">[A]</td>
 		</tr>
 	</table>
 </div>
 <div class="even">
-	<p>* Input of expressions with variables G, m, I, r, t, v, x, omega_m, theta_m, omega, and theta is permitted in order to model complex physics.</p>
-	<p>** These values assume that the aforementioned variables are set to zero.</p>
+	Variable reference for use in expressions
+	<table>
+			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
+			<tr><th class='rowlabel'>m</th><td class="unit">[kg]</td><td>Mass</td></tr>
+			<tr><th class='rowlabel'>I</th><td class="unit">[kg m^2]</td><td>MOI</td></tr>
+			<tr><th class='rowlabel'>r</th><td class="unit">[m]</td><td>Radius</td></tr>
+			<tr><th class='rowlabel'>t</th><td class="unit">[s]</td><td>Time</td></tr>
+			<tr><th class='rowlabel'>v</th><td class="unit">[m/s]</td><td>Lin. Velocity</td></tr>
+			<tr><th class='rowlabel'>x</th><td class="unit">[m/s]</td><td>Lin. Position</td></tr>
+			<tr><th class='rowlabel'>omega</th><td class="unit">[RPM]</td><td>Rot. Velocity</td></tr>
+			<tr><th class='rowlabel'>theta</th><td class="unit">[Rev]</td><td>Rot. Position</td></tr>
+			<tr><th class='rowlabel'>omega_m</th><td class="unit">[RPM]</td><td>Rot. Motor Velocity</td></tr>
+			<tr><th class='rowlabel'>theta_m</th><td class="unit">[Rev]</td><td>Rot. Motor Position</td></tr>
+	</table>
 </div>
 
 <!--<div class="even">
 	<button type="button" onclick="compute()">CALCULATE!</button>
 </div>-->
 
-</div><div style="margin-left: 0px;" class="container">
+</div><div style="margin-left: 0px;" class="container" id="charts">
 	 <div id="vchart_div" style="width: 900px; height: 500px"></div>
 	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
 	</div>
