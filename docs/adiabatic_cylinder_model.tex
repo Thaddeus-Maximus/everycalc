@@ -99,20 +99,20 @@
 	\end{itemize}		
 	
 	\begin{align}
-		\frac{d}{dt} [m_s u(T)] = - P_s A v + \dot{m}_{in} h(T_{in}) \nonumber
+		\frac{d}{dt} [m_s u(T)] = - P_s A v + \dot{m}_{in} (h(T_{in} + (\frac{\dot{\volume}}{\pi / 4 \ d_{tube}})^2) \nonumber
 	\end{align}
 	
 	The derivative here is quite ugly, since both the mass and temperature of the system are changing. However, it can be broken up with the product rule ($\frac{d}{dt}[xy] = y \frac{dx}{dt} + x \frac{dy}{dt}$).
 	
 	\begin{align} 
-		m_s \frac{d u(T_s)}{dt} + u(T_s) \frac{d m_s}{dt} = - P_s A v + \dot{m}_{in} h(T_{in}) \nonumber \\
-		m_s \frac{d u(T_s)}{dt} = \dot{m}_{in} h(T_{in}) - P_s A v - u(T_s) \frac{d m_s}{dt} \nonumber
+		m_s \frac{d u(T_s)}{dt} + u(T_s) \frac{d m_s}{dt} = - P_s A v + \dot{m}_{in}  (\frac{\dot{\volume}}{\pi / 4 \ d_{tube}})^2 + \dot{m}_{in} h(T_{in}) \nonumber \\
+		m_s \frac{d u(T_s)}{dt} = \dot{m}_{in} h(T_{in}) - P_s A v - u(T_s) \frac{d m_s}{dt} + \dot{m}_{in}  (\frac{\dot{\volume}}{\pi / 4 \ d_{tube}})^2\nonumber
 	\end{align}
 	
 	Recognizing that $u(T)$ and $h(T)$ can be approximated as $u(T) = c_p T$ and $h(T) = c_v T$, we can then solve the equation for $\frac{dT_s}{dt}$.
 	
 	\begin{align} \label{eq:ddt_T}
-		\frac{d T_s}{dt} = \frac{ \dot{m}_{in} c_v T_{in} - P_s A v - c_p T_s \dot{m}_{in} }{c_p m_s}
+		\frac{d T_s}{dt} = \frac{ \dot{m}_{in}[ c_v T_{in} - c_p T_s + (\frac{\dot{\volume}}{\pi / 4 \ d_{tube}})^2]     - P_s A v}{c_p m_s}
 	\end{align}
 	
 	All of these are knowns or states aside from $P_s$, which can be determined with the ideal gas law, and the modeling of the system volume as based on cylinder extension, crossectional area, and initial (i.e. hose) dead volume.
@@ -272,6 +272,9 @@
 	
 	\section*{Validation}
 		No validation has been performed yet on these models, as I don't have access to the equipment to test them. If anyone wants to perform this testing, it would be very cool!
+		
+	\section*{Future Improvements (and when to say no)}
+		The next obvious improvement to make would be to model the flow restriction provided by valves. Beyond that, looking at pressure drop in the tank as air is consumed, or flow restriction as a result of the pressure regulator seems to me to be splitting hairs, and chasing high-speed actuation which would require significant testing anyways.
 	
 	
 \end{document}

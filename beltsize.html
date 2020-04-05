@@ -5,18 +5,21 @@
 	function thload() {
 		vendor_select();
 		driver_select();
+		switch_type();
 	}
 
 	function gidv(id) {
 		return parseFloat(document.getElementById(id).value);
 	}
 
-	function calc_l (cc, d1t, d2t) {
+	function calc_l (cc, d1t, d2t, crossed) {
 		d1 = Math.min(d1t, d2t);
 		d2 = Math.max(d1t, d2t);
-		theta = Math.asin((d2-d1)/2/cc);
-		//console.log('theta: ', theta)
-		return 2*cc*Math.sqrt(1-((d2-d1)/2/cc)*((d2-d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2-d1);
+		theta = Math.asin((crossed ? (d2+d1) : (d2-d1))/2/cc);
+		if (crossed)
+			return 2*cc*Math.sqrt(1-((d2+d1)/2/cc)*((d2+d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2+d1);
+		else
+			return 2*cc*Math.sqrt(1-((d2-d1)/2/cc)*((d2-d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2-d1);
 	}
 
 	function wrap_1(d1, d2, cc, pitch) {
@@ -29,7 +32,7 @@
 		return d2/2*(Math.PI + 2*theta)/pitch;
 	}
 
-	function calc_cc (l, d1, d2) {
+	function calc_cc (l, d1, d2, crossed) {
 		a = l;
 		b = (d1+d2)/2;
 		c = (a+b)/2;
@@ -37,9 +40,9 @@
 		while (n<100) {
 			n++;
 			c = (a+b)/2;
-			fa = calc_l(a, d1, d2) - l;
-			fb = calc_l(b, d1, d2) - l;
-			fc = calc_l(c, d1, d2) - l;
+			fa = calc_l(a, d1, d2, crossed) - l;
+			fb = calc_l(b, d1, d2, crossed) - l;
+			fc = calc_l(c, d1, d2, crossed) - l;
 
 			if (Math.abs(fc)<1e-4) {
 				break;
@@ -84,7 +87,7 @@
 		if(v == "teeth") {
 			nb = gidv('driver_val');
 			l = nb*pitch;
-			cc = calc_cc(l, p1, p2) + gidv("center_add");
+			cc = calc_cc(l, p1, p2, false) + gidv("center_add");
 			//console.log("center-center: ", cc);
 			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
 				document.getElementById("n_teeth_s").value = 'pulleys';
@@ -99,9 +102,9 @@
 				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,pitch);
 				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,pitch);
 			}
-		} else {
+		} else if (document.getElementById('type_timing').checked) {
 			cc = gidv('driver_val') - gidv("center_add");
-			l = calc_l(cc, p1, p2);
+			l = calc_l(cc, p1, p2, false);
 			nb = l/pitch;
 
 			vendor = document.getElementById('vendor').value;
@@ -126,8 +129,8 @@
 			
 			l_s = nb_s*pitch;
 			l_l = nb_l*pitch;
-			cc_s = calc_cc(l_s, p1, p2) + gidv("center_add");
-			cc_l = calc_cc(l_l, p1, p2) + gidv("center_add");
+			cc_s = calc_cc(l_s, p1, p2, false) + gidv("center_add");
+			cc_l = calc_cc(l_l, p1, p2, false) + gidv("center_add");
 
 			if (isNaN(cc_l) || cc_l <= (p1+p2)/2*1.01) {
 				document.getElementById("n_teeth_l").value = 'no';
@@ -156,6 +159,26 @@
 				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch);
 				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch);
 			}
+		} else {
+			crossed = document.getElementById("crossed").checked;
+			cc = gidv('driver_val') - gidv("center_add");
+			p1 = gidv('p1_n');
+			p2 = gidv('p2_n');
+			l = calc_l(cc, p1, p2, crossed) / (1+gidv("stretch")/100);
+
+			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
+				document.getElementById("n_teeth_s").value = 'no';
+				document.getElementById("l_s")		.value = 'options';
+				document.getElementById("cc_s")		.value = '';
+				document.getElementById("p1_s")		.value = '';
+				document.getElementById("p2_s")		.value = '!';
+			} else {
+				document.getElementById("n_teeth_s").value = "-";
+				document.getElementById("l_s")		.value = l;
+				document.getElementById("cc_s")		.value = gidv('driver_val');
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,1);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,1);
+			}
 		}
 	}
 
@@ -175,8 +198,9 @@
 
 	function driver_select() {
 		v = document.getElementById("driver").value;
+		timing = document.getElementById("type_timing").checked;
 		//console.log(v);
-		if(v == "teeth") {
+		if(v == "teeth" || !timing) {
 			document.getElementById("n_teeth_l").style.display="none";
 			document.getElementById("l_l").style.display="none";
 			document.getElementById("cc_l").style.display="none";
@@ -184,6 +208,7 @@
 			document.getElementById("p2_l").style.display="none";
 			document.getElementById("sm_lrg_label").style.display="none";
 			document.getElementById("src_label").style.display="none";
+			document.getElementById("no_teeth_out").style.display= timing ? "table-row" : "none";
 		}else {
 			document.getElementById("n_teeth_l").style.display="inline-block";
 			document.getElementById("l_l").style.display="inline-block";
@@ -192,9 +217,35 @@
 			document.getElementById("p2_l").style.display="inline-block";
 			document.getElementById("sm_lrg_label").style.display="table-row";
 			document.getElementById("src_label").style.display="table-row";
+			document.getElementById("no_teeth_out").style.display= timing ? "table-row" : "none";
 		}
 
 		compute();
+	}
+
+	function switch_type() {
+		v = document.getElementById("type_timing").checked;
+		if (v) {
+			document.getElementById("driver").disabled = false;
+			document.getElementById("th_pitch").style.display="table-row";
+			document.getElementById("th_stretch").style.display="none";
+			document.getElementById("p1_mesh").innerHTML = "P1 Teeth in Mesh";
+			document.getElementById("p2_mesh").innerHTML = "P2 Teeth in Mesh";
+			document.getElementById("no_teeth_1").innerHTML = "# Teeth";
+			document.getElementById("no_teeth_2").innerHTML = "# Teeth";
+			//document.getElementById("center_add").disabled = false;
+		} else {
+			document.getElementById("driver").value = "cc";
+			document.getElementById("driver").disabled = true;
+			document.getElementById("th_pitch").style.display="none";
+			document.getElementById("th_stretch").style.display="table-row";
+			document.getElementById("p1_mesh").innerHTML = "P1 Distance in Mesh";
+			document.getElementById("p2_mesh").innerHTML = "P2 Distance in Mesh";
+			document.getElementById("no_teeth_1").innerHTML = "Pulley Diam.";
+			document.getElementById("no_teeth_2").innerHTML = "Pulley Diam.";
+			//document.getElementById("center_add").disabled = true;
+		}
+		driver_select();
 	}
 </script>
 
@@ -212,25 +263,33 @@
 			  <label for="inch">Inches</label><br>
 			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="compute()" >
 			  <label for="mm">Millimeters</label><br>
+			  <input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switch_type()" checked>
+			  <label for="timing">Timing Belt</label>
+			  <input type="radio" id="type_poly" name="belt_type" value="timing" onclick="switch_type()" checked>
+			  <label for="timing">Polybelt</label>
 		</center>
 	</div>
 
 	<div class="odd">
 	
 	<table>
-		<tr>
-			<th class="collabel" colspan=6>
-				Pitch: <input id="pitch" value=5 onchange="compute()" /> mm
-			</th>
+		<tr id="th_pitch">
+			<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
+			<td><input id="pitch" value=5 onchange="compute()" /></td><td class="unit">mm</td>
+		</tr><tr id="th_stretch">
+			<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
+			<td><input id="stretch" value=5 onchange="compute()" /></td><td class="unit">%</td>
+			<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
+			<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
 		</tr>
 		<tr>
 			<th class="collabel" colspan=2>Pulley 1</th>
 			<th class="collabel" colspan=2>Pulley 2</th>
 			<th class="collabel" colspan=2>Center</th>
 		</tr><tr>
-			<th class="rowlabel"># Teeth</th>
+			<th class="rowlabel" id="no_teeth_1"># Teeth</th>
 			<th><input id="p1_n" value=24 onchange="compute()" /></th>
-			<th class="rowlabel"># Teeth</th>
+			<th class="rowlabel" id="no_teeth_2"># Teeth</th>
 			<th><input id="p2_n" value=18 onchange="compute()" /></th>
 			<th id="des_cc" class="rowlabel">
 				<select id="driver" onchange="driver_select()">
@@ -273,7 +332,7 @@
 				<th class="collabel"></th>
 				<th class="collabel">Smaller</th>
 				<th class="collabel">Larger</th>
-			</tr><tr>
+			</tr><tr id="no_teeth_out">
 				<th class="rowlabel"># of Teeth</th>
 				<td><input id="n_teeth_s" disabled /></td>
 				<td><input id="n_teeth_l" disabled /></td>
@@ -286,11 +345,11 @@
 				<td><input id="cc_s" disabled /></td>
 				<td><input id="cc_l" disabled /></td>
 			</tr><tr>
-				<th class="rowlabel">P1 Teeth In Mesh</th>
+				<th class="rowlabel" id="p1_mesh">P1 Teeth In Mesh</th>
 				<td><input id="p1_s" disabled /></td>
 				<td><input id="p1_l" disabled /></td>
 			</tr><tr>
-				<th class="rowlabel">P2 Teeth In Mesh</th>
+				<th class="rowlabel" id="p2_mesh">P2 Teeth In Mesh</th>
 				<td><input id="p2_s" disabled /></td>
 				<td><input id="p2_l" disabled /></td>
 			</tr>

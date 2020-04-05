@@ -94,6 +94,8 @@
 		return 0;
 	}
 
+	en_vm = true;
+
 	function compute(simulate) {
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 
@@ -159,7 +161,11 @@
 			F = eval(document.getElementById('load').value); // N
 			//console.log(F);
 
-			dT_s = (-c_p*T_s*m_in - P_s*A*v + m_in*c_v*T_in)/c_p/m_s;
+			vmterm = en_vm ? Math.pow(V_in/(Math.PI/4 * d_line*d_line), 2) : 0;
+
+			console.log(vmterm);
+
+			dT_s = ( m_in * (-c_p*T_s + c_v*T_in + vmterm) - P_s*A*v)/c_p/m_s;
 			dm_s = m_in;
 
 			dx = v;
