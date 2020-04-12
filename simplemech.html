@@ -3,6 +3,46 @@
 <link rel="stylesheet" href="style.css"> 
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
+	unit_sys = 0;
+	inputs_unit_map = {
+		"motor_stall_torque": ["N-m", "N-m"],
+		"motor_stall_torque_adj": ["N-m", "N-m"],
+		"encoder_cpx": ["c/m", "c/ft"],
+		"radius": ["mm","in"],
+		"load": ["N", "lbf"],
+		"mass": ["kg", "lbm"],
+		"theor_freespd": ["m/s", "ft/s"],
+		"theor_runspd": ["m/s", "ft/s"],
+		"theor_stall_force": ["N", "lbf"],
+
+		"mass_ref": ["kg", "lbm"],
+		"moi_ref": ["kg m^2", "lbm in^2"],
+		"radius_ref": ["m"," in"],
+		"velocity_ref": ["m/s", "ft/s"],
+		"position_ref": ["m", "ft"]
+	}
+
+	function populate_units() {
+		unit_labels = document.getElementsByClassName('unit');
+		//console.log(unit_labels);
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+			}
+		}
+	}
+
+	function switch_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else 
+			unit_sys = 1;
+
+		populate_units();
+		compute();
+	}
+
 	var vchart = null, vchart_options = null;
 	var xchart = null, xchart_options = null;
 
@@ -79,11 +119,29 @@
 	}
 
 	function gidv(id) {
-		return eval(document.getElementById(id).value);
+
+		v =  eval(document.getElementById(id).value);
+		if (typeof inputs_unit_map[id] !== 'undefined')
+			v = convert(v, inputs_unit_map[id][unit_sys]);
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof value === 'string') {
+			document.getElementById(id).value = value;
+		} else {
+			if (typeof inputs_unit_map[id] !== 'undefined')
+				value = convert_to(value, inputs_unit_map[id][unit_sys]);
+			document.getElementById(id).value = value.toFixed(places);
+		}
 	}
 
 	function thload() {
 		var inputs, index;
+
+		populate_units();
 
 		inputs = document.getElementsByTagName('input');
 		for (index = 0; index < inputs.length; ++index) {
@@ -116,7 +174,11 @@
 
 	function compute(simulate) {
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
-		document.getElementById('charts').style.background='#fdd';
+		document.getElementById('charts').classList.add('uncomputed');
+		document.getElementById('endcond_met').classList.add('uncomputed');
+		document.getElementById('current_cons').classList.add('uncomputed');
+		document.getElementById('current_end').classList.add('uncomputed');
+
 		var dt = 0;
 		// overall, solve: alpha = (T-Mres)/I
 		// make x, v, theta, omega available
@@ -148,10 +210,10 @@
 		if(isNaN(Mres)) Mres = 0;
 		// T = Mres -> G*Ts - G*Ts*omega_m/wf = Mres -> omega_m = (G*Ts - Mres)/(G*Ts/wf)
 		omega_m_theor = (G*Ts - Mres)/(G*Ts/wf);
-		document.getElementById("theor_freespd").value = r*wf/G;
-		document.getElementById("theor_runspd").value = r*omega_m_theor/G;
-		document.getElementById("theor_stall_force").value = G*Ts/r;
-		document.getElementById("theor_stall_current").value = If + (Is-If) * (wf-omega_m_theor)/wf;
+		gids("theor_freespd", r*wf/G)
+		gids("theor_runspd", r*omega_m_theor/G);
+		gids("theor_stall_force", G*Ts/r);
+		gids("theor_stall_current", If + (Is-If) * (wf-omega_m_theor)/wf);
 
 		enc_plc = document.getElementById('encoder_placement').value;
 		//console.log(enc_plc);
@@ -168,8 +230,9 @@
 			cpx = gidv('encoder_cpr')/NaNto1(gidv('encoder_reduction'))/(r*2*Math.PI);
 			if(enc_plc == 'motor') cpx *= G;
 
-			document.getElementById('encoder_cpx').value = cpx;
-			document.getElementById('encoder_max_cps').value = cpx*r*wf/G;
+			console.log(cpx);
+			gids('encoder_cpx', cpx);
+			gids('encoder_max_cps', cpx*r*wf/G);
 		}
 
 		if (!simulate) return; // YARRR, NO MORE PLAIN CALCS BEYOND THIS POINT
@@ -201,7 +264,7 @@
 			theta_m = theta*G;
 
 			T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-			Mres = eval(load_expr)*r;
+			Mres = convert(eval(load_expr), inputs_unit_map["load"][unit_sys])*r;
 			if(isNaN(Mres)) Mres = 0;
 			alpha = (T-Mres) / I;
 			//console.log(T, Mres, alpha);
@@ -232,11 +295,14 @@
 
 		vchart.draw(vdata, vchart_options);
       	xchart.draw(xdata, xchart_options);
-      	document.getElementById('charts').style.background='transparent';
+      	document.getElementById('charts').classList.remove('uncomputed');
+      	document.getElementById('endcond_met').classList.remove('uncomputed');
+		document.getElementById('current_cons').classList.remove('uncomputed');
+		document.getElementById('current_end').classList.remove('uncomputed');
 
-      	document.getElementById("endcond_met").value = eval(end_expr) ? t_ar[t_ar.length-1]:"NOT MET";
-      	document.getElementById("current_cons").value = cur_cons;
-      	document.getElementById("current_end").value = (If + (Is-If)*(wf-G*omega_ar[omega_ar.length-1])/wf);
+      	gids("endcond_met", eval(end_expr) ? t_ar[t_ar.length-1]:"NOT MET");
+      	gids("current_cons", cur_cons);
+      	gids("current_end", (If + (Is-If)*(wf-G*omega_ar[omega_ar.length-1])/wf));
 	}
 
 	function motortype_select() {
@@ -250,7 +316,7 @@
 				adjVal *= gidv("motornum")*gidv("efficiency")/100;
 			if (a=="free_current" || a=="stall_current" )
 				adjVal *= gidv("motornum");
-			document.getElementById("motor_"+a+"_adj").value=adjVal;
+			gids("motor_"+a+"_adj",adjVal);
 		});
 
 		compute();
@@ -273,7 +339,7 @@
 		G /= NaNto1(gidv("G3A"));
 		G /= NaNto1(gidv("G4A"));
 
-		document.getElementById("G").value = G;
+		gids("G", G);
 	}
 
 </script>
@@ -284,7 +350,14 @@
 	<h3>Thad's Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
-
+	<div class="even">
+		<center>
+			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
+			  <label for="english">English</label><br>
+			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
+			  <label for="metric">Metric</label><br>
+		</center>
+	</div>
 
 	<div class="odd">
 		<table>
@@ -338,7 +411,7 @@
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 			<td><input id="motor_stall_torque" disabled /></td>
 			<td><input id="motor_stall_torque_adj" disabled /></td>
-			<td class="unit">[N-m]</td>
+			<td class="unit" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 			<td><input id="motor_free_current" disabled /></td>
@@ -390,7 +463,7 @@
 			<td><input id="encoder_cpr" onchange="compute(false)" value=1 /></td>
 			<th class="rowlabel">C/x<span class="ttt">Encoder Counts Per Distance Traveled<br/>(how many encoder counts per unit distance traveled)</span></th>
 			<td><input id="encoder_cpx" value=1 disabled /></td>
-			<td class="unit">[m^-1]</td>
+			<td class="unit" id="unit_encoder_cpx"></td>
 		</tr><tr class='encoder_detail'>
 			<th class="rowlabel">Reduction<span class="ttt">Additional reduction applied between the shaft and the encoder</span></th>
 			<td><input id="encoder_reduction" onchange="compute(false)" value='' /></td>
@@ -403,15 +476,15 @@
 		<tr>
 			<th class="rowlabel">Radius <span class="ttt">Radius of the output.<br/>If this is an arm, input the length of the arm.<br/>If this is an elevator, input the radius of the spool.<br/>If this is a drivetrain, input the radius of the wheel.</span></th>
 			<td><input id="radius" oninput="" value=0.1 /></td>
-			<td class="unit">[m]</td>
+			<td class="unit" id="unit_radius"></td>
 		</tr><tr>
 			<th class="rowlabel">Load Equation<span class="ttt">(Optional) Load equation. You can put a simple number here, or you can put an expression.<br/>If you put an expression, you can use any javascript operators (+,-,*,/,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
 			<td><input id="load" oninput="" /></td>
-			<td class="unit">[N]</td>
+			<td class="unit" id="unit_load"></td>
 		</tr><tr>
 			<th class="rowlabel">Mass<span class="ttt">(Optional) [Equivalent] Mass.<br/>If you're running a linear device, you can just put its mass in here.<br/>If you are analyzing a rotational device, you can put the moment of inertia, divided by the radius squared here.</span></th>
 			<td><input id="mass" oninput="" value=1.0 /></td>
-			<td class="unit">[kg]</td>
+			<td class="unit" id="unit_mass"></td>
 		</tr><tr>
 			<th class="rowlabel">End Condition<span class="ttt">(Optional) End condition. Must be an expression that logically evaluates.<br/>You can use any javascript operators/comparators (+,-,*,/,>,<,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
 			<td><input id="endcond" oninput="" value="t > 5"/></td>
@@ -437,15 +510,15 @@
 		<tr>
 			<th class="rowlabel">No Load Speed<span class="ttt">Speed without any load on the system.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_freespd" disabled /></td>
-			<td class="unit">[m/s]</td>
+			<td class="unit" id="unit_theor_freespd"></td>
 		</tr><tr>
 			<th class="rowlabel">Running Speed<span class="ttt">Speed while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_runspd" disabled /></td>
-			<td class="unit">[m/s]</td>
+			<td class="unit" id="unit_theor_runspd"></td>
 		</tr><tr>
 			<th class="rowlabel">Stall Force<span class="ttt">Force produced while at stall (ignoring external load/mass)<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_stall_force" disabled /></td>
-			<td class="unit">[N]</td>
+			<td class="unit" id="unit_theor_stall_force"></td>
 		</tr><tr>
 			<th class="rowlabel">Running Current<span class="ttt">Current consumption while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
 			<td><input id="theor_stall_current" disabled /></td>
@@ -457,12 +530,12 @@
 	Variable reference for use in expressions
 	<table>
 			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
-			<tr><th class='rowlabel'>m</th><td class="unit">[kg]</td><td>Mass</td></tr>
-			<tr><th class='rowlabel'>I</th><td class="unit">[kg m^2]</td><td>MOI</td></tr>
-			<tr><th class='rowlabel'>r</th><td class="unit">[m]</td><td>Radius</td></tr>
+			<tr><th class='rowlabel'>m</th><td class="unit" id="unit_mass_ref">[kg]</td><td>Mass</td></tr>
+			<tr><th class='rowlabel'>I</th><td class="unit" id="unit_moi_ref"></td><td>MOI</td></tr>
+			<tr><th class='rowlabel'>r</th><td class="unit" id="unit_radius_ref"></td><td>Radius</td></tr>
 			<tr><th class='rowlabel'>t</th><td class="unit">[s]</td><td>Time</td></tr>
-			<tr><th class='rowlabel'>v</th><td class="unit">[m/s]</td><td>Lin. Velocity</td></tr>
-			<tr><th class='rowlabel'>x</th><td class="unit">[m/s]</td><td>Lin. Position</td></tr>
+			<tr><th class='rowlabel'>v</th><td class="unit" id="unit_velocity_ref"></td><td>Lin. Velocity</td></tr>
+			<tr><th class='rowlabel'>x</th><td class="unit" id="unit_position_ref"></td><td>Lin. Position</td></tr>
 			<tr><th class='rowlabel'>omega</th><td class="unit">[RPM]</td><td>Rot. Velocity</td></tr>
 			<tr><th class='rowlabel'>theta</th><td class="unit">[Rev]</td><td>Rot. Position</td></tr>
 			<tr><th class='rowlabel'>omega_m</th><td class="unit">[RPM]</td><td>Rot. Motor Velocity</td></tr>

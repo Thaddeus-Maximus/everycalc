@@ -40,6 +40,9 @@ select, input {
 .error {
   background: #f99;
 }
+.uncomputed {
+  background: #d99;
+}
 
 .collabel{
 	text-align: top;

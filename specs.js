@@ -142,7 +142,14 @@ var unit_conversions = {
 
 	"m/s": 1,
 	"ft/s": 0.3048,
-	"in/s": 0.0254
+	"in/s": 0.0254,
+
+	"c/ft": 3.280,
+	"c/m": 1,
+
+	"kg m^2": 1,
+	"lbm in^2": 2.926e-4,
+	"kg mm^2": 1e-6
 }
 
 // converting between things is for suckers. Just convert to base units, always.
