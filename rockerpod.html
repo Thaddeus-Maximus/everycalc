@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="style.css"> 
+<script type="text/javascript" src="specs.js"></script>
+<script type="text/javascript">
+	unit_sys = 0;
+	inputs_unit_map = {
+		"N": ["N","lbf"],
+		"F": ["N","lbf"],
+		"T_clutch": ["N-m", "in-lbf"],
+		"r_pod": ["mm", "in"],
+		"h_pod": ["mm", "in"],
+		"d_wheel": ["mm", "in"],
+		"motor_stall_torque": ["N-m", "N-m"],
+		"motor_stall_torque_adj": ["N-m", "N-m"],
+		"free_speed": ["m/s", "ft/s"]
+	}
+
+	function switch_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else 
+			unit_sys = 1;
+
+		unit_labels = document.getElementsByClassName('unit');
+		//console.log(unit_labels);
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+			}
+		}
+		compute();
+	}
+
+	function gidv(id) {
+
+		v =  eval(document.getElementById(id).value);
+		if (typeof inputs_unit_map[id] !== 'undefined')
+			v = convert(v, inputs_unit_map[id][unit_sys]);
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof inputs_unit_map[id] !== 'undefined')
+			value = convert_to(value, inputs_unit_map[id][unit_sys]);
+		document.getElementById(id).value = value.toFixed(places);
+	}
+
+	function thload() {
+		var inputs, index;
+
+		switch_units();
+
+		inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
+		    inputs[index].onkeyup = function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+
+		    	if (key==13) {
+		    		compute(true);
+		    	} else {
+		    		compute(false);
+		    	}
+		    }
+		}
+
+		select = document.getElementById("motortype");
+		i=0;
+		for(motor in motor_data) {
+			i++;
+			opt = document.createElement('option');
+			opt.innerHTML = motor_data[motor]["plain_name"];
+			opt.value = motor;
+			select.appendChild(opt);
+		}
+		motortype_select(document.getElementById("motortype"));
+		calc_ratio_pre();
+		calc_ratio_pod();
+		
+		
+	}
+
+	function motortype_select() {
+		e=document.getElementById("motortype");
+		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		props.forEach(function(a) {
+			
+			gids("motor_"+a, get_motor_data(e.value, a));
+			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
+			if (a=="stall_torque")
+				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+			if (a=="free_current" || a=="stall_current" )
+				adjVal *= gidv("motornum");
+			gids("motor_"+a+"_adj", adjVal);
+		});
+
+		compute();
+	}
+
+	function NaNto1(x) {
+		if (isNaN(x))
+			return 1;
+		return x;
+	}
+
+	function calc_ratio_pre() {
+		var G = 1;
+		G *= NaNto1(gidv("G1B"));
+		G *= NaNto1(gidv("G2B"));
+		G *= NaNto1(gidv("G3B"));
+		G /= NaNto1(gidv("G1A"));
+		G /= NaNto1(gidv("G2A"));
+		G /= NaNto1(gidv("G3A"));
+
+		gids("G_pre", G, 4);
+		gids("G_comb", G*gidv("G_pod"), 4);
+	}
+	function calc_ratio_pod() {
+		var G = 1;
+		G *= NaNto1(gidv("G1BP"));
+		G *= NaNto1(gidv("G2BP"));
+		G *= NaNto1(gidv("G3BP"));
+		G /= NaNto1(gidv("G1AP"));
+		G /= NaNto1(gidv("G2AP"));
+		G /= NaNto1(gidv("G3AP"));
+
+		gids("G_pod", G, 4);
+		gids("G_comb", G*gidv("G_pre"), 4);
+	}
+
+	function compute() {
+		G_pod = gidv("G_pod");
+		G_pre = gidv("G_pre");
+		T_in  = G_pre*gidv("motor_stall_torque_adj");
+		T_clutch = gidv("T_clutch");
+		h_pod = gidv("h_pod");
+		r_pod = gidv("r_pod");
+		r_wheel = gidv("d_wheel")/2;
+		mu = gidv("mu");
+		omega_free = gidv("motor_max_rpm_adj");
+
+		w = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
+		F = G_pod*(T_in-T_clutch) / r_wheel;
+		N = (T_in + F*h_pod)/w;
+		mu_ideal = F/N;
+		v = omega_free/60*Math.PI*r_wheel*2/G_pod/G_pre;
+
+		gids("F", F);
+		gids("N", N);
+		gids("mu_ideal", mu_ideal);
+		gids("free_speed", v);
+		if (mu < mu_ideal) {
+			document.getElementById("F").classList.add('error');
+			document.getElementById("N").classList.add('error');
+			document.getElementById("mu_ideal").classList.add('error');
+		}
+		else{
+			document.getElementById("F").classList.remove('error');
+			document.getElementById("N").classList.remove('error');
+			document.getElementById("mu_ideal").classList.remove('error');
+		}
+	}
+</script>
+
+<html>
+<body onload="thload()">
+<div style="float: left;" class="container">
+	<h3>Thad's Rocker Drive Calculator</h3>
+	<center>
+		<a href="./">Back To Index</a><br/>
+		<i>My <a href="./simplemech">Simple Mechanism Calculator</a> is a good companion to this.</i>
+	</center>
+
+	<div class="odd">
+		<center>
+			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
+			  <label for="english">English</label><br>
+			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
+			  <label for="metric">Metric</label><br>
+		</center>
+	</div>
+
+	<div class="even">
+		<table>
+		<tr>
+			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
+			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
+		</tr><tr>
+			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
+			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
+			<td class="unit">[V]</td>
+		</tr><tr>
+			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
+			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
+			<td class="unit">[%]</td>
+		</tr>
+
+		<tr>
+			<th>Motor</th>
+			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
+			  
+			  <!--<option value="neo">REV NEO</option>
+			  <option value="neo550">REV NEO550</option>
+			  <option value="falcon500">VEX Falcon 500</option>
+			  <option value="cim">CIM</option>
+			  <option value="minicim">MiniCIM</option>
+			  <option value="bag">Vex BAG</option>
+			  <option value="775pro">775Pro / Redline</option>
+			  <option value="am9015">AndyMark 9015</option>
+			  <option value="neverest">AndyMark NeveRest</option>
+			  <option value="rs550">BaneBots RS-550</option>-->
+			</select></td>
+		</tr>
+		<tr>
+			<th></th>
+			<th class="collabel">Raw Motor</th>
+			<th class="collabel">Adjusted</th>
+			<th></th>
+		</tr>
+		<tr>
+			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+			<td><input id="motor_max_rpm" disabled /></td>
+			<td><input id="motor_max_rpm_adj" disabled /></td>
+			<td class="unit">[RPM]</td>
+		</tr><tr>
+			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+			<td><input id="motor_stall_torque" disabled /></td>
+			<td><input id="motor_stall_torque_adj" disabled /></td>
+			<td class="unit" id="unit_motor_stall_torque"></td>
+		</tr><tr>
+			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+			<td><input id="motor_free_current" disabled /></td>
+			<td><input id="motor_free_current_adj" disabled /></td>
+			<td class="unit">[A]</td>
+		</tr><tr>
+			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+			<td><input id="motor_stall_current" disabled /></td>
+			<td><input id="motor_stall_current_adj" disabled /></td>
+			<td class="unit">[A]</td>
+		</tr>
+	</table>
+</div><div class="odd">
+		<table>
+		<tr>
+			<th class="rowlabel" colspan=3>Overall Gear Ratio<span class="ttt">Gear ratio of both gearbox before rocker and in pod</span></th>
+			<td colspan=3><input id="G_comb" disabled/></td>
+		</tr><tr>
+			<th class="rowlabel">Pre-Pod Gear Ratio<span class="ttt">The gear ratio before the rocker pod. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
+			<td class="tiny"></td>
+			<td><input id="G_pre" disabled/></td>
+			<th class="rowlabel">Pod Gear Ratio<span class="ttt">The gear ratio in the rocker pod. Negative ratios are ratios where the direction is not reversed between input and output. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
+			<td class="tiny"></td>
+			<td><input id="G_pod" disabled/></td>
+		</tr><tr>
+			<td><input id="G1A" oninput="calc_ratio_pre()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G1B" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G1AP" oninput="calc_ratio_pod()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G1BP" oninput="calc_ratio_pod()" /></td>
+		</tr><tr>
+			<td><input id="G2A" oninput="calc_ratio_pre()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G2B" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G2AP" oninput="calc_ratio_pod()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G2BP" oninput="calc_ratio_pod()" /></td>
+		</tr><tr>
+			<td><input id="G3A" oninput="calc_ratio_pre()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G3B" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G3AP" oninput="calc_ratio_pod()" /></td>
+			<td class="tiny">:</td>
+			<td><input id="G3BP" oninput="calc_ratio_pod()" /></td>
+		</tr>
+	</table>
+</div><div class="even">
+	<table>
+		<tr>
+			<th class="rowlabel">Clutch Torque<span class="ttt">The clutch torque on the rocker pod, providing additional resistance and thus dig-in.</span></th>
+				<td><input id="T_clutch" oninput="compute()" /></td><td class="unit" id="unit_T_clutch"></td>
+		</tr><tr>
+			<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
+				<td><input id="r_pod" oninput="compute()" /></td><td class="unit" id="unit_r_pod"></td>
+		</tr><tr>
+			<th class="rowlabel">Pod Pivot Height<span class="ttt">Distance from ground to pod's pivot point</span></th>
+				<td><input id="h_pod" oninput="compute()" /></td><td class="unit"  id="unit_h_pod"></td>
+		</tr><tr>
+			<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
+				<td><input id="d_wheel" oninput="compute()" /></td><td class="unit" id="unit_d_wheel"></td>
+		</tr><tr>
+			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction.</span></th>
+				<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
+		</tr>
+	</table>
+</div>
+
+<div class="output">
+	<table>
+		<tr>
+			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
+				<td><input id="F" /></td></td><td class="unit" id="unit_F"></td>
+		</tr><tr>
+			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
+				<td><input id="N" /></td></td><td class="unit" id="unit_N"></td>
+		</tr><tr>
+			<th class="rowlabel">Required Friction Coefficient<span class="ttt">Minimum friction coefficient for the pod to dig rather than slip. Too low of a number may result in excessive normal force.</span></th>
+				<td><input id="mu_ideal" /></td></td><td class="unit">[-]</td>
+		</tr><tr>
+			<th class="rowlabel">Free Speed<span class="ttt">Free speed of module</span></th>
+				<td><input id="free_speed" /></td></td><td class="unit" id="unit_free_speed"></td>
+		</tr>
+	</table>
+</div>
+
+</div>
+</body>
+</html>
