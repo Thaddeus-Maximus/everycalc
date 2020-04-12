@@ -37,7 +37,9 @@ select, input {
 	width: 120px;
 }
 
-
+.error {
+  background: #f99;
+}
 
 .collabel{
 	text-align: top;

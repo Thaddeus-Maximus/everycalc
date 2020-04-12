@@ -117,3 +117,44 @@ var belts_data = {
 		"5mm": [40,45,48,93,55,85,104,107,110,117,120,131,140,151,160,170,180,200]
 	}
 }
+
+var unit_conversions = {
+	"m":  1,
+	"mm": 1e-3,
+	"in": 0.0254,
+	"ft": 0.3048,
+
+	"ft-lbf": 1.356,
+	"in-lbf": 0.113,
+	"ozf-in": 0.007062,
+	"N-m": 1,
+	"N-mm": 1e-3,
+
+	"N": 1,
+	"lbf": 4.448,
+	"kgf": 9.807,
+	"ozf": .278,
+
+	"kg": 1,
+	"g": 1e-3,
+	"lbm": .4536,
+	"slug": 14.59,
+
+	"m/s": 1,
+	"ft/s": 0.3048,
+	"in/s": 0.0254
+}
+
+// converting between things is for suckers. Just convert to base units, always.
+function convert(number, from_unit) {
+	return number*unit_conversions[from_unit];
+}
+
+function convert_to(number, to_unit) {
+	return number/unit_conversions[to_unit];
+}
+
+
+function get_motor_data(motor,key){
+	return motor_data[motor][key];
+}
