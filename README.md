@@ -12,3 +12,8 @@ Inspired by the countless "JVN Calc" clones, this aims to (maybe) put an end to 
 - Provide all the useful analysis tools I've seen to make mechatronic mechanisms in FRC
 - Maybe provide basic structural analysis tools (like beam deflection/strength calculators)
 - Material comparisons (would require a hefty database... or a scraper... hmm)
+
+# Documentation
+
+[Rocker Pod Model](docs/rocker_pod_model.pdf)
+[Rocker Pod Model](docs/adiabatic_cylinder_model.pdf)
