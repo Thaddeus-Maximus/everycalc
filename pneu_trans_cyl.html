@@ -3,17 +3,60 @@
 <link rel="stylesheet" href="style.css"> 
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
+	unit_sys = 0;
+	inputs_unit_map = {
+		'f_push': ['N', 'lbf'],
+		'f_pull': ['N', 'lbf'],
+		'v_endstop': ['mm/s', 'in/s'],
+		'E_endstop': ['J', 'ft-lbf'],
+		'air_cons': ['g', 'lbm'],
+
+		'mass': ['kg', 'lbm'],
+		'load': ['N', 'lbf'],
+		'stroke': ['mm', 'in'],
+		'd_rod': ['mm', 'in'],
+		'd_bore': ['mm', 'in'],
+		'l_line': ['m', 'ft'],
+		'd_line': ['mm', 'in'],
+		'T_src': ['C', 'C'],
+		'P_src': ['kPa', 'psi']
+	}
+
+	function populate_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else 
+			unit_sys = 1;
+
+		unit_labels = document.getElementsByClassName('unit');
+		//console.log(unit_labels);
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+			}
+		}
+	}
+
+	function switch_units() {
+		populate_units();
+		compute();
+	}
+
 	var poschart = null, poschart_options = null;
 
 	google.charts.load('current', {'packages':['corechart', 'scatter', 'line']});
     google.charts.setOnLoadCallback(drawStuff);
 
+    function populate_direction() {
+    	document.getElementById('direction_push').disabled = direction_push;
+    	document.getElementById('direction_pull').disabled = !direction_push;
+    }
 
     direction_push = true;
     function setDirection(push) {
     	direction_push = push;
-    	document.getElementById('direction_push').disabled = push;
-    	document.getElementById('direction_pull').disabled = !push;
+    	populate_direction();
 
     	compute(true);
     }
@@ -62,13 +105,31 @@
 	}
 
 	function gidv(id) {
-		return eval(document.getElementById(id).value);
+
+		v =  eval(document.getElementById(id).value);
+		if (typeof inputs_unit_map[id] !== 'undefined')
+			v = convert(v, inputs_unit_map[id][unit_sys]);
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof value === 'string') {
+			document.getElementById(id).value = value;
+		} else {
+			if (typeof inputs_unit_map[id] !== 'undefined')
+				value = convert_to(value, inputs_unit_map[id][unit_sys]);
+			document.getElementById(id).value = value.toFixed(places);
+		}
 	}
 
 	function thload() {
+		populate_units();
+
 		drawStuff();
 
-		setDirection(true);
+		populate_direction();
 		
 
 		var inputs, index;
@@ -85,6 +146,8 @@
 		    	}
 		    }
 		}
+
+		compute(false);
 	}
 
 		
@@ -99,24 +162,38 @@
 	function compute(simulate) {
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 
+		document.getElementById('charts').classList.add('uncomputed');
+      	document.getElementById('t_endstop').classList.add('uncomputed');
+      	document.getElementById('t_steady').classList.add('uncomputed');
+      	document.getElementById('v_endstop').classList.add('uncomputed');
+      	document.getElementById('E_endstop').classList.add('uncomputed');
+      	document.getElementById('air_cons').classList.add('uncomputed');
+
 		// Constants
-		dt = 0.0005;
-		P_atm = 101e3;
+		dt = 0.0005; // s
+		P_atm = 101e3; // Pa
 		R = 287.05; // J/kg-K
 		c_p = 1010; // J/kg-K
 		c_v = c_p - R;
 
 		// Variables
 		T_in = gidv('T_src') + 273; // K
-		P_in = gidv('P_src')*1000+P_atm; //Pa; 60psi (conversion between gague and abs pressure)
-		A = (Math.pow(gidv('d_bore')/1000,2)-
-					(direction_push ? 0 : Math.pow(gidv('d_rod')/1000,2)))*Math.PI/4; // m^2
-		xf = gidv('stroke')/1000; // m
+		P_in = gidv('P_src')+P_atm; //Pa; 60psi (conversion between gague and abs pressure)
+		A_push = Math.pow(gidv('d_bore'),2)*Math.PI/4;
+		A_pull = A_push - Math.pow(gidv('d_rod'),2)*Math.PI/4
+		A = direction_push ? A_push : A_pull; // m^2
+		xf = gidv('stroke'); // m
 		
-		d_line = gidv('d_line')/1000;
+		d_line = gidv('d_line');
 		l_line = gidv('l_line');
 		V_extra = Math.PI/4*Math.pow(d_line,2)*l_line;
 		M = gidv('mass'); // kg
+
+		F_push = P_in*A_push;
+		F_pull = P_in*A_pull;
+		gids("f_push", F_push);
+		gids("f_pull", F_pull);
+
 
 		// State variables (autocomputed)
 		t = 0;
@@ -124,6 +201,8 @@
 		x = 0;
 		v = 0;
 		m_s = P_atm*V_extra/R/T_s; // rho = 1.2 kg/m^3
+
+		if(!simulate) return;
 
 		data = [];
 		chartdata = [];
@@ -155,15 +234,13 @@
 
 		while(i<3000) {
 			P_s = m_s/(x*A+V_extra)*R*T_s;
-			V_in = sign(P_in-P_s)*0.0197862*Math.pow(Math.pow(d_line,5)*(P_in-P_atm)*Math.abs(P_in-P_s)/l_line, 20/37);
+			V_in = sign(P_in-P_s)*0.0197862*Math.pow(Math.pow(d_line,5)*(P_in-P_atm)*Math.abs(P_in-P_s)/l_line, 20/37); //magical equation
 			m_in = P_in/R/T_in*V_in;
 
-			F = eval(document.getElementById('load').value); // N
+			F = convert(eval(document.getElementById('load').value), inputs_unit_map['load'][unit_sys]); // N
 			//console.log(F);
 
 			vmterm = en_vm ? Math.pow(V_in/(Math.PI/4 * d_line*d_line), 2) : 0;
-
-			console.log(vmterm);
 
 			dT_s = ( m_in * (-c_p*T_s + c_v*T_in + vmterm) - P_s*A*v)/c_p/m_s;
 			dm_s = m_in;
@@ -187,7 +264,7 @@
 			T_s += dT_s*dt;
 			m_s += dm_s*dt;
 
-			if (x >= xf && P_s >= P_in) {
+			if (x >= xf && P_s >= P_in*0.99) {
 				if (isNaN(t_endstop)) {
 					t_endstop = t;
 					v_endstop = v;
@@ -200,7 +277,7 @@
 			if (eval(termcrit)) break;
 
 			//data.push([t,x,v,P_s,T_s,m_s]);
-			chartdata.push([t,x,(P_s-P_atm)/1000]); //,T_s,m_s
+			chartdata.push([t,x,P_s-P_atm]); //,T_s,m_s
 			i++;
 		}
 
@@ -208,12 +285,17 @@
 
 		poschart.draw(posdata, poschart_options);
       	//xchart.draw(xdata, xchart_options);
-      	document.getElementById('charts').style.background='transparent';
-      	document.getElementById('t_endstop').value = NaNtoerr(t_endstop);
-      	document.getElementById('t_steady').value  = NaNtoerr(t_ss);
-      	document.getElementById('v_endstop').value = NaNtoerr(v_endstop);
-      	document.getElementById('E_endstop').value = NaNtoerr(E_endstop);
-      	document.getElementById('air_cons').value  = air_cons*1000;
+      	document.getElementById('charts').classList.remove('uncomputed');
+      	document.getElementById('t_endstop').classList.remove('uncomputed');
+      	document.getElementById('t_steady').classList.remove('uncomputed');
+      	document.getElementById('v_endstop').classList.remove('uncomputed');
+      	document.getElementById('E_endstop').classList.remove('uncomputed');
+      	document.getElementById('air_cons').classList.remove('uncomputed');
+      	gids('t_endstop', NaNtoerr(t_endstop));
+      	gids('t_steady',  NaNtoerr(t_ss));
+      	gids('v_endstop', NaNtoerr(v_endstop));
+      	gids('E_endstop', NaNtoerr(E_endstop));
+      	gids('air_cons',  air_cons);
 	}
 
 	function NaNtoerr(x) {
@@ -236,32 +318,41 @@
 		<h3>Thad's Pneumatic Piston Calculator</h3>
 		<center><a href="./">Back To Index</a></center>
 
+		<div class="even">
+		<center>
+			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
+			  <label for="english">English</label><br>
+			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
+			  <label for="metric">Metric</label><br>
+		</center>
+		</div>
+
 		<div class="odd">
 		<table>
 			<tr>
 				<th class='rowlabel'>Tank Pressure</th>
 				<td><input id='P_src' value=400></td>
-				<td class='unit'>kPa</td>
+				<td class='unit' id='unit_P_src'></td>
 			</tr><tr>
 				<th class="rowlabel">Tank Temperature</th>
 				<td><input id="T_src" value=20></td>
-				<td class="unit">C</td>
+				<td class="unit" id='unit_T_src'></td>
 			</tr><tr>
 				<th class='rowlabel'>Line Diameter</th>
 				<td><input id='d_line' value=5></td>
-				<td class="unit">mm</td>
+				<td class="unit" id='unit_d_line'></td>
 			</tr><tr>
 				<th class="rowlabel">Line Length</th>
 				<td><input id="l_line" value=1.5></td>
-				<td class="unit">m</td>
+				<td class="unit" id='unit_l_line'></td>
 			</tr><tr>
 				<th class="rowlabel">Bore Diameter</th>
 				<td><input id="d_bore" value=20></td>
-				<td class="unit">mm</td>
+				<td class="unit" id='unit_d_bore'></td>
 			</tr><tr>
 				<th class="rowlabel">Rod Diameter</th>
 				<td><input id="d_rod" value=6></td>
-				<td class="unit">mm</td>
+				<td class="unit" id='unit_d_rod'></td>
 			</tr><tr>
 				<th class="rowlabel">Direction</th>
 				<td colspan=2><button id="direction_push" onclick="setDirection(true)" disabled >PUSH</button>
@@ -269,23 +360,32 @@
 			</tr><tr>
 				<th class="rowlabel">Stroke</th>
 				<td><input id="stroke" value=100></td>
-				<td class="unit">mm</td>
+				<td class="unit" id='unit_stroke'></td>
 			</tr><tr>
 				<th class="rowlabel">Load</th>
 				<td><input id="load" value=50></td>
-				<td class="unit">N</td>
+				<td class="unit" id='unit_load'></td>
 			</tr><tr>
 				<th class="rowlabel">Mass</th>
 				<td><input id="mass" value=0.7></td>
-				<td class="unit">kg</td>
+				<td class="unit" id='unit_mass'></td>
 			</tr><tr>
 				<th class="rowlabel">Alt. Termination Criteria</th>
 				<td><input id="termcrit" value=''></td>
 			</tr>
 		</table>
+		<button type="button" onclick="compute()">Compute!</button>
 		</div><div class="output">
 			<table>
 				<tr>
+					<th class='rowlabel'>Force (Push)</th>
+					<td><input id='f_push' disabled /></td>
+					<td class='unit' id='unit_f_push'></td>
+				</tr><tr>
+					<th class='rowlabel'>Force (Pull)</th>
+					<td><input id='f_pull' disabled /></td>
+					<td class='unit' id='unit_f_pull'></td>
+				</tr><tr>
 					<th class='rowlabel'>Time to Reach Endstop</th>
 					<td><input id='t_endstop' disabled /></td>
 					<td class='unit'>[s]</td>
@@ -296,15 +396,15 @@
 				</tr><tr>
 					<th class='rowlabel'>Velocity Hitting Endstop</th>
 					<td><input id='v_endstop' disabled /></td>
-					<td class='unit'>[m/s]</td>
+					<td class='unit' id='unit_v_endstop'></td>
 				</tr><tr>
 					<th class='rowlabel'>Kinetic Energy Hitting Endstop</th>
 					<td><input id='E_endstop' disabled /></td>
-					<td class='unit'>[J]</td>
+					<td class='unit' id='unit_E_endstop'></td>
 				</tr><tr>
 					<th class='rowlabel'>Air Consumption</th>
 					<td><input id='air_cons' disabled /></td>
-					<td class='unit'>[g]</td>
+					<td class='unit' id='unit_air_cons'></td>
 				</tr>
 			</table>
 		</div>

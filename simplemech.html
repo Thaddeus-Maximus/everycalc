@@ -23,6 +23,11 @@
 	}
 
 	function populate_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else 
+			unit_sys = 1;
+		
 		unit_labels = document.getElementsByClassName('unit');
 		//console.log(unit_labels);
 		for (unit in unit_labels) {
@@ -34,10 +39,6 @@
 	}
 
 	function switch_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
 
 		populate_units();
 		compute();

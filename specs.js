@@ -149,7 +149,16 @@ var unit_conversions = {
 
 	"kg m^2": 1,
 	"lbm in^2": 2.926e-4,
-	"kg mm^2": 1e-6
+	"kg mm^2": 1e-6,
+
+	'kPa': 1000,
+	'MPa': 1e6,
+	'Pa': 1,
+	'psi': 6894.76,
+
+	'J': 1, //note: ft-lbf is covered by the torque section; and conversion factor is the same.
+
+	'C': 1
 }
 
 // converting between things is for suckers. Just convert to base units, always.
