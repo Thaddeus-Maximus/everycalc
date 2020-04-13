@@ -32,9 +32,11 @@
 		compute();
 	}
 
-	function gidv(id) {
+	function gidv(id, default_value) {
 
 		v =  eval(document.getElementById(id).value);
+		console.log(id, v);
+		if (typeof default_value!=='undefined' && typeof v === 'undefined') v=default_value;
 		if (typeof inputs_unit_map[id] !== 'undefined')
 			v = convert(v, inputs_unit_map[id][unit_sys]);
 		return v;
@@ -134,7 +136,7 @@
 		G_pod = gidv("G_pod");
 		G_pre = gidv("G_pre");
 		T_in  = G_pre*gidv("motor_stall_torque_adj");
-		T_clutch = gidv("T_clutch");
+		T_clutch = gidv("T_clutch", 0);
 		h_pod = gidv("h_pod");
 		r_pod = gidv("r_pod");
 		r_wheel = gidv("d_wheel")/2;

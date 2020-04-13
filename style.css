@@ -38,7 +38,7 @@ select, input {
 }
 
 .error {
-  background: #f99;
+  background: #fd6;
 }
 .uncomputed {
   background: #d99;
