@@ -281,7 +281,7 @@
 </div><div class="even">
 	<table>
 		<tr>
-			<th class="rowlabel">Clutch Torque<span class="ttt">The clutch torque on the rocker pod, providing additional resistance and thus dig-in.</span></th>
+			<th class="rowlabel">Clutch Torque<span class="ttt">The torque of the clutch/brake on the rocker pod (linking the input torque more directly to the pod), providing additional resistance and thus dig-in at the cost of propulsive force. <i>Leave blank if no such clutch.</i></span></th>
 				<td><input id="T_clutch" oninput="compute()" /></td><td class="unit" id="unit_T_clutch"></td>
 		</tr><tr>
 			<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
@@ -293,7 +293,7 @@
 			<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
 				<td><input id="d_wheel" oninput="compute()" /></td><td class="unit" id="unit_d_wheel"></td>
 		</tr><tr>
-			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction.</span></th>
+			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction</span></th>
 				<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
 		</tr>
 	</table>
@@ -303,16 +303,16 @@
 	<table>
 		<tr>
 			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
-				<td><input id="F" /></td></td><td class="unit" id="unit_F"></td>
+				<td><input id="F" disabled /></td></td><td class="unit" id="unit_F"></td>
 		</tr><tr>
 			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
-				<td><input id="N" /></td></td><td class="unit" id="unit_N"></td>
+				<td><input id="N" disabled /></td></td><td class="unit" id="unit_N"></td>
 		</tr><tr>
-			<th class="rowlabel">Required Friction Coefficient<span class="ttt">Minimum friction coefficient for the pod to dig rather than slip. Too low of a number may result in excessive normal force.</span></th>
-				<td><input id="mu_ideal" /></td></td><td class="unit">[-]</td>
+			<th class="rowlabel">F/N<span class="ttt">Ratio of F to N; the effective frictional coefficient of the pod. If this is larger than the actual coefficient of friction, the pod will slip rather than dig in (cells will highlight orange to display this)</span></th>
+				<td><input id="mu_ideal" disabled /></td></td><td class="unit">[-]</td>
 		</tr><tr>
 			<th class="rowlabel">Free Speed<span class="ttt">Free speed of module</span></th>
-				<td><input id="free_speed" /></td></td><td class="unit" id="unit_free_speed"></td>
+				<td><input id="free_speed" disabled /></td></td><td class="unit" id="unit_free_speed"></td>
 		</tr>
 	</table>
 </div>
