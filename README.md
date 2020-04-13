@@ -3,7 +3,7 @@ What it says on the tin. A suite of tools to help engineer things quickly rather
 
 Hosted at https://thaddeus-maximus.github.io/swissarmyengineer/
 
-Inspired by the countless "JVN Calc" clones, this aims to (maybe) put an end to the cloning. Maybe it'll just steer it in a different web-based direction. Or maybe
+Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-calc-past-and-future) clones, this aims to (maybe) put an end to the cloning. Maybe it'll just steer it in a different web-based direction. Or maybe
 
 ![xkcd 927](https://imgs.xkcd.com/comics/standards.png)
 
