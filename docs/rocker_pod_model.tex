@@ -133,7 +133,7 @@ Applying conservation of angular momentum to the wheel yields
 
 \begin{align}
 	\cancelto{\mbox{0 (lightweight system)}}{\frac{d}{dt} L_{sys}} = \sum_{about\ axle} \vec{r} \times \vec{F} + \cancelto{\mbox{0 (no mass transfer)}}{\sum_{+in} \dot{m} [...]} \nonumber \\
-	r_{p} F - T_{wheel} = 0 .
+	r_{w} F - T_{wheel} = 0 .
 \end{align}
 
 The wheel torque is related to the input torque by module gear ratio $G$.
@@ -153,8 +153,8 @@ The wheel's force should be friction-limited. We'll use a simple static friction
 The various constraints can be solved, yielding
 
 \begin{align}
-	F &= \frac{G}{r_{wheel}} T_{in} \\
-	N &= \frac{1 + G \frac{h}{r_{wheel}}}{\sqrt{r_{p}^2 - (h - r_{w})^2}} T_{in}
+	F &= \frac{G}{r_{w}} T_{in} \\
+	N &= \frac{1 + G \frac{h}{r_{w}}}{\sqrt{r_{p}^2 - (h - r_{w})^2}} T_{in}
 \end{align}
 
 The ratio of propulsive force to normal force can also be solved for, which would be the effective frictional coefficient of the module.
