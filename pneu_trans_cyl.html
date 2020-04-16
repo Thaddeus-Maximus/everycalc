@@ -49,8 +49,8 @@
     google.charts.setOnLoadCallback(drawStuff);
 
     function populate_direction() {
-    	document.getElementById('direction_push').disabled = direction_push;
-    	document.getElementById('direction_pull').disabled = !direction_push;
+    	document.getElementById('direction_push').readonly = direction_push;
+    	document.getElementById('direction_pull').readonly = !direction_push;
     }
 
     direction_push = true;
@@ -355,7 +355,7 @@
 				<td class="unit" id='unit_d_rod'></td>
 			</tr><tr>
 				<th class="rowlabel">Direction</th>
-				<td colspan=2><button id="direction_push" onclick="setDirection(true)" disabled >PUSH</button>
+				<td colspan=2><button id="direction_push" onclick="setDirection(true)" readonly >PUSH</button>
 					<button id="direction_pull" onclick="setDirection(false)" >PULL</button></td>
 			</tr><tr>
 				<th class="rowlabel">Stroke</th>
@@ -379,31 +379,31 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Force (Push)</th>
-					<td><input id='f_push' disabled /></td>
+					<td><input id='f_push' readonly /></td>
 					<td class='unit' id='unit_f_push'></td>
 				</tr><tr>
 					<th class='rowlabel'>Force (Pull)</th>
-					<td><input id='f_pull' disabled /></td>
+					<td><input id='f_pull' readonly /></td>
 					<td class='unit' id='unit_f_pull'></td>
 				</tr><tr>
 					<th class='rowlabel'>Time to Reach Endstop</th>
-					<td><input id='t_endstop' disabled /></td>
+					<td><input id='t_endstop' readonly /></td>
 					<td class='unit'>[s]</td>
 				</tr><tr>
 					<th class='rowlabel'>Time to Reach Steady-State</th>
-					<td><input id='t_steady' disabled /></td>
+					<td><input id='t_steady' readonly /></td>
 					<td class='unit'>[s]</td>
 				</tr><tr>
 					<th class='rowlabel'>Velocity Hitting Endstop</th>
-					<td><input id='v_endstop' disabled /></td>
+					<td><input id='v_endstop' readonly /></td>
 					<td class='unit' id='unit_v_endstop'></td>
 				</tr><tr>
 					<th class='rowlabel'>Kinetic Energy Hitting Endstop</th>
-					<td><input id='E_endstop' disabled /></td>
+					<td><input id='E_endstop' readonly /></td>
 					<td class='unit' id='unit_E_endstop'></td>
 				</tr><tr>
 					<th class='rowlabel'>Air Consumption</th>
-					<td><input id='air_cons' disabled /></td>
+					<td><input id='air_cons' readonly /></td>
 					<td class='unit' id='unit_air_cons'></td>
 				</tr>
 			</table>

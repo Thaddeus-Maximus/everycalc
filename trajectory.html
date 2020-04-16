@@ -108,17 +108,17 @@ chart_container = null;
     function mode_select() {
     	var mode = document.getElementById('mode').value;
     	if (mode=='raw') {
-    		document.getElementById('v_initial').disabled = false;
-    		document.getElementById('theta').disabled     = false;
+    		document.getElementById('v_initial').readonly = false;
+    		document.getElementById('theta').readonly     = false;
     	} else if (mode=='find_theta') {
-    		document.getElementById('v_initial').disabled = false;
-    		document.getElementById('theta').disabled     = true;
+    		document.getElementById('v_initial').readonly = false;
+    		document.getElementById('theta').readonly     = true;
     	} else if (mode=='find_v') {
-    		document.getElementById('v_initial').disabled = true;
-    		document.getElementById('theta').disabled     = false;
+    		document.getElementById('v_initial').readonly = true;
+    		document.getElementById('theta').readonly     = false;
     	} else if (mode=='find_min_v') {
-    		document.getElementById('v_initial').disabled = true;
-    		document.getElementById('theta').disabled     = true;
+    		document.getElementById('v_initial').readonly = true;
+    		document.getElementById('theta').readonly     = true;
     	}
     }
 
@@ -439,23 +439,23 @@ chart_container = null;
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
-					<td><input id='strike_height' disabled></td><td class="tiny">&#177;</td>
-					<td><input id='strike_height_err' disabled></td>
+					<td><input id='strike_height' readonly></td><td class="tiny">&#177;</td>
+					<td><input id='strike_height_err' readonly></td>
 					<td class='unit' id='unit_strike_height'></td>
 				</tr><tr>
 					<th class='rowlabel'>Swept Zone</th>
-					<td><input id='sweep_height' disabled></td><td class="tiny">&#177;</td>
-					<td><input id='sweep_height_err' disabled></td>
+					<td><input id='sweep_height' readonly></td><td class="tiny">&#177;</td>
+					<td><input id='sweep_height_err' readonly></td>
 					<td class='unit' id='unit_sweep_height'></td>
 				</tr><tr>
 					<th class="rowlabel">Angle of Strike</th>
-					<td><input id="strike_angle" disabled></td><td class="tiny">&#177;</td>
-					<td><input id="strike_angle_err" disabled></td>
+					<td><input id="strike_angle" readonly></td><td class="tiny">&#177;</td>
+					<td><input id="strike_angle_err" readonly></td>
 					<td class="unit" id='unit_strike_angle'></td>
 				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
-					<td><input id="time_of_flight" disabled></td><td class="tiny">&#177;</td>
-					<td><input id="time_of_flight_err" disabled></td>
+					<td><input id="time_of_flight" readonly></td><td class="tiny">&#177;</td>
+					<td><input id="time_of_flight_err" readonly></td>
 					<td class="unit" id='unit_time_of_flight'>[s]</td>
 				</tr>
 			</table>

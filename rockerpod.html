@@ -223,23 +223,23 @@
 		</tr>
 		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input id="motor_max_rpm" disabled /></td>
-			<td><input id="motor_max_rpm_adj" disabled /></td>
+			<td><input id="motor_max_rpm" readonly /></td>
+			<td><input id="motor_max_rpm_adj" readonly /></td>
 			<td class="unit">[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input id="motor_stall_torque" disabled /></td>
-			<td><input id="motor_stall_torque_adj" disabled /></td>
+			<td><input id="motor_stall_torque" readonly /></td>
+			<td><input id="motor_stall_torque_adj" readonly /></td>
 			<td class="unit" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-			<td><input id="motor_free_current" disabled /></td>
-			<td><input id="motor_free_current_adj" disabled /></td>
+			<td><input id="motor_free_current" readonly /></td>
+			<td><input id="motor_free_current_adj" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-			<td><input id="motor_stall_current" disabled /></td>
-			<td><input id="motor_stall_current_adj" disabled /></td>
+			<td><input id="motor_stall_current" readonly /></td>
+			<td><input id="motor_stall_current_adj" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr>
 	</table>
@@ -247,14 +247,14 @@
 		<table>
 		<tr>
 			<th class="rowlabel" colspan=3>Overall Gear Ratio<span class="ttt">Gear ratio of both gearbox before rocker and in pod</span></th>
-			<td colspan=3><input id="G_comb" disabled/></td>
+			<td colspan=3><input id="G_comb" readonly/></td>
 		</tr><tr>
 			<th class="rowlabel">Pre-Pod Gear Ratio<span class="ttt">The gear ratio before the rocker pod. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
 			<td class="tiny"></td>
-			<td><input id="G_pre" disabled/></td>
+			<td><input id="G_pre" readonly/></td>
 			<th class="rowlabel">Pod Gear Ratio<span class="ttt">The gear ratio in the rocker pod. Negative ratios are ratios where the direction is not reversed between input and output. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
 			<td class="tiny"></td>
-			<td><input id="G_pod" disabled/></td>
+			<td><input id="G_pod" readonly/></td>
 		</tr><tr>
 			<td><input id="G1A" oninput="calc_ratio_pre()" /></td>
 			<td class="tiny">:</td>
@@ -303,16 +303,16 @@
 	<table>
 		<tr>
 			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
-				<td><input id="F" disabled /></td></td><td class="unit" id="unit_F"></td>
+				<td><input id="F" readonly /></td></td><td class="unit" id="unit_F"></td>
 		</tr><tr>
 			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
-				<td><input id="N" disabled /></td></td><td class="unit" id="unit_N"></td>
+				<td><input id="N" readonly /></td></td><td class="unit" id="unit_N"></td>
 		</tr><tr>
 			<th class="rowlabel">F/N<span class="ttt">Ratio of F to N; the effective frictional coefficient of the pod. If this is larger than the actual coefficient of friction, the pod will slip rather than dig in (cells will highlight orange to display this)</span></th>
-				<td><input id="mu_ideal" disabled /></td></td><td class="unit">[-]</td>
+				<td><input id="mu_ideal" readonly /></td></td><td class="unit">[-]</td>
 		</tr><tr>
 			<th class="rowlabel">Free Speed<span class="ttt">Free speed of module</span></th>
-				<td><input id="free_speed" disabled /></td></td><td class="unit" id="unit_free_speed"></td>
+				<td><input id="free_speed" readonly /></td></td><td class="unit" id="unit_free_speed"></td>
 		</tr>
 	</table>
 </div>

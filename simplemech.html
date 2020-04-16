@@ -405,23 +405,23 @@
 		</tr>
 		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input id="motor_max_rpm" disabled /></td>
-			<td><input id="motor_max_rpm_adj" disabled /></td>
+			<td><input id="motor_max_rpm" readonly /></td>
+			<td><input id="motor_max_rpm_adj" readonly /></td>
 			<td class="unit">[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input id="motor_stall_torque" disabled /></td>
-			<td><input id="motor_stall_torque_adj" disabled /></td>
+			<td><input id="motor_stall_torque" readonly /></td>
+			<td><input id="motor_stall_torque_adj" readonly /></td>
 			<td class="unit" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-			<td><input id="motor_free_current" disabled /></td>
-			<td><input id="motor_free_current_adj" disabled /></td>
+			<td><input id="motor_free_current" readonly /></td>
+			<td><input id="motor_free_current_adj" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-			<td><input id="motor_stall_current" disabled /></td>
-			<td><input id="motor_stall_current_adj" disabled /></td>
+			<td><input id="motor_stall_current" readonly /></td>
+			<td><input id="motor_stall_current_adj" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr>
 	</table>
@@ -431,7 +431,7 @@
 		<tr>
 			<th class="rowlabel">Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
 			<td class="tiny"></td>
-			<td><input id="G" disabled/></td>
+			<td><input id="G" readonly/></td>
 		</tr><tr>
 			<td><input id="G1A" oninput="calc_ratio()" /></td>
 			<td class="tiny">:</td>
@@ -463,13 +463,13 @@
 			<th class="rowlabel">CPR<span class="ttt">Encoder Counts Per Revolution<br/>(you can also put ticks, and ticks will be computed. Math is the same)</span></th>
 			<td><input id="encoder_cpr" onchange="compute(false)" value=1 /></td>
 			<th class="rowlabel">C/x<span class="ttt">Encoder Counts Per Distance Traveled<br/>(how many encoder counts per unit distance traveled)</span></th>
-			<td><input id="encoder_cpx" value=1 disabled /></td>
+			<td><input id="encoder_cpx" value=1 readonly /></td>
 			<td class="unit" id="unit_encoder_cpx"></td>
 		</tr><tr class='encoder_detail'>
 			<th class="rowlabel">Reduction<span class="ttt">Additional reduction applied between the shaft and the encoder</span></th>
 			<td><input id="encoder_reduction" onchange="compute(false)" value='' /></td>
 			<th class="rowlabel">Max CPS<span class="ttt">Maximum Counts per Second, at free speed</span></th>
-			<td><input id="encoder_max_cps" value=1 disabled /></td>
+			<td><input id="encoder_max_cps" value=1 readonly /></td>
 		</tr>
 	</table></div>
 	<div class="odd">
@@ -497,32 +497,32 @@
 	<table>
 		<tr>
 			<th class="rowlabel">End Condition Met in t=<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet.</span></th>
-			<td><input id="endcond_met" disabled /></td>
+			<td><input id="endcond_met" readonly /></td>
 			<td class="unit">[s]</td>
 		</tr><tr>
 			<th class="rowlabel">Current Used<span class="ttt">Total electrical consumption in the simulation period</span></th>
-			<td><input id="current_cons" disabled /></td>
+			<td><input id="current_cons" readonly /></td>
 			<td class="unit">[A-s]</td>
 		</tr><tr>
 			<th class="rowlabel">Current At End<span class="ttt">Current drawn at the end of the simulation period</span></th>
-			<td><input id="current_end" disabled /></td>
+			<td><input id="current_end" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr>
 		<tr>
 			<th class="rowlabel">No Load Speed<span class="ttt">Speed without any load on the system.<br/>Equivalent to the JVN calc.</span></th>
-			<td><input id="theor_freespd" disabled /></td>
+			<td><input id="theor_freespd" readonly /></td>
 			<td class="unit" id="unit_theor_freespd"></td>
 		</tr><tr>
 			<th class="rowlabel">Running Speed<span class="ttt">Speed while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
-			<td><input id="theor_runspd" disabled /></td>
+			<td><input id="theor_runspd" readonly /></td>
 			<td class="unit" id="unit_theor_runspd"></td>
 		</tr><tr>
 			<th class="rowlabel">Stall Force<span class="ttt">Force produced while at stall (ignoring external load/mass)<br/>Equivalent to the JVN calc.</span></th>
-			<td><input id="theor_stall_force" disabled /></td>
+			<td><input id="theor_stall_force" readonly /></td>
 			<td class="unit" id="unit_theor_stall_force"></td>
 		</tr><tr>
 			<th class="rowlabel">Running Current<span class="ttt">Current consumption while running at steady-state, ASSUMING THAT ALL TRANSIENT VARIABLES (v,x,omega,theta) ARE ZERO.<br/>Equivalent to the JVN calc.</span></th>
-			<td><input id="theor_stall_current" disabled /></td>
+			<td><input id="theor_stall_current" readonly /></td>
 			<td class="unit">[A]</td>
 		</tr>
 	</table>
