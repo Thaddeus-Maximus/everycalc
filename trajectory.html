@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl/dist/echarts-gl.min.js"></script>
+       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-stat/dist/ecStat.min.js"></script>
+       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/extension/dataTool.min.js"></script>
+       <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/extension/bmap.min.js"></script>
+<link rel="stylesheet" href="style.css"> 
+<script type="text/javascript" src="specs.js"></script>
+<script type="text/javascript">
+
+unit_sys = 0;
+inputs_unit_map = {
+	'theta': 			['deg', 'deg', 'deg'],
+	'theta_err': 		['deg', 'deg', 'deg'],
+	'v_initial':     	['m/s', 'ft/s','in/s'],
+	'v_initial_err': 	['m/s', 'ft/s','in/s'],
+	'x_target':      	['m',   'ft',  'in'],
+	'x_target_err':  	['m',   'ft',  'in'],
+	'y_target':      	['m',   'ft',  'in'],
+	'y_target_err':  	['m',   'ft',  'in'],
+	'y_initial':     	['m',   'ft',  'in'],
+	'y_initial_err': 	['m',   'ft',  'in'],
+	'h_target':      	['mm',  'in',  'in'],
+	'h_target_err':  	['mm',  'in',  'in'],
+	'd_ball':        	['mm',  'in',  'in'],
+	'd_ball_err':    	['mm',  'in',  'in'],
+	'strike_height':    ['m',   'ft',  'in'],
+	'strike_height_err':['m',   'ft',  'in'],
+	'sweep_height':     ['m',   'ft',  'in'],
+	'sweep_height_err': ['m',   'ft',  'in'],
+	'strike_angle':     ['deg', 'deg', 'deg'],
+	'strike_angle_err': ['deg', 'deg', 'deg']
+};
+
+	function populate_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else if (document.getElementById('unit_english').checked)
+			unit_sys = 1;
+		else
+			unit_sys = 2;
+
+		unit_labels = document.getElementsByClassName('unit');
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+			}
+		}
+	}
+
+	function switch_units() {
+		populate_units();
+		compute();
+	}
+
+chart = null;
+chart_container = null;
+
+    function plot_data(datas, targ_params) {
+    	var chart; var chart_container;
+
+    	[targ_dist, targ_ht, targ_diam] = targ_params;
+
+    	chart_container = document.getElementById("chart_container");
+		chart = echarts.init(chart_container);
+
+		chart_option = {
+		    xAxis:  {},
+		    yAxis:  {show: false},
+		    series: [],
+		    tooltip: {
+		        
+		        formatter: function (params) {
+		            return "(" + params.data[0].toFixed(3) + ", " + params.data[1].toFixed(3) + ")";
+		        },
+		        axisPointer: {
+		            animation: false
+		        }
+		    }
+		};
+		if(datas) {
+			chart_option.series.push({
+			        type: 'line',
+			        color: '#f00',
+			        showSymbol: false,
+			        data: [[0, 0],[0, targ_ht-targ_diam/2]]
+			    });
+			chart_option.series.push({
+			        type: 'line',
+			        color: '#f00',
+			        showSymbol: false,
+			        data: [[0, targ_ht+targ_diam],[0, targ_ht+targ_diam/2]]
+			    });
+			for (data in datas) {
+				chart_option.series.push({
+			        type: 'line',
+			        color: '#0a0',
+			        data: datas[data]
+			    });
+			}
+		}
+		if (chart_option && typeof chart_option === "object") {
+		    chart.setOption(chart_option, true);
+		}  
+    };
+
+    function mode_select() {
+    	var mode = document.getElementById('mode').value;
+    	if (mode=='raw') {
+    		document.getElementById('v_initial').disabled = false;
+    		document.getElementById('theta').disabled     = false;
+    	} else if (mode=='find_theta') {
+    		document.getElementById('v_initial').disabled = false;
+    		document.getElementById('theta').disabled     = true;
+    	} else if (mode=='find_v') {
+    		document.getElementById('v_initial').disabled = true;
+    		document.getElementById('theta').disabled     = false;
+    	} else if (mode=='find_min_v') {
+    		document.getElementById('v_initial').disabled = true;
+    		document.getElementById('theta').disabled     = true;
+    	}
+    }
+
+	function gidv(id) {
+		var v =  document.getElementById(id).value;
+		if (typeof v === 'string' && v.slice(-1) == '%') {
+			v = eval(document.getElementById(id.slice(0,-4)).value)*eval(v.slice(0,-1)/100);
+		} else if (v=='') {
+			v = 0;
+		
+		} else {
+			v = eval(v);
+		}
+		
+		if (typeof inputs_unit_map[id] !== 'undefined')
+			v = convert(v, inputs_unit_map[id][unit_sys]);
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof value === 'string') {
+			document.getElementById(id).value = value;
+		} else {
+			if (typeof inputs_unit_map[id] !== 'undefined')
+				value = convert_to(value, inputs_unit_map[id][unit_sys]);
+			document.getElementById(id).value = value.toFixed(places);
+		}
+	}
+
+	function thload() {
+		populate_units();
+		mode_select();
+
+		var inputs, index;
+
+		inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
+		    inputs[index].onkeyup = function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+
+		    	if (key==13) {
+		    		compute(true);
+		    	} else {
+		    		
+		    	}
+		    }
+		}
+
+		compute(true);
+	}
+
+		
+	function sign(x) {
+		if (x>0) return 1;
+		if (x<0) return -1;
+		return 0;
+	}
+
+	en_vm = true;
+
+	function linterp(xyn, x) {
+		i;
+		for (i=1; i<xyn.length-1 && !isNaN(xyn[i][0]) && x>xyn[i][0]; i++) {}
+		return xyn[i-1][1] + (xyn[i][1]-xyn[i-1][1])/(xyn[i][0]-xyn[i-1][0])*(x-xyn[i-1][0]);
+	}
+
+	function linterpder(xyn, x) { // interpolated derivative
+		i;
+		for (i=1; i<xyn.length-1 && !isNaN(xyn[i][0]) && x>xyn[i][0]; i++) {}
+		return (xyn[i][1]-xyn[i-1][1])/(xyn[i][0]-xyn[i-1][0]);
+	}
+
+	function convert_to_array(xyn, to) {
+		newxyn = [];
+		for(i=0;i<xyn.length;i++) {
+			l = [];
+			if (typeof xyn[i] === 'object') {
+				for(j=0;j<xyn[i].length;j++) {
+					l.push(convert_to(xyn[i][j], to));
+				}
+				newxyn.push(l);
+			} else {
+				newxyn.push(convert_to(xyn[i], to));
+			}
+		}
+		return newxyn;
+	}
+
+	function run_sim(params_pack) {
+		[v, theta, y0, xtarg, d] = params_pack;
+		
+
+		x=-xtarg;
+		y=y0;
+		vx=Math.cos(theta)*v;
+		vy=Math.sin(theta)*v;
+		g=9.81;
+		xl=x; xh=x;
+
+		dt = xtarg/v/100;
+		res_ctr = [[x,y]];
+		res_low = [[NaN, NaN]];
+		res_high = [[NaN, NaN]];
+
+		y_low=0;
+		y_high=0;
+		tof=0;
+
+		i=0;
+		t=0;
+		while(i<3000 && xh<=xtarg*0.05 && xl<=xtarg*0.05 && y>=0) {
+			vy -= g*dt;
+			x += vx*dt;
+			y += vy*dt;
+			t += dt;
+
+			xl = x + d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+			xh = x - d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+			yl = y - d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+			yh = y + d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+
+			if (x>0) {
+				tof = t;
+			}
+
+			res_ctr .push([x,y]);
+			res_low .push([xl,yl]);
+			res_high.push([xh,yh]);
+			i+=1;
+		}
+
+		stats = {
+			'y_low': linterp(res_low, 0),
+			'y_high': linterp(res_high, 0),
+			'y_ctr': linterp(res_ctr, 0),
+			'ang': Math.atan(linterpder(res_ctr, 0)),
+			'tof': tof
+		}
+
+		return [res_low, res_ctr, res_high, stats];
+	}
+
+	function bit_test(num, bit){
+	    return ((num>>bit) % 2 != 0)
+	}
+
+	g = 9.81;
+
+	function compute(simulate) {
+		mode = document.getElementById('mode').value;
+		if (mode=='raw') {
+    		// nothing special
+    	} else if (mode=='find_theta') {
+    		var x = gidv('x_target');
+    		var y = gidv('y_target') - gidv('y_initial');
+    		var v = gidv('v_initial');
+
+    		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
+
+    		gids('theta', theta);
+    	} else if (mode=='find_v') {
+    		var x = gidv('x_target');
+    		var y = gidv('y_target') - gidv('y_initial');
+    		var theta = gidv('theta');
+
+    		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+
+    		gids('v_initial', v);
+    	} else if (mode=='find_min_v') {
+    		var x = gidv('x_target');
+    		var y = gidv('y_target') - gidv('y_initial');
+
+    		theta = Math.atan(y/x + Math.sqrt(y*y/x/x+1));
+    		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+
+    		gids('theta', theta);
+    		gids('v_initial', v);
+    	}
+
+
+		simulate = typeof simulate !== 'undefined' ? simulate : true;
+		if(!simulate) return; // lol you gotta simulate this
+
+		max_low       = +Infinity;
+		max_low_stat  = {};
+		max_low_run   = [];
+		max_high      = -Infinity;
+		max_high_stat = {};
+		max_high_run  = [];
+		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball'];
+
+		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+			params = [];
+			for (j=0; j<params_list.length; j++) {
+				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+			}
+			run = run_sim(params);
+			if (run[3]['y_low'] < max_low)   {
+				max_low      = run[3]['y_low'];
+				max_low_run  = run[0];
+				max_low_stat = run[3];
+			}
+			if (run[3]['y_high'] > max_high) {
+				max_high      = run[3]['y_high'];
+				max_high_run  = run[2];
+				max_high_stat = run[3];
+			}
+		}
+		
+		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
+		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
+		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
+      	plot_data([max_low_run, max_high_run], targetstuff);
+
+      	
+      	gids('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
+      	gids('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
+      	gids('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
+      	gids('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
+      	gids('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
+      	gids('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
+      	gids('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
+      	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
+	}
+
+	function NaNtoerr(x) {
+		if (isNaN(x)) return '-'; return x;
+	}
+
+
+	function NaNto1(x) {
+		if (isNaN(x))
+			return 1;
+		return x;
+	}
+
+
+</script>
+
+<html>
+<body onload="thload()">
+	<div style="width: 100%; float: left;" class="container">
+		<h3>Thad's Ballistic Trajectory Calculator</h3>
+		<center><a href="./">Back To Index</a><br/>WARNING: PLOT DOESNT HAVE SCALED AXES YET!</center>
+
+		<div class="even" style=''>
+			<table>
+				<tr>
+					<td>
+					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" > English
+					</td><td class="rowlabel">
+						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
+					</td><td>
+						<select id="mode" onchange="mode_select(); compute();">
+							<option value="raw" selected='selected'>Blind Adjustment</option>
+							<option value="find_theta">Find Angle</option>
+							<option value="find_v">Find Velocity</option>
+							<option value="find_min_v">Find Minimum Velocity</option>
+						</select>
+					</td>
+				</tr><tr>
+					<td>
+					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()" checked>
+					  Inches
+					</td>
+				</tr><tr>
+					<td>
+					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked> Metric
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<div style='display:table-row'>
+		<div class="odd" style='display:table-cell'>
+			<table>
+				<tr>
+					<th class='rowlabel'>Launch Angle</th>
+					<td><input id='theta' value=40><td class="tiny">&#177;</td>
+					<td><input id='theta_err' value=0></td>
+					<td class='unit' id='unit_theta'></td>
+				</tr><tr>
+					<th class="rowlabel">Launch Velocity</th>
+					<td><input id="v_initial" value=30></td><td class="tiny">&#177;</td>
+					<td><input id="v_initial_err" value=10></td>
+					<td class="unit" id='unit_v_initial'></td>
+				</tr><tr>
+					<th class='rowlabel'>Distance to Target</th>
+					<td><input id='x_target' value=5></td><td class="tiny">&#177;</td>
+					<td><input id="x_target_err" value=0.1></td>
+					<td class="unit" id='unit_x_target'></td>
+				</tr><tr>
+					<th class="rowlabel">Launch Height</th>
+					<td><input id="y_initial" value=1.5></td><td class="tiny">&#177;</td>
+					<td><input id="y_initial_err" value=''></td>
+					<td class="unit" id='unit_y_initial'></td>
+				</tr><tr>
+					<th class="rowlabel">Target Center Height</th>
+					<td><input id="y_target" value=3></td><td></td>
+					<td><!--<input id="y_target_err" value=''>--></td>
+					<td class="unit" id='unit_y_target'></td>
+				</tr><tr>
+					<th class="rowlabel">Target Height</th>
+					<td><input id="h_target" value=1></td><td></td>
+					<td><!--<input id="h_target_err" value=1>--></td>
+					<td class="unit" id='unit_h_target'></td>
+				</tr><tr>
+					<th class='rowlabel'>Projectile Diameter</th>
+					<td><input id='d_ball' value=200></td><td class="tiny">&#177;</td>
+					<td><input id='d_ball_err' value=0></td>
+					<td class='unit' id='unit_d_ball'></td>
+				</tr>
+			</table>
+		</div><div class="output" style='display:table-cell'>
+			<button type="button" onclick="compute()">Compute!</button>
+			<table>
+				<tr>
+					<th class='rowlabel'>Strike Point</th>
+					<td><input id='strike_height' disabled></td><td class="tiny">&#177;</td>
+					<td><input id='strike_height_err' disabled></td>
+					<td class='unit' id='unit_strike_height'></td>
+				</tr><tr>
+					<th class='rowlabel'>Swept Zone</th>
+					<td><input id='sweep_height' disabled></td><td class="tiny">&#177;</td>
+					<td><input id='sweep_height_err' disabled></td>
+					<td class='unit' id='unit_sweep_height'></td>
+				</tr><tr>
+					<th class="rowlabel">Angle of Strike</th>
+					<td><input id="strike_angle" disabled></td><td class="tiny">&#177;</td>
+					<td><input id="strike_angle_err" disabled></td>
+					<td class="unit" id='unit_strike_angle'></td>
+				</tr><tr>
+					<th class="rowlabel">Time of Flight</th>
+					<td><input id="time_of_flight" disabled></td><td class="tiny">&#177;</td>
+					<td><input id="time_of_flight_err" disabled></td>
+					<td class="unit" id='unit_time_of_flight'>[s]</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+	
+		<div id="chart_container" style="height: 600px; width=1000px;"></div>
+	</div>
+</body>
+</html>

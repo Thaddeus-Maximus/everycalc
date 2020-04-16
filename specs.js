@@ -158,7 +158,14 @@ var unit_conversions = {
 
 	'J': 1, //note: ft-lbf is covered by the torque section; and conversion factor is the same.
 
-	'C': 1
+	'C': 1,
+
+	'rad': 1,
+	'radian': 1,
+	'revolutions': Math.PI*2,
+	'rev': Math.PI*2,
+	'degrees': Math.PI/180,
+	'deg': Math.PI/180
 }
 
 // converting between things is for suckers. Just convert to base units, always.
