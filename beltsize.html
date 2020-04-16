@@ -66,16 +66,16 @@
 		p1 = gidv('p1_n') * pitch / Math.PI;	
 		p2 = gidv('p2_n') * pitch / Math.PI;
 
-		document.getElementById("ratio").value = p2/p1;
+		document.getElementById("ratio").value = (p2/p1).toFixed(4);
 
-		document.getElementById("p1_pd").value = p1;
-		document.getElementById("p2_pd").value = p2;
+		document.getElementById("p1_pd").value = p1.toFixed(4);
+		document.getElementById("p2_pd").value = p2.toFixed(4);
 
 		if (gidv('pitch')==5) {
 			od1 = p1 + 1.1/uconv;
 			od2 = p2 + 1.1/uconv;
-			document.getElementById('p1_od').value = od1;
-			document.getElementById('p2_od').value = od2;
+			document.getElementById('p1_od').value = od1.toFixed(4);
+			document.getElementById('p2_od').value = od2.toFixed(4);
 		} else {
 			document.getElementById('p1_od').value = '';
 			document.getElementById('p2_od').value = '';
@@ -96,11 +96,11 @@
 				document.getElementById("p1_s")		.value = 'close';
 				document.getElementById("p2_s")		.value = '!';
 			} else {
-				document.getElementById("n_teeth_s").value = nb;
-				document.getElementById("l_s")		.value = l;
-				document.getElementById("cc_s")		.value = cc;
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,pitch);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,pitch);
+				document.getElementById("n_teeth_s").value = nb.toFixed(4);
+				document.getElementById("l_s")		.value = l.toFixed(4);
+				document.getElementById("cc_s")		.value = cc.toFixed(4);
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,pitch).toFixed(4);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,pitch).toFixed(4);
 			}
 		} else if (document.getElementById('type_timing').checked) {
 			cc = gidv('driver_val') - gidv("center_add");
@@ -139,11 +139,11 @@
 				document.getElementById("p1_l")		.value = '';
 				document.getElementById("p2_l")		.value = '!';
 			} else {
-				document.getElementById("n_teeth_l").value = nb_l;
-				document.getElementById("l_l")		.value = l_l;
-				document.getElementById("cc_l")		.value = cc_l;
-				document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch);
-				document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch);
+				document.getElementById("n_teeth_l").value = nb_l.toFixed(4);
+				document.getElementById("l_l")		.value = l_l.toFixed(4);
+				document.getElementById("cc_l")		.value = cc_l.toFixed(4);
+				document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch).toFixed(4);
+				document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch).toFixed(4);
 			}
 
 			if (isNaN(cc_s) || cc_s <= (p1+p2)/2*1.01) {
@@ -153,11 +153,11 @@
 				document.getElementById("p1_s")		.value = '';
 				document.getElementById("p2_s")		.value = '!';
 			} else {
-				document.getElementById("n_teeth_s").value = nb_s;
-				document.getElementById("l_s")		.value = l_s;
-				document.getElementById("cc_s")		.value = cc_s;
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch);
+				document.getElementById("n_teeth_s").value = nb_s.toFixed(4);
+				document.getElementById("l_s")		.value = l_s.toFixed(4);
+				document.getElementById("cc_s")		.value = cc_s.toFixed(4);
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch).toFixed(4);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch).toFixed(4);
 			}
 		} else {
 			crossed = document.getElementById("crossed").checked;
@@ -174,10 +174,10 @@
 				document.getElementById("p2_s")		.value = '!';
 			} else {
 				document.getElementById("n_teeth_s").value = "-";
-				document.getElementById("l_s")		.value = l;
-				document.getElementById("cc_s")		.value = gidv('driver_val');
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,1);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,1);
+				document.getElementById("l_s")		.value = l.toFixed(4);
+				document.getElementById("cc_s")		.value = gidv('driver_val').toFixed(4);
+				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,1).toFixed(4);
+				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,1).toFixed(4);
 			}
 		}
 	}
@@ -226,24 +226,22 @@
 	function switch_type() {
 		v = document.getElementById("type_timing").checked;
 		if (v) {
-			document.getElementById("driver").disabled = false;
+			document.getElementById("driver").readonly = false;
 			document.getElementById("th_pitch").style.display="table-row";
 			document.getElementById("th_stretch").style.display="none";
 			document.getElementById("p1_mesh").innerHTML = "P1 Teeth in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Teeth in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "# Teeth";
-			document.getElementById("no_teeth_2").innerHTML = "# Teeth";
-			//document.getElementById("center_add").disabled = false;
+			//document.getElementById("center_add").readonly = false;
 		} else {
 			document.getElementById("driver").value = "cc";
-			document.getElementById("driver").disabled = true;
+			document.getElementById("driver").readonly = true;
 			document.getElementById("th_pitch").style.display="none";
 			document.getElementById("th_stretch").style.display="table-row";
 			document.getElementById("p1_mesh").innerHTML = "P1 Distance in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Distance in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "Pulley Diam.";
-			document.getElementById("no_teeth_2").innerHTML = "Pulley Diam.";
-			//document.getElementById("center_add").disabled = true;
+			//document.getElementById("center_add").readonly = true;
 		}
 		driver_select();
 	}
@@ -260,7 +258,7 @@
 	<div class="even">
 		<center>
 			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="compute()"  checked>
-			  <label for="inch">Inches</label><br>
+			  <label for="inch">Inches</label>
 			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="compute()" >
 			  <label for="mm">Millimeters</label><br>
 			  <input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switch_type()" checked>
@@ -283,13 +281,13 @@
 			<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
 		</tr>
 		<tr>
-			<th class="collabel" colspan=2>Pulley 1</th>
-			<th class="collabel" colspan=2>Pulley 2</th>
+			<td></td>
+			<th class="collabel">Pulley 1</th>
+			<th class="collabel">Pulley 2</th>
 			<th class="collabel" colspan=2>Center</th>
 		</tr><tr>
 			<th class="rowlabel" id="no_teeth_1"># Teeth</th>
 			<th><input id="p1_n" value=24 onchange="compute()" /></th>
-			<th class="rowlabel" id="no_teeth_2"># Teeth</th>
 			<th><input id="p2_n" value=18 onchange="compute()" /></th>
 			<th id="des_cc" class="rowlabel">
 				<select id="driver" onchange="driver_select()">
@@ -302,25 +300,18 @@
 			<th><input id="des_teeth" value=500 style="display:none" /></th>-->
 		</tr><tr>
 			<th class="rowlabel">OD</th>
-			<th><input id="p1_od" disabled /></th>
-			<th class="rowlabel">OD</th>
-			<th><input id="p2_od" disabled /></th>
-			<th id="center_add_label" class="rowlabel">Center Add</th>
+			<th><input id="p1_od" readonly /></th>
+			<th><input id="p2_od" readonly /></th>
+			<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
 			<th><input id="center_add" value=0.000  onchange="compute()" /></th>
 		</tr><tr>
 			<th class="rowlabel">PD</th>
-			<th><input id="p1_pd" disabled /></th>
-			<th class="rowlabel">PD</th>
-			<th><input id="p2_pd" disabled /></th>
+			<th><input id="p1_pd" readonly /></th>
+			<th><input id="p2_pd" readonly /></th>
 			<th class="rowlabel">Ratio</th>
-			<th><input id="ratio" disabled /></th>
-		</tr>
-	</table>
-	</div><div class="even" id="results_table">
-		<center>
-		<table>
-			<tr  id="src_label">
-				<th class="collabel" colspan=3>
+			<th><input id="ratio" readonly /></th>
+		</tr><tr id="src_label">
+				<th class="collabel" colspan=5>
 					Belting Option Source: <select id="vendor" onchange="vendor_select()">
 						<option value="vex">VexPro</option>
 						<option value="am">AndyMark</option>
@@ -328,30 +319,35 @@
 					</select>
 					<input id="raw_inc" value=5 onchange="compute()" /><span id="raw_inc_label">Teeth</span>
 				</th>
-			</tr><tr id="sm_lrg_label">
+			</tr>
+	</table>
+	</div><div class="output" id="results_table">
+		<center>
+		<table>
+			<tr id="sm_lrg_label">
 				<th class="collabel"></th>
 				<th class="collabel">Smaller</th>
 				<th class="collabel">Larger</th>
 			</tr><tr id="no_teeth_out">
 				<th class="rowlabel"># of Teeth</th>
-				<td><input id="n_teeth_s" disabled /></td>
-				<td><input id="n_teeth_l" disabled /></td>
+				<td><input id="n_teeth_s" readonly /></td>
+				<td><input id="n_teeth_l" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel">Length</th>
-				<td><input id="l_s" disabled /></td>
-				<td><input id="l_l" disabled /></td>
+				<td><input id="l_s" readonly /></td>
+				<td><input id="l_l" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel">Center-Center</th>
-				<td><input id="cc_s" disabled /></td>
-				<td><input id="cc_l" disabled /></td>
+				<td><input id="cc_s" readonly /></td>
+				<td><input id="cc_l" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel" id="p1_mesh">P1 Teeth In Mesh</th>
-				<td><input id="p1_s" disabled /></td>
-				<td><input id="p1_l" disabled /></td>
+				<td><input id="p1_s" readonly /></td>
+				<td><input id="p1_l" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel" id="p2_mesh">P2 Teeth In Mesh</th>
-				<td><input id="p2_s" disabled /></td>
-				<td><input id="p2_l" disabled /></td>
+				<td><input id="p2_s" readonly /></td>
+				<td><input id="p2_l" readonly /></td>
 			</tr>
 		</table>
 	</center>
