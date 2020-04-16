@@ -226,22 +226,22 @@
 	function switch_type() {
 		v = document.getElementById("type_timing").checked;
 		if (v) {
-			document.getElementById("driver").readonly = false;
+			document.getElementById("driver").readOnly = false;
 			document.getElementById("th_pitch").style.display="table-row";
 			document.getElementById("th_stretch").style.display="none";
 			document.getElementById("p1_mesh").innerHTML = "P1 Teeth in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Teeth in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "# Teeth";
-			//document.getElementById("center_add").readonly = false;
+			//document.getElementById("center_add").readOnly = false;
 		} else {
 			document.getElementById("driver").value = "cc";
-			document.getElementById("driver").readonly = true;
+			document.getElementById("driver").readOnly = true;
 			document.getElementById("th_pitch").style.display="none";
 			document.getElementById("th_stretch").style.display="table-row";
 			document.getElementById("p1_mesh").innerHTML = "P1 Distance in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Distance in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "Pulley Diam.";
-			//document.getElementById("center_add").readonly = true;
+			//document.getElementById("center_add").readOnly = true;
 		}
 		driver_select();
 	}

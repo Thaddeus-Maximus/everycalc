@@ -8,7 +8,7 @@
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
 
-unit_sys = 0;
+unit_sys = 1;
 inputs_unit_map = {
 	'theta': 			['deg', 'deg', 'deg'],
 	'theta_err': 		['deg', 'deg', 'deg'],
@@ -107,18 +107,19 @@ chart_container = null;
 
     function mode_select() {
     	var mode = document.getElementById('mode').value;
+    	console.log(mode);
     	if (mode=='raw') {
-    		document.getElementById('v_initial').readonly = false;
-    		document.getElementById('theta').readonly     = false;
+    		document.getElementById('v_initial').readOnly = false;
+    		document.getElementById('theta').readOnly     = false;
     	} else if (mode=='find_theta') {
-    		document.getElementById('v_initial').readonly = false;
-    		document.getElementById('theta').readonly     = true;
+    		document.getElementById('v_initial').readOnly = false;
+    		document.getElementById('theta').readOnly     = true;
     	} else if (mode=='find_v') {
-    		document.getElementById('v_initial').readonly = true;
-    		document.getElementById('theta').readonly     = false;
+    		document.getElementById('v_initial').readOnly = true;
+    		document.getElementById('theta').readOnly     = false;
     	} else if (mode=='find_min_v') {
-    		document.getElementById('v_initial').readonly = true;
-    		document.getElementById('theta').readonly     = true;
+    		document.getElementById('v_initial').readOnly = true;
+    		document.getElementById('theta').readOnly     = true;
     	}
     }
 
@@ -370,7 +371,7 @@ chart_container = null;
 			<table>
 				<tr>
 					<td>
-					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" > English
+					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
 					</td><td class="rowlabel">
 						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
 					</td><td>
@@ -383,12 +384,12 @@ chart_container = null;
 					</td>
 				</tr><tr>
 					<td>
-					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()" checked>
+					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()">
 					  Inches
 					</td>
 				</tr><tr>
 					<td>
-					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked> Metric
+					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
 					</td>
 				</tr>
 			</table>
@@ -399,18 +400,18 @@ chart_container = null;
 			<table>
 				<tr>
 					<th class='rowlabel'>Launch Angle</th>
-					<td><input id='theta' value=40><td class="tiny">&#177;</td>
-					<td><input id='theta_err' value=0></td>
+					<td><input id='theta' value=30><td class="tiny">&#177;</td>
+					<td><input id='theta_err' value=''></td>
 					<td class='unit' id='unit_theta'></td>
 				</tr><tr>
 					<th class="rowlabel">Launch Velocity</th>
-					<td><input id="v_initial" value=30></td><td class="tiny">&#177;</td>
-					<td><input id="v_initial_err" value=10></td>
+					<td><input id="v_initial" value=45></td><td class="tiny">&#177;</td>
+					<td><input id="v_initial_err" value=''></td>
 					<td class="unit" id='unit_v_initial'></td>
 				</tr><tr>
 					<th class='rowlabel'>Distance to Target</th>
-					<td><input id='x_target' value=5></td><td class="tiny">&#177;</td>
-					<td><input id="x_target_err" value=0.1></td>
+					<td><input id='x_target' value=15></td><td class="tiny">&#177;</td>
+					<td><input id="x_target_err" value=''></td>
 					<td class="unit" id='unit_x_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Launch Height</th>
@@ -419,18 +420,18 @@ chart_container = null;
 					<td class="unit" id='unit_y_initial'></td>
 				</tr><tr>
 					<th class="rowlabel">Target Center Height</th>
-					<td><input id="y_target" value=3></td><td></td>
+					<td><input id="y_target" value=8></td><td></td>
 					<td><!--<input id="y_target_err" value=''>--></td>
 					<td class="unit" id='unit_y_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Target Height</th>
-					<td><input id="h_target" value=1></td><td></td>
+					<td><input id="h_target" value=30></td><td></td>
 					<td><!--<input id="h_target_err" value=1>--></td>
 					<td class="unit" id='unit_h_target'></td>
 				</tr><tr>
 					<th class='rowlabel'>Projectile Diameter</th>
-					<td><input id='d_ball' value=200></td><td class="tiny">&#177;</td>
-					<td><input id='d_ball_err' value=0></td>
+					<td><input id='d_ball' value=7></td><td class="tiny">&#177;</td>
+					<td><input id='d_ball_err' value=''></td>
 					<td class='unit' id='unit_d_ball'></td>
 				</tr>
 			</table>
@@ -439,23 +440,23 @@ chart_container = null;
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
-					<td><input id='strike_height' readonly></td><td class="tiny">&#177;</td>
-					<td><input id='strike_height_err' readonly></td>
+					<td><input id='strike_height' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='strike_height_err' readOnly></td>
 					<td class='unit' id='unit_strike_height'></td>
 				</tr><tr>
 					<th class='rowlabel'>Swept Zone</th>
-					<td><input id='sweep_height' readonly></td><td class="tiny">&#177;</td>
-					<td><input id='sweep_height_err' readonly></td>
+					<td><input id='sweep_height' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='sweep_height_err' readOnly></td>
 					<td class='unit' id='unit_sweep_height'></td>
 				</tr><tr>
 					<th class="rowlabel">Angle of Strike</th>
-					<td><input id="strike_angle" readonly></td><td class="tiny">&#177;</td>
-					<td><input id="strike_angle_err" readonly></td>
+					<td><input id="strike_angle" readOnly></td><td class="tiny">&#177;</td>
+					<td><input id="strike_angle_err" readOnly></td>
 					<td class="unit" id='unit_strike_angle'></td>
 				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
-					<td><input id="time_of_flight" readonly></td><td class="tiny">&#177;</td>
-					<td><input id="time_of_flight_err" readonly></td>
+					<td><input id="time_of_flight" readOnly></td><td class="tiny">&#177;</td>
+					<td><input id="time_of_flight_err" readOnly></td>
 					<td class="unit" id='unit_time_of_flight'>[s]</td>
 				</tr>
 			</table>

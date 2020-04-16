@@ -49,8 +49,8 @@
     google.charts.setOnLoadCallback(drawStuff);
 
     function populate_direction() {
-    	document.getElementById('direction_push').readonly = direction_push;
-    	document.getElementById('direction_pull').readonly = !direction_push;
+    	document.getElementById('direction_push').readOnly = direction_push;
+    	document.getElementById('direction_pull').readOnly = !direction_push;
     }
 
     direction_push = true;
