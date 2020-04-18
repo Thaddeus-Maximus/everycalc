@@ -343,6 +343,18 @@
 		gids("G", G);
 	}
 
+	function collapse(id) {
+		el = document.getElementById('detail_'+id);
+		btn = document.getElementById('toggle_detail_'+id);
+		if(el.style['display'] != 'none') {
+			el.style['display'] = 'none';
+			btn.innerHTML = "&#9660";
+		} else {
+			el.style['display'] = 'inherit';
+			btn.innerHTML = "&#9650";
+		}
+	}
+
 </script>
 
 <html>
@@ -351,7 +363,7 @@
 	<h3>Thad's Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
-	<div class="even">
+	<div class="odd">
 		<center>
 			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
 			  <label for="english">English</label><br>
@@ -360,43 +372,29 @@
 		</center>
 	</div>
 
-	<div class="odd">
-		<table>
-		<tr>
-			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
-			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
-		</tr><tr>
-			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
-			<td class="unit">[V]</td>
-		</tr><tr>
-			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
-			<td class="unit">[%]</td>
-		</tr>
-	</table>
-</div>
-
 	
 
 	<div class="even">
-		<table>
-		<tr>
-			<th>Motor</th>
-			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
-			  
-			  <!--<option value="neo">REV NEO</option>
-			  <option value="neo550">REV NEO550</option>
-			  <option value="falcon500">VEX Falcon 500</option>
-			  <option value="cim">CIM</option>
-			  <option value="minicim">MiniCIM</option>
-			  <option value="bag">Vex BAG</option>
-			  <option value="775pro">775Pro / Redline</option>
-			  <option value="am9015">AndyMark 9015</option>
-			  <option value="neverest">AndyMark NeveRest</option>
-			  <option value="rs550">BaneBots RS-550</option>-->
-			</select></td>
-		</tr>
+		<div>
+			<span class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></span>
+			<input class='narrow' id="motornum" oninput="motortype_select()" value=1 />
+
+			<span class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></span>
+			<input class='narrow' id="op_voltage" oninput="motortype_select()" value=12 />
+			<span class="unit">[V]</span>
+			
+			<span class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></span>
+			<input class='narrow'  id="efficiency" oninput="motortype_select()" value=85 />
+			<span class="unit">[%]</span>
+			
+		</div>
+		<div>
+			
+			Motor
+			<select class="doublewide" id="motortype" oninput="motortype_select()"></select>
+			<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>
+		</div>
+	<table id='detail_motor' style='display:none;'>
 		<tr>
 			<th></th>
 			<th class="collabel">Raw Motor</th>
@@ -427,12 +425,13 @@
 	</table>
 </div>
 	<div class="odd">
-		<table>
+		<div>
+		<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
+		<input id="G" readonly/>
+		<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>
+	</div>
+	<table id='detail_gratio' style="display:none;">
 		<tr>
-			<th class="rowlabel">Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
-			<td class="tiny"></td>
-			<td><input id="G" readonly/></td>
-		</tr><tr>
 			<td><input id="G1A" oninput="calc_ratio()" /></td>
 			<td class="tiny">:</td>
 			<td><input id="G1B" oninput="calc_ratio()" /></td>
@@ -451,15 +450,17 @@
 		</tr>
 	</table>
 </div><div class="even">
-	<table>
-		<tr>
-			<th class="rowlabel" colspan=2>Encoder Relativity <span class="ttt">(Optional) Where is the encoder placed - on (or in) the motor, or on the output shaft?</span>
-				<select id="encoder_placement" onchange="compute(false)">
+	<div>
+		<span class="rowlabel">Encoder Relativity<span class="ttt">(Optional) Where is the encoder placed - on (or in) the motor, or on the output shaft?</span></span>
+			<select id="encoder_placement" onchange="compute(false)">
 				<option value="none">No Encoder</option>
 				<option value="motor">To Motor</option>
 				<option value="output">To Output</option>
-			</select></td>
-		</tr><tr class='encoder_detail'>
+			</select>
+		<button type="button" onclick="collapse('encoder')" id='toggle_detail_encoder'>&#9660;</button>
+		</div>
+		<table id='detail_encoder' style='display:none;'>
+		<tr class='encoder_detail'>
 			<th class="rowlabel">CPR<span class="ttt">Encoder Counts Per Revolution<br/>(you can also put ticks, and ticks will be computed. Math is the same)</span></th>
 			<td><input id="encoder_cpr" onchange="compute(false)" value=1 /></td>
 			<th class="rowlabel">C/x<span class="ttt">Encoder Counts Per Distance Traveled<br/>(how many encoder counts per unit distance traveled)</span></th>
@@ -491,7 +492,23 @@
 			<td><input id="endcond" oninput="" value="t > 5"/></td>
 		</tr>
 	</table>
-	<button type="button" onclick="compute()">Compute!</button>
+<div class="even">
+	Variable reference for use in expressions
+	<button type="button" onclick="collapse('varref')" id='toggle_detail_varref'>&#9660;</button>
+	<table id='detail_varref' style='display:none;'>
+			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
+			<tr><th class='rowlabel'>m</th><td class="unit" id="unit_mass_ref">[kg]</td><td>Mass</td></tr>
+			<tr><th class='rowlabel'>I</th><td class="unit" id="unit_moi_ref"></td><td>MOI</td></tr>
+			<tr><th class='rowlabel'>r</th><td class="unit" id="unit_radius_ref"></td><td>Radius</td></tr>
+			<tr><th class='rowlabel'>t</th><td class="unit">[s]</td><td>Time</td></tr>
+			<tr><th class='rowlabel'>v</th><td class="unit" id="unit_velocity_ref"></td><td>Lin. Velocity</td></tr>
+			<tr><th class='rowlabel'>x</th><td class="unit" id="unit_position_ref"></td><td>Lin. Position</td></tr>
+			<tr><th class='rowlabel'>omega</th><td class="unit">[RPM]</td><td>Rot. Velocity</td></tr>
+			<tr><th class='rowlabel'>theta</th><td class="unit">[Rev]</td><td>Rot. Position</td></tr>
+			<tr><th class='rowlabel'>omega_m</th><td class="unit">[RPM]</td><td>Rot. Motor Velocity</td></tr>
+			<tr><th class='rowlabel'>theta_m</th><td class="unit">[Rev]</td><td>Rot. Motor Position</td></tr>
+	</table>
+	<center><button type="button" onclick="compute()">Compute!</button></center>
 </div>
 <div  class="output">
 	<table>
@@ -527,22 +544,7 @@
 		</tr>
 	</table>
 </div>
-<div class="even">
-	Variable reference for use in expressions
-	<table>
-			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
-			<tr><th class='rowlabel'>m</th><td class="unit" id="unit_mass_ref">[kg]</td><td>Mass</td></tr>
-			<tr><th class='rowlabel'>I</th><td class="unit" id="unit_moi_ref"></td><td>MOI</td></tr>
-			<tr><th class='rowlabel'>r</th><td class="unit" id="unit_radius_ref"></td><td>Radius</td></tr>
-			<tr><th class='rowlabel'>t</th><td class="unit">[s]</td><td>Time</td></tr>
-			<tr><th class='rowlabel'>v</th><td class="unit" id="unit_velocity_ref"></td><td>Lin. Velocity</td></tr>
-			<tr><th class='rowlabel'>x</th><td class="unit" id="unit_position_ref"></td><td>Lin. Position</td></tr>
-			<tr><th class='rowlabel'>omega</th><td class="unit">[RPM]</td><td>Rot. Velocity</td></tr>
-			<tr><th class='rowlabel'>theta</th><td class="unit">[Rev]</td><td>Rot. Position</td></tr>
-			<tr><th class='rowlabel'>omega_m</th><td class="unit">[RPM]</td><td>Rot. Motor Velocity</td></tr>
-			<tr><th class='rowlabel'>theta_m</th><td class="unit">[Rev]</td><td>Rot. Motor Position</td></tr>
-	</table>
-</div>
+
 
 <!--<div class="even">
 	<button type="button" onclick="compute()">CALCULATE!</button>

@@ -75,6 +75,13 @@ select, input {
 	background-color: #fca;
 }
 
+.collapse button {
+
+}
+
+input.narrow  {
+  width: 45px;
+}
 
 .container {
 	float: left;
