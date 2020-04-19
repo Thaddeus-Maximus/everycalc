@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <link rel="stylesheet" href="style.css"> 
 <script type="text/javascript" src="specs.js"></script>
+<script type="text/javascript" src="dual_chart.js"></script>
 <script type="text/javascript">
 	unit_sys = 0;
 	inputs_unit_map = {
@@ -43,77 +43,6 @@
 		populate_units();
 		compute();
 	}
-
-	var vchart = null, vchart_options = null;
-	var xchart = null, xchart_options = null;
-
-	google.charts.load('current', {'packages':['corechart', 'scatter', 'line']});
-    google.charts.setOnLoadCallback(drawStuff);
-
-
-    function drawStuff() {
-      vchart = new google.visualization.LineChart(document.getElementById('vchart_div'));
-      var vchartDiv = document.getElementById('vchart_div');
-
-      vchart_options = {
-          backgroundColor: { fill:'transparent' },
-          curveType: 'function',
-          legend: {position: 'top'},
-          vAxes: {
-          	0: {title: 'Linear Velocity (m/s)'},
-          	1: {title: 'Linear Position (m)'}
-          },
-          series: {
-          	0: {targetAxisIndex: 0},
-          	1: {targetAxisIndex: 1}
-          },
-          vAxis: {
-	          viewWindow: {
-	            min: 0
-	          }
-	        }
-
-      };
-
-      var vdata = new google.visualization.DataTable();
-      vdata.addColumn('number', 'Time (s)');
-      vdata.addColumn('number', 'Linear Velocity (m/s)');
-      vdata.addColumn('number', 'Linear Position (m)');
-      vdata.addRows([]);
-
-      vchart.draw(vdata, vchart_options);
-
-      xchart = new google.visualization.LineChart(document.getElementById('xchart_div'));
-      var xchartDiv = document.getElementById('xchart_div');
-
-      xchart_options = {
-          backgroundColor: { fill:'transparent' },
-          curveType: 'function',
-          legend: {position: 'top'},
-          vAxes: {
-          	0: {title: 'Angular Velocity (RPM)'},
-          	1: {title: 'Rotational Position (Rev)'}
-          },
-          series: {
-          	0: {targetAxisIndex: 0},
-          	1: {targetAxisIndex: 1}
-          },
-          vAxis: {
-	          viewWindow: {
-	            min: 0
-	          }
-	        }
-
-      };
-
-      var xdata = new google.visualization.DataTable();
-      xdata.addColumn('number', 'Time (s)');
-      xdata.addColumn('number', 'Angular Velocity (RPM)');
-      xdata.addColumn('number', 'Rotational Position (Rev)');
-      xdata.addRows([]);
-
-      xchart.draw(xdata, xchart_options);
-    };
 
 	function get_motor_data(motor,key){
 		return motor_data[motor][key];
@@ -167,7 +96,6 @@
 			select.appendChild(opt);
 		}
 
-		drawStuff();
 		calc_ratio();
 		motortype_select(document.getElementById("motortype"));
 		
@@ -242,17 +170,9 @@
 
 		alpha_o = NaN;
 
-		var vdata = new google.visualization.DataTable();
-		vdata.addColumn('number', 'Time (s)');
-      	vdata.addColumn('number', 'Linear Velocity (m/s)');
-      	vdata.addColumn('number', 'Linear Position (m)');
-      	vdata.addRows([[0,0,0]]);
-
-      	var xdata = new google.visualization.DataTable();
-		xdata.addColumn('number', 'Time (s)');
-      	xdata.addColumn('number', 'Angular Velocity (RPM)');
-      	xdata.addColumn('number', 'Rotational Position (rev)');
-      	xdata.addRows([[0,0,0]]);
+		tdata = [0];
+		xdata = [0];
+		vdata = [0];
       	i=0;
 		while(1) {
 			//console.log(dt);
@@ -281,8 +201,9 @@
 
 			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf);
 
-			vdata.addRows([[t_ar[t_ar.length-1], omega_ar[omega_ar.length-1]*r, 			r*theta_ar[theta_ar.length-1]]]);
-			xdata.addRows([[t_ar[t_ar.length-1], 60/2/Math.PI*omega_ar[omega_ar.length-1], 	2/Math.PI*theta_ar[theta_ar.length-1]]])
+			tdata.push(t_ar[t_ar.length-1]);
+			xdata.push(omega_ar[omega_ar.length-1]*r);
+			vdata.push(theta_ar[theta_ar.length-1]*r);
 
 			if (i > 1000 || eval(end_expr)) break;
 
@@ -290,14 +211,11 @@
 			i++;
 		}
 
-		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth purposes
+		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
 
-		//console.log(vdata, xdata);
-
-		vchart.draw(vdata, vchart_options);
-      	xchart.draw(xdata, xchart_options);
-      	document.getElementById('charts').classList.remove('uncomputed');
-      	document.getElementById('endcond_met').classList.remove('uncomputed');
+		drawchart1(tdata, xdata, vdata);
+		document.getElementById('charts').classList.remove('uncomputed');
+		document.getElementById('endcond_met').classList.remove('uncomputed');
 		document.getElementById('current_cons').classList.remove('uncomputed');
 		document.getElementById('current_end').classList.remove('uncomputed');
 
@@ -357,16 +275,122 @@
 
 </script>
 
+<script style="text/javascript">
+	function makeTicks(xmax, x2max, n) {
+		if (xmax < 0 || x2max < 0) return [0];
+		h = xmax/n; h2 = x2max/n;
+		base = Math.floor(Math.log10(h));
+		base2 = Math.floor(Math.log10(h2));
+		h = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
+		h2 = Math.round(h2/Math.pow(10, base2))*Math.pow(10, base2);
+		ticks = [];
+		ticksstr = [];
+		for(var i=0; h*(i-1) < xmax || h2*(i-1) < x2max; i++) {
+			ticks.push(h*i);
+			ticksstr.push((h*i).toFixed(base < 0 ? 1:-base+1));
+		}
+		return [ticks, ticksstr];
+	}
+
+	function sign(x) {
+		if(x>0) return 1;
+		if(x<0) return -1;
+		return 0;
+	}
+
+	function drawTicks(axis, ticks, ticklabels, ff, f0, gf, g0, max, marg) {
+		altaxis = axis == 'x' ? 'y':'x';
+		realaxis = axis == 'z' ? 'y':axis;
+		xgrid = document.getElementById(axis+'_grid');
+		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
+
+		labels = document.getElementById(axis+'_labels');
+		while(labels.children.length>1) labels.removeChild(labels.lastChild);
+
+		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
+
+		for (i in ticks) {
+			line = document.createElementNS('http://www.w3.org/2000/svg','line');
+			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
+			fp = f0 + (ff-f0)/(max-0)*ticks[i];
+			line.setAttribute(realaxis+'1', fp);
+			line.setAttribute(realaxis+'2', fp);
+			line.setAttribute('class', 'grid');
+			xgrid.append(line);
+
+			label = document.createElementNS('http://www.w3.org/2000/svg','text');
+			label.setAttribute(altaxis, gfl);
+			label.setAttribute(realaxis, fp);
+			label.innerHTML = i==0 ? '0' : ticklabels[i];
+			labels.append(label);
+		}
+	}
+
+		
+	function removeElementsByClass(className){
+	    var elements = document.getElementsByClassName(className);
+	    while(elements.length > 0){
+	        elements[0].parentNode.removeChild(elements[0]);
+	    }
+	}
+
+	function svglen(svg, v) {
+		l = svg.createSVGLength();
+		l.baseVal = v;
+		l.animVal = v;
+		return l;
+	}
+
+	function drawchart1(x,y,z) {
+		svg = document.getElementById('chart_position');
+		x_axis = document.getElementById('x_axis');
+		y_axis = document.getElementById('y_axis');
+		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+		z0 = y0; zf = yf;
+
+		y_line = document.getElementById('y_line');
+		z_line = document.getElementById('z_line');
+		y_line.setAttribute("points",""); // I don't like it, but it does clear the points
+		z_line.setAttribute("points",""); // I don't like it, but it does clear the points
+
+		[xticks, xticklabels] = makeTicks(Math.max(...x), Math.max(...x), 9);
+		[yticks, yticklabels] = makeTicks(Math.max(...y), Math.max(...z), 6);
+		[zticks, zticklabels] = makeTicks(Math.max(...z), Math.max(...y), 6);
+		xmax = xticks[xticks.length-1];
+		ymax = yticks[yticks.length-1];
+		zmax = zticks[zticks.length-1];
+
+		drawTicks('x', xticks, xticklabels, xf, x0, yf, y0, xmax, 15);
+		drawTicks('y', yticks, yticklabels, yf, y0, xf, x0, ymax, 5);
+		drawTicks('z', zticks, zticklabels, zf, z0, xf, x0, zmax, 5);
+
+		for (i in x) {
+			var pty = svg.createSVGPoint();
+			var ptz = svg.createSVGPoint();
+			pty.x = ptz.x = x0 + (xf-x0)/(xmax-0)*x[i];
+			pty.y = y0 + (yf-y0)/(ymax-0)*y[i];
+			ptz.y = z0 + (zf-z0)/(zmax-0)*z[i];
+			y_line.points.appendItem(pty);
+			z_line.points.appendItem(ptz);
+		}
+	}
+</script>
+
+
 <html>
 <body onload="thload()">
-	<div style="width: 420px; float: left;" class="container">
+	<div style="display:table;">
+	<div style="width: 420px; float: left; display:table-cell;" class="container">
 	<h3>Thad's Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
 	<div class="odd">
 		<center>
 			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
-			  <label for="english">English</label><br>
+			  <label for="english">English</label>
 			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
 			  <label for="metric">Metric</label><br>
 		</center>
@@ -543,16 +567,61 @@
 			<td class="unit">[A]</td>
 		</tr>
 	</table>
-</div>
-
+	</div>
+</div></div>
 
 <!--<div class="even">
 	<button type="button" onclick="compute()">CALCULATE!</button>
 </div>-->
 
-</div><div style="margin-left: 0px;" class="container" id="charts">
-	 <div id="vchart_div" style="width: 900px; height: 500px"></div>
-	 <div id="xchart_div" style="width: 900px; height: 500px"></div>
+
+<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+
+<svg version="1.2" class="graph" id='chart_position' aria-labelledby="title" role="img">
+  <title id="title">Position/Velocity Data</title>
+
+<g class="x-grid" id="xAxes">
+  <line id="x_axis" class="axes" x1="50" x2="50" y1="20" y2="450"></line>
+</g>
+<g class="y-grid" id="yAxes">
+  <line id="y_axis" class="axes" x1="50" x2="705" y1=450 y2=450></line>
+</g>
+<g class="y-grid" id="zAxes">
+  <line id="z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+</g>
+
+<g class="x-grid" id="x_grid">
+</g>
+<g class="y-grid" id="y_grid">
+</g>
+<g class="z-grid" id="z_grid">
+</g>
+  <g class="labels x-labels" id='x_labels'>
+  <text x="375" y=485 class="label-title">Time [s]</text>
+</g>
+<g class="labels y-labels" id='y_labels'>
+  <text x=-220 y=10 class="label-title" transform="rotate(270)">Position</text>
+</g>
+<g class="labels z-labels" id='z_labels'>
+  <text x=-220 y=760 class="label-title" transform="rotate(270)">Velocity</text>
+</g>
+<polyline
+	id='y_line'
+	fill='none'
+	stroke='#0074d9'
+	stroke-width=2
+	points="
+	"/>
+<polyline
+	id='z_line'
+	fill='none'
+	stroke='#d91200'
+	stroke-width=2
+	points="
+	"/>
+
+</svg>
 	</div>
+</div>
 </body>
 </html>

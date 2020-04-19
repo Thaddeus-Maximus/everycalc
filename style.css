@@ -82,6 +82,13 @@ select, input {
 input.narrow  {
   width: 45px;
 }
+input {
+  background-color: #fff;
+}
+
+input[readonly] {
+  background-color: #ccd;
+}
 
 .container {
 	float: left;
@@ -132,4 +139,50 @@ input.narrow  {
 .rowlabel:hover .ttt {
   visibility: visible;
   opacity: 1;
+}
+
+.graph .labels.x-labels {
+  text-anchor: middle;
+}
+
+.graph .labels.y-labels {
+  text-anchor: end;
+}
+.graph .labels.z-labels {
+  text-anchor: start;
+}
+
+
+.graph {
+  height: 550px;
+  width: 780px;
+  margin: 10px;
+}
+
+.graph .axes {
+  stroke: #333;
+  stroke-dasharray: 0;
+  stroke-width: 1.5;
+}
+
+.graph .grid {
+  stroke: #ccc;
+  stroke-dasharray: 0;
+  stroke-width: 1;
+}
+
+.labels {
+  font-size: 13px;
+}
+
+.label-title {
+  font-weight: bold;
+  font-size: 12px;
+  fill: black;
+  text-anchor: middle;
+}
+
+.data {
+  fill: red;
+  stroke-width: 1; 
 }
