@@ -19,7 +19,10 @@
 		"moi_ref": ["kg m^2", "lbm in^2"],
 		"radius_ref": ["m"," in"],
 		"velocity_ref": ["m/s", "ft/s"],
-		"position_ref": ["m", "ft"]
+		"position_ref": ["m", "ft"],
+
+		"xout": ["m", "ft"],
+		"vout": ["m/s", "ft/s"]
 	}
 
 	function populate_units() {
@@ -36,10 +39,12 @@
 				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
 			}
 		}
+
+		document.getElementById('chart_position_label').innerHTML = 'Position ['+inputs_unit_map['xout'][unit_sys]+']';
+		document.getElementById('chart_velocity_label').innerHTML = 'Velocity ['+inputs_unit_map['vout'][unit_sys]+']';
 	}
 
 	function switch_units() {
-
 		populate_units();
 		compute();
 	}
@@ -48,10 +53,10 @@
 		return motor_data[motor][key];
 	}
 
-	function gidv(id) {
+	function gidv(id, ignore_units) {
 
 		v =  eval(document.getElementById(id).value);
-		if (typeof inputs_unit_map[id] !== 'undefined')
+		if ((!ignore_units) && typeof inputs_unit_map[id] !== 'undefined')
 			v = convert(v, inputs_unit_map[id][unit_sys]);
 		return v;
 	}
@@ -111,9 +116,9 @@
 		var dt = 0;
 		// overall, solve: alpha = (T-Mres)/I
 		// make x, v, theta, omega available
-		var r = gidv("radius");
-		var m = gidv("mass");
-		var Ts = gidv("motor_stall_torque_adj");
+		var R = gidv("radius"); var r = gidv('radius', true);
+		var M = gidv("mass");   var m = gidv('mass',   true);
+		var TS = gidv("motor_stall_torque_adj"); var Ts = gidv('motor_stall_torque_adj', true);
 		var wf = gidv("motor_max_rpm_adj") * 2*Math.PI/60; // convert to rad/s!
 		var If = gidv("motor_free_current_adj");
 		var Is = gidv("motor_stall_current_adj");
@@ -126,7 +131,7 @@
 
 		if(end_expr == "") end_expr = "0";
 
-		I = m*r*r;
+		I = M*R*R;
 
 		alpha_ar = [0,0];
 		omega_ar = [0,0];
@@ -134,14 +139,14 @@
 		t_ar = [0];
 
 		omega=0; theta=0; theta_m=0; omega_m=0; v=0; x=0; t=0;
-		T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-		Mres = eval(load_expr)*r;
+		T = G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf;
+		Mres = eval(load_expr)*R;
 		if(isNaN(Mres)) Mres = 0;
 		// T = Mres -> G*Ts - G*Ts*omega_m/wf = Mres -> omega_m = (G*Ts - Mres)/(G*Ts/wf)
-		omega_m_theor = (G*Ts - Mres)/(G*Ts/wf);
-		gids("theor_freespd", r*wf/G)
-		gids("theor_runspd", r*omega_m_theor/G);
-		gids("theor_stall_force", G*Ts/r);
+		omega_m_theor = (G*TS - Mres)/(G*TS/wf);
+		gids("theor_freespd", R*wf/G)
+		gids("theor_runspd", R*omega_m_theor/G);
+		gids("theor_stall_force", G*TS/R);
 		gids("theor_stall_current", If + (Is-If) * (wf-omega_m_theor)/wf);
 
 		enc_plc = document.getElementById('encoder_placement').value;
@@ -161,7 +166,7 @@
 
 			console.log(cpx);
 			gids('encoder_cpx', cpx);
-			gids('encoder_max_cps', cpx*r*wf/G);
+			gids('encoder_max_cps', cpx*R*wf/G);
 		}
 
 		if (!simulate) return; // YARRR, NO MORE PLAIN CALCS BEYOND THIS POINT
@@ -179,13 +184,13 @@
 			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
 			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
-			x = theta_ar[theta_ar.length-1]*r;
-			v = omega_ar[omega_ar.length-1]*r;
+			x = convert_to(theta_ar[theta_ar.length-1]*R, inputs_unit_map['xout'][unit_sys]);
+			v = convert_to(omega_ar[omega_ar.length-1]*R, inputs_unit_map['vout'][unit_sys]);
 			omega_m = omega*G;
 			theta_m = theta*G;
 
-			T = G*Ts*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-			Mres = convert(eval(load_expr), inputs_unit_map["load"][unit_sys])*r;
+			T = G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf;
+			Mres = convert(eval(load_expr), inputs_unit_map["load"][unit_sys])*R;
 			if(isNaN(Mres)) Mres = 0;
 			alpha = (T-Mres) / I;
 			//console.log(T, Mres, alpha);
@@ -202,8 +207,8 @@
 			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf);
 
 			tdata.push(t_ar[t_ar.length-1]);
-			xdata.push(omega_ar[omega_ar.length-1]*r);
-			vdata.push(theta_ar[theta_ar.length-1]*r);
+			xdata.push(convert_to(omega_ar[omega_ar.length-1]*R, inputs_unit_map['xout'][unit_sys]));
+			vdata.push(convert_to(theta_ar[theta_ar.length-1]*R, inputs_unit_map['vout'][unit_sys]));
 
 			if (i > 1000 || eval(end_expr)) break;
 
@@ -287,7 +292,7 @@
 		ticksstr = [];
 		for(var i=0; h*(i-1) < xmax || h2*(i-1) < x2max; i++) {
 			ticks.push(h*i);
-			ticksstr.push((h*i).toFixed(base < 0 ? 1:-base+1));
+			ticksstr.push((h*i).toFixed(base > 0 ? 0:-base));
 		}
 		return [ticks, ticksstr];
 	}
@@ -600,10 +605,10 @@
   <text x="375" y=485 class="label-title">Time [s]</text>
 </g>
 <g class="labels y-labels" id='y_labels'>
-  <text x=-220 y=10 class="label-title" transform="rotate(270)">Position</text>
+  <text x=-220 y=10 class="label-title" transform="rotate(270)" id="chart_velocity_label">Velocity</text>
 </g>
 <g class="labels z-labels" id='z_labels'>
-  <text x=-220 y=760 class="label-title" transform="rotate(270)">Velocity</text>
+  <text x=-220 y=760 class="label-title" transform="rotate(270)" id="chart_position_label">Position</text>
 </g>
 <polyline
 	id='y_line'
