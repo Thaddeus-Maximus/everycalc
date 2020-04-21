@@ -21,11 +21,8 @@
 		"velocity_ref": ["m/s", "ft/s"],
 		"position_ref": ["m", "ft"],
 
-		"xout": ["m", "ft"],
-		"vout": ["m/s", "ft/s"],
-
-		"query_x": ["m", "ft"],
-		"query_v": ["m", "ft"]
+		"query_d": ["m", "ft"],
+		"query_v": ["m/s", "ft/s"]
 	}
 
 	function populate_units() {
@@ -43,8 +40,8 @@
 			}
 		}
 
-		document.getElementById('chart_position_label').innerHTML = 'Position ['+inputs_unit_map['xout'][unit_sys]+']';
-		document.getElementById('chart_velocity_label').innerHTML = 'Velocity ['+inputs_unit_map['vout'][unit_sys]+']';
+		document.getElementById('chart_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
+		document.getElementById('chart_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -187,8 +184,8 @@
 			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
 			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
-			x = convert_to(theta_ar[theta_ar.length-1]*R, inputs_unit_map['xout'][unit_sys]);
-			v = convert_to(omega_ar[omega_ar.length-1]*R, inputs_unit_map['vout'][unit_sys]);
+			x = convert_to(theta_ar[theta_ar.length-1]*R, inputs_unit_map['query_d'][unit_sys]);
+			v = convert_to(omega_ar[omega_ar.length-1]*R, inputs_unit_map['query_v'][unit_sys]);
 			omega_m = omega*G;
 			theta_m = theta*G;
 
@@ -284,18 +281,36 @@
 </script>
 
 <script style="text/javascript">
-	function makeTicks(xmax, x2max, n) {
-		if (xmax < 0 || x2max < 0) return [0];
-		h = xmax/n; h2 = x2max/n;
-		base = Math.floor(Math.log10(h));
-		base2 = Math.floor(Math.log10(h2));
-		h = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
-		h2 = Math.round(h2/Math.pow(10, base2))*Math.pow(10, base2);
+	function makeTicks(maxes, num_to_print, n) {
+		if (Math.min(maxes) < 0) return [0];
+		H = [];
+		bases = [];
+		for(var i=0; i<maxes.length; i++){
+			h = maxes[i]/n;
+			base = Math.floor(Math.log10(h));
+			bases.push(base);
+			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
+		}
+
 		ticks = [];
 		ticksstr = [];
-		for(var i=0; h*(i-1) < xmax || h2*(i-1) < x2max; i++) {
-			ticks.push(h*i);
-			ticksstr.push((h*i).toFixed(base > 0 ? 0:-base));
+		alive = true;
+		for(var i=0; alive; i++) {
+			alive = false;
+			labelstr = '';
+			for(var j=0; j<H.length; j++) {
+				if (ticks.length <= j+1)
+					ticks.push([]);
+				ticks[j].push(H[j]*i);
+				labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
+				if (j != H.length-1)
+					labelstr += ' / ';
+
+				if (H[j]*(i) < maxes[j])
+					alive = true;
+			}
+			ticksstr.push(labelstr);
+			
 		}
 		return [ticks, ticksstr];
 	}
@@ -306,7 +321,7 @@
 		return 0;
 	}
 
-	function drawTicks(axis, ticks, ticklabels, ff, f0, gf, g0, max, marg) {
+	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
 		altaxis = axis == 'x' ? 'y':'x';
 		realaxis = axis == 'z' ? 'y':axis;
 		xgrid = document.getElementById(axis+'_grid');
@@ -317,10 +332,10 @@
 
 		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
 
-		for (i in ticks) {
+		for (i in ticklabels) {
 			line = document.createElementNS('http://www.w3.org/2000/svg','line');
 			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)/(max-0)*ticks[i];
+			fp = f0 + (ff-f0)*(i/ticklabels.length);
 			line.setAttribute(realaxis+'1', fp);
 			line.setAttribute(realaxis+'2', fp);
 			line.setAttribute('class', 'grid');
@@ -356,43 +371,48 @@
 	}
 
 	function drawchart1(channels) {
-		[x,y_raw,z_raw] = channels;
-		y = convert_to(y_raw, inputs_unit_map['query_v'][unit_sys]);
-		z = convert_to(z_raw, inputs_unit_map['query_v'][unit_sys]);
+		[t,v_raw,d_raw] = channels;
+		d = convert_to(d_raw, inputs_unit_map['query_d'][unit_sys]);
+		v = convert_to(v_raw, inputs_unit_map['query_v'][unit_sys]);
+
 		svg = document.getElementById('chart_position');
 		x_axis = document.getElementById('x_axis');
 		y_axis = document.getElementById('y_axis');
+
 		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		z0 = y0; zf = yf;
 
-		y_line = document.getElementById('y_line');
-		z_line = document.getElementById('z_line');
-		y_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		z_line.setAttribute("points",""); // I don't like it, but it does clear the points
+		d_line = document.getElementById('d_line');
+		v_line = document.getElementById('v_line');
+		d_line.setAttribute("points",""); // I don't like it, but it does clear the points
+		v_line.setAttribute("points",""); // I don't like it, but it does clear the points
 
-		[xticks, xticklabels] = makeTicks(Math.max(...x), Math.max(...x), 9);
-		[yticks, yticklabels] = makeTicks(Math.max(...y), Math.max(...z), 6);
-		[zticks, zticklabels] = makeTicks(Math.max(...z), Math.max(...y), 6);
-		xmax = xticks[xticks.length-1];
-		ymax = yticks[yticks.length-1];
-		zmax = zticks[zticks.length-1];
+		[[t_ticks], xticklabels] = makeTicks([Math.max(...t)], 1, 9);
+		[[d_ticks, v_ticks], yticklabels] = makeTicks([Math.max(...d), Math.max(...v)], 2, 6);
+		//[zticks, zticklabels] = makeTicks(Math.max(...z), Math.max(...y), 6);
+		t_max = t_ticks[t_ticks.length-1];
+		d_max = d_ticks[d_ticks.length-1];
+		v_max = v_ticks[v_ticks.length-1];
+		//zmax = zticks[zticks.length-1];
 
-		drawTicks('x', xticks, xticklabels, xf, x0, yf, y0, xmax, 15);
-		drawTicks('y', yticks, yticklabels, yf, y0, xf, x0, ymax, 5);
-		drawTicks('z', zticks, zticklabels, zf, z0, xf, x0, zmax, 5);
 
-		for (i in x) {
-			var pty = svg.createSVGPoint();
-			var ptz = svg.createSVGPoint();
-			pty.x = x0 + (xf-x0)/(xmax-0)*x[i];
-			ptz.x = pty.x;
-			pty.y = y0 + (yf-y0)/(ymax-0)*y[i];
-			ptz.y = z0 + (zf-z0)/(zmax-0)*z[i];
-			y_line.points.appendItem(pty);
-			z_line.points.appendItem(ptz);
+
+		drawTicks('x', xticklabels, xf, x0, yf, y0, 15);
+		drawTicks('y', yticklabels, yf, y0, xf, x0, 5);
+		//drawTicks('z', zticks, zticklabels, zf, z0, xf, x0, zmax, 5);
+
+		for (i in t) {
+			var ptd = svg.createSVGPoint();
+			var ptv = svg.createSVGPoint();
+			xq = x0 + (xf-x0)/(t_max-0)*t[i];
+			ptv.x = ptd.x = xq;
+			ptd.y = y0 + (yf-y0)/(d_max-0)*d[i];
+			ptv.y = z0 + (zf-z0)/(v_max-0)*v[i];
+			d_line.points.appendItem(ptd);
+			v_line.points.appendItem(ptv);
 		}
 		
 		bg=document.getElementById('chart_position');
@@ -411,7 +431,7 @@
 		});*/
 
 		gids('query_time', '-', 3, true);
-		gids('query_x', '-', 3, true);
+		gids('query_d', '-', 3, true);
 		gids('query_v', '-', 3, true);
 
 		handler = function(event){
@@ -419,24 +439,24 @@
 				xq = event.clientX - bg.getBoundingClientRect().left;
 				yq = event.clientY - bg.getBoundingClientRect().top;
 
-				XQ = (xmax-0)/(xf-x0)*(xq-x0);
-				if (XQ>Math.max(...x)){
-					XQ = Math.max(...x);
-					xq = x0 + (xf-x0)/(xmax-0)*XQ;
+				tq = (t_max-0)/(xf-x0)*(xq-x0);
+				if (tq>Math.max(...t)){
+					tq = Math.max(...t);
+					xq = x0 + (xf-x0)/(t_max-0)*tq;
 				}
-				if (XQ<0) {
-					XQ=0; xq=x0;
+				if (tq<0) {
+					tq=0; xq=x0;
 				}
-				YQ = linterp(x, y, XQ);
-				ZQ = linterp(x, z, XQ);
+				dq = linterp(t, d, tq);
+				vq = linterp(t, v, tq);
 				qline.setAttribute('opacity', 1);
 
 				qline.setAttribute('x1', xq);
 				qline.setAttribute('x2', xq);
 
-				gids('query_time', XQ, 3, true);
-				gids('query_x', ZQ, 3, true);
-				gids('query_v', YQ, 3, true);
+				gids('query_time', tq, 3, true);
+				gids('query_d', dq, 3, true);
+				gids('query_v', vq, 3, true);
 			}
 		bg.addEventListener('mousemove', handler);
 		bg.addEventListener('mousedown', handler);
@@ -649,12 +669,12 @@
   <title id="title">Position/Velocity Data</title>
 
 
-<rect class="background" id="graph_background" x=50 y=20 width=655 height=430 />
+<rect class="background" id="graph_background" x=90 y=20 width=615 height=430 />
 <g class="x-grid" id="xAxes">
-  <line id="x_axis" class="axes" x1="50" x2="50" y1="20" y2="450"></line>
+  <line id="x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
 </g>
 <g class="y-grid" id="yAxes">
-  <line id="y_axis" class="axes" x1="50" x2="705" y1=450 y2=450></line>
+  <line id="y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
 </g>
 <g class="y-grid" id="zAxes">
   <line id="z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
@@ -670,23 +690,26 @@
   <text x="375" y=485 class="label-title">Time [s]</text>
 </g>
 <g class="labels y-labels" id='y_labels'>
-  <text x=-220 y=10 class="label-title" transform="rotate(270)" id="chart_velocity_label" fill="#0074d9">Velocity</text>
+  <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_d_label" fill="#0074d9">Position</text>
 </g>
 <g class="labels z-labels" id='z_labels'>
-  <text x=-220 y=760 class="label-title" transform="rotate(270)" id="chart_position_label" fill="#d91200">Position</text>
+  <text x=-180 y=15 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#d91200">Velocity</text>
+</g>
+<g class="labels z-labels" id='z_labels'>
+  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 <g class="query-line" id="query_line_g">
 	<line id="query_line" x1=100 x2=100 y1=20 y2=450></line>
 </g>
 <polyline
-	id='y_line'
+	id='d_line'
 	fill='none'
 	stroke='#0074d9'
 	stroke-width=2
 	points="
 	"/>
 <polyline
-	id='z_line'
+	id='v_line'
 	fill='none'
 	stroke='#d91200'
 	stroke-width=2
@@ -702,8 +725,8 @@
 				<td class="unit">[s]</td>
 			</tr><tr>
 				<th class="rowlabel">Position</th>
-				<td><input id="query_x" readonly /></td>
-				<td class="unit" id="unit_query_x"></td>
+				<td><input id="query_d" readonly /></td>
+				<td class="unit" id="unit_query_d"></td>
 			</tr><tr>
 				<th class="rowlabel">Velocity</th>
 				<td><input id="query_v" readonly /></td>
