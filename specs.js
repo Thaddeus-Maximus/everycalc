@@ -118,6 +118,7 @@ var belts_data = {
 	}
 }
 
+// '1 of this unit to <base unit>'
 var unit_conversions = {
 	"m":  1,
 	"mm": 1e-3,
@@ -168,7 +169,14 @@ var unit_conversions = {
 	'revolutions': Math.PI*2,
 	'rev': Math.PI*2,
 	'degrees': Math.PI/180,
-	'deg': Math.PI/180
+	'deg': Math.PI/180,
+
+	'rad/s': 1,
+	'RPM': Math.PI*2/60,
+
+	'rad/s^2': 1,
+	'RPM/s': Math.PI*2/60
+
 }
 
 // converting between things is for suckers. Just convert to base units, always.

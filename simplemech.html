@@ -23,9 +23,7 @@
 
 		"query_d": ["m", "ft"],
 		"query_v": ["m/s", "ft/s"],
-
 		"query_f": ["N", "lbf"],
-
 		"query_a": ["m/s^2", "ft/s^2"]
 	}
 
@@ -46,12 +44,30 @@
 
 		document.getElementById('chart_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
 		document.getElementById('chart_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
-		document.getElementById('chart_F_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
+		document.getElementById('chart_f_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
 	}
 
-	function switch_units() {
+
+	function select_plot_mode(no_compute) {
+		var v = document.getElementById('plot_mode').value;
+		if (v=='linear') {
+			inputs_unit_map["query_d"]=["m", "ft"];
+			inputs_unit_map["query_v"]=["m/s", "ft/s"];
+			inputs_unit_map["query_f"]=["N", "lbf"];
+			inputs_unit_map["query_a"]=["m/s^2", "ft/s^2"];
+		} else if (v=='rotary') {
+			inputs_unit_map["query_d"]=["rev", "rev"];
+			inputs_unit_map["query_v"]=["RPM", "RPM"];
+			inputs_unit_map["query_f"]=["N-m", "ft-lbf"];
+			inputs_unit_map["query_a"]=["RPM/s", "RPM/s"];
+		}
+
+		switch_units(no_compute);
+	}
+
+	function switch_units(no_compute) {
 		populate_units();
-		compute();
+		if(!no_compute) compute();
 	}
 
 	function get_motor_data(motor,key){
@@ -81,7 +97,7 @@
 	function thload() {
 		var inputs, index;
 
-		populate_units();
+		select_plot_mode(true);
 
 		inputs = document.getElementsByTagName('input');
 		for (index = 0; index < inputs.length; ++index) {
@@ -180,7 +196,10 @@
 
 		alpha_o = NaN;
 
-		channels = [[0],[0],[0],[Is],[G*TS/R],[0]];
+		Rf = R;
+		if (document.getElementById('plot_mode').value == 'linear') Rf = 1;
+
+		channels = [[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
       	i=0;
 		while(1) {
 			//console.log(dt);
@@ -209,12 +228,13 @@
 			cur = If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf;
 			cur_cons = cur_cons + dt*cur;
 
+
 			channels[0].push(t_ar[t_ar.length-1]);
-			channels[1].push(omega_ar[omega_ar.length-1]*R);
-			channels[2].push(theta_ar[theta_ar.length-1]*R);
+			channels[1].push(omega_ar[omega_ar.length-1]*R / Rf);
+			channels[2].push(theta_ar[theta_ar.length-1]*R / Rf);
 			channels[3].push(cur);
-			channels[4].push(T/R);
-			channels[5].push(alpha*R);
+			channels[4].push(T/R * Rf);
+			channels[5].push(alpha*R / Rf);
 
 			if (i > 3000 || eval(end_expr)) break;
 
@@ -293,7 +313,7 @@
 		bases = [];
 		for(var i=0; i<maxes.length; i++){
 			h = maxes[i]/n;
-			base = Math.floor(Math.log10(h));
+			base = Math.floor(Math.log10(h)-Math.log10(5));
 			bases.push(base);
 			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
 		}
@@ -304,14 +324,15 @@
 		for(var i=0; alive; i++) {
 			alive = false;
 			labelstr = '';
-			for(var j=0; j<num_to_print; j++) {
-				if (ticks.length <= j+1)
-					ticks.push([]);
-				ticks[j].push(H[j]*i);
-				labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-				if (j != num_to_print-1)
-					labelstr += ' / ';
-
+			for(var j=0; j<maxes.length; j++) {
+				if (j<num_to_print) {
+					if (ticks.length <= j+1)
+						ticks.push([]);
+					ticks[j].push(H[j]*i);
+					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
+					if (j != num_to_print-1)
+						labelstr += ' / ';
+				}
 				if (H[j]*(i) < maxes[j])
 					alive = true;
 			}
@@ -377,7 +398,7 @@
 	}
 
 	function drawchart1(channels) {
-		[t,v_raw,d_raw,cur,F_raw,a_raw] = channels;
+		[t, v_raw, d_raw, cur, F_raw, a_raw] = channels;
 		d = convert_to(d_raw, inputs_unit_map['query_d'][unit_sys]);
 		v = convert_to(v_raw, inputs_unit_map['query_v'][unit_sys]);
 		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
@@ -446,6 +467,9 @@
 		gids('query_time', '-', 3, true);
 		gids('query_d', '-', 3, true);
 		gids('query_v', '-', 3, true);
+		gids('query_cur', '-', 3, true);
+		gids('query_f', '-', 3, true);
+		gids('query_a', '-', 3, true);
 
 		handler = function(event){
 			if(event.buttons != 1) return;
@@ -640,7 +664,7 @@
 <div  class="output">
 	<table>
 		<tr>
-			<th class="rowlabel">End Condition Met in t=<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet.</span></th>
+			<th class="rowlabel">End Condition Met in t=<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet. Auto-time-stepping may cause runs with high initial accelerations to have very short runtimes.</span></th>
 			<td><input id="endcond_met" readonly /></td>
 			<td class="unit">[s]</td>
 		</tr><tr>
@@ -719,7 +743,7 @@
   <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#444">Current [A]</text>
 </g>
 <g class="labels z-labels" id='z_labels'>
-  <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_F_label" fill="#c48900">Force</text>
+  <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_f_label" fill="#c48900">Force</text>
 </g>
 
 <g class="labels z-labels" id='z_labels'>
@@ -758,8 +782,19 @@
 	points="
 	"/>
 </svg>
+	
 	<div class="output-graph">
+
 		<table>
+			<tr>
+				<th class="rowlabel">Plot Mode</th>
+				<td>
+					<select id="plot_mode" onchange="select_plot_mode()">
+						<option value="linear">Linear</option>
+						<option value="rotary">Rotary</option>
+					</select>
+				</td>
+			</tr>
 			<tr>
 				<th class="rowlabel">Queried Time<span class="ttt">Query a time on the graph by clicking (and optionally dragging) a point. Timepoint represented by a vertical bar.</span></th>
 				<td><input id="query_time" readonly /></td>
