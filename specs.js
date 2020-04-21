@@ -174,7 +174,13 @@ function convert(number, from_unit) {
 }
 
 function convert_to(number, to_unit) {
-	return number/unit_conversions[to_unit];
+	uconv = unit_conversions[to_unit];
+	if (typeof number == 'object') {
+		for (var i=0;i<number.length;i++)
+			number[i] = number[i]/uconv;
+		return number;
+	}
+	return number/uconv;
 }
 
 
