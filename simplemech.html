@@ -42,9 +42,9 @@
 			}
 		}
 
-		document.getElementById('chart_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
-		document.getElementById('chart_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
-		document.getElementById('chart_f_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
+		document.getElementById(chart_name+'_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
+		document.getElementById(chart_name+'_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
+		document.getElementById(chart_name+'_f_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
 	}
 
 
@@ -348,13 +348,15 @@
 		return 0;
 	}
 
+	chart_name = 'chart';
+
 	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
 		altaxis = axis == 'x' ? 'y':'x';
 		realaxis = axis == 'z' ? 'y':axis;
-		xgrid = document.getElementById(axis+'_grid');
+		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
 		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
 
-		labels = document.getElementById(axis+'_labels');
+		labels = document.getElementById(chart_name+'_'+axis+'_labels');
 		while(labels.children.length>1) labels.removeChild(labels.lastChild);
 
 		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
@@ -404,19 +406,19 @@
 		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
 		a = convert_to(a_raw, inputs_unit_map['query_a'][unit_sys]);
 
-		svg = document.getElementById('chart_position');
-		x_axis = document.getElementById('x_axis');
-		y_axis = document.getElementById('y_axis');
+		svg = document.getElementById('chart');
+		x_axis = document.getElementById('chart_x_axis');
+		y_axis = document.getElementById('chart_y_axis');
 
 		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 
-		d_line = document.getElementById('d_line');
-		v_line = document.getElementById('v_line');
-		cur_line = document.getElementById('cur_line');
-		f_line = document.getElementById('F_line');
+		d_line = document.getElementById('chart_d_line');
+		v_line = document.getElementById('chart_v_line');
+		cur_line = document.getElementById('chart_cur_line');
+		f_line = document.getElementById('chart_f_line');
 		d_line.setAttribute("points",""); // I don't like it, but it does clear the points
 		v_line.setAttribute("points",""); // I don't like it, but it does clear the points
 		cur_line.setAttribute("points",""); // I don't like it, but it does clear the points
@@ -459,9 +461,9 @@
 			f_line.points.appendItem(ptf);
 		}
 		
-		bg=document.getElementById('chart_position');
+		bg=document.getElementById('chart');
 
-		qline = document.getElementById('query_line');
+		qline = document.getElementById('chart_query_line');
 		qline.setAttribute('opacity', 0);
 
 		gids('query_time', '-', 3, true);
@@ -704,78 +706,65 @@
 
 <div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
 
-<svg version="1.2" class="graph" id='chart_position' aria-labelledby="title" role="img">
+<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
   <title id="title">Position/Velocity Data</title>
 
 
-<rect class="background" id="graph_background" x=90 y=20 width=615 height=430 />
-<g class="x-grid" id="xAxes">
-  <line id="x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
+<rect class="background" id="chart_background" x=90 y=20 width=615 height=430 />
+<g class="x-grid">
+  <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
 </g>
-<g class="y-grid" id="yAxes">
-  <line id="y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
-</g>
-<g class="y-grid" id="zAxes">
-  <line id="z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+<g class="y-grid">
+  <line id="chart_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
+  <line id="chart_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
 </g>
 
-<g class="x-grid" id="x_grid">
-</g>
-<g class="y-grid" id="y_grid">
-</g>
-<g class="z-grid" id="z_grid">
-</g>
-  <g class="labels x-labels" id='x_labels'>
+<g class="x-grid" id="chart_x_grid"></g>
+<g class="y-grid" id="chart_y_grid"></g>
+<g class="z-grid" id="chart_z_grid"></g>
+
+<g class="labels x-labels" id='chart_x_labels'>
   <text x="375" y=485 class="label-title">Time [s]</text>
 </g>
 
-<g class="labels y-labels" id='y_labels'>
+<g class="labels y-labels" id='chart_y_labels'>
   <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_d_label" fill="#0074d9">Position</text>
-</g>
-<g class="labels z-labels" id='z_labels'>
   <text x=-180 y=15 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#d91200">Velocity</text>
-</g>
-<g class="labels z-labels" id='z_labels'>
   <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 
-<g class="labels z-labels" id='z_labels'>
+<g class="labels z-labels" id='chart_z_labels'>
   <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#444">Current [A]</text>
-</g>
-<g class="labels z-labels" id='z_labels'>
   <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_f_label" fill="#c48900">Force</text>
-</g>
-
-<g class="labels z-labels" id='z_labels'>
   <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 
-<g class="query-line" id="query_line_g">
-	<line id="query_line" x1=100 x2=100 y1=15 y2=455></line>
+<g class="query-line">
+	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
 </g>
 <polyline
-	id='d_line'
+	id='chart_d_line'
 	fill='none'
 	stroke='#0074d9'
 	stroke-width=2
 	points="
 	"/>
 <polyline
-	id='v_line'
+	id='chart_v_line'
 	fill='none'
 	stroke='#d91200'
 	stroke-width=2
 	points="
 	"/>
 <polyline
-	id='cur_line'
+	id='chart_cur_line'
 	fill='none'
 	stroke='#444'
 	stroke-width=2
 	points="
 	"/>
 <polyline
-	id='F_line'
+	id='chart_f_line'
 	fill='none'
 	stroke='#c48900'
 	stroke-width=2
