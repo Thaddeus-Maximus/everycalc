@@ -22,7 +22,11 @@
 		"position_ref": ["m", "ft"],
 
 		"query_d": ["m", "ft"],
-		"query_v": ["m/s", "ft/s"]
+		"query_v": ["m/s", "ft/s"],
+
+		"query_f": ["N", "lbf"],
+
+		"query_a": ["m/s^2", "ft/s^2"]
 	}
 
 	function populate_units() {
@@ -42,6 +46,7 @@
 
 		document.getElementById('chart_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
 		document.getElementById('chart_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
+		document.getElementById('chart_F_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -175,9 +180,7 @@
 
 		alpha_o = NaN;
 
-		channels = [];
-		for (var i=0;i<3;i++)
-			channels.push([0]);
+		channels = [[0],[0],[0],[Is],[G*TS/R],[0]];
       	i=0;
 		while(1) {
 			//console.log(dt);
@@ -203,12 +206,15 @@
 			omega_ar.push(omega_ar[omega_ar.length-1] + alpha_ar[alpha_ar.length-1]*dt*3/2 - alpha_ar[alpha_ar.length-2]*dt*1/2);
 			t_ar.push(t_ar[t_ar.length-1]+dt);
 			
-
-			cur_cons = cur_cons + dt*(If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf);
+			cur = If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf;
+			cur_cons = cur_cons + dt*cur;
 
 			channels[0].push(t_ar[t_ar.length-1]);
 			channels[1].push(omega_ar[omega_ar.length-1]*R);
 			channels[2].push(theta_ar[theta_ar.length-1]*R);
+			channels[3].push(cur);
+			channels[4].push(T/R);
+			channels[5].push(alpha*R);
 
 			if (i > 3000 || eval(end_expr)) break;
 
@@ -298,12 +304,12 @@
 		for(var i=0; alive; i++) {
 			alive = false;
 			labelstr = '';
-			for(var j=0; j<H.length; j++) {
+			for(var j=0; j<num_to_print; j++) {
 				if (ticks.length <= j+1)
 					ticks.push([]);
 				ticks[j].push(H[j]*i);
 				labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-				if (j != H.length-1)
+				if (j != num_to_print-1)
 					labelstr += ' / ';
 
 				if (H[j]*(i) < maxes[j])
@@ -371,9 +377,11 @@
 	}
 
 	function drawchart1(channels) {
-		[t,v_raw,d_raw] = channels;
+		[t,v_raw,d_raw,cur,F_raw,a_raw] = channels;
 		d = convert_to(d_raw, inputs_unit_map['query_d'][unit_sys]);
 		v = convert_to(v_raw, inputs_unit_map['query_v'][unit_sys]);
+		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
+		a = convert_to(a_raw, inputs_unit_map['query_a'][unit_sys]);
 
 		svg = document.getElementById('chart_position');
 		x_axis = document.getElementById('x_axis');
@@ -383,52 +391,57 @@
 		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
-		z0 = y0; zf = yf;
 
 		d_line = document.getElementById('d_line');
 		v_line = document.getElementById('v_line');
+		cur_line = document.getElementById('cur_line');
+		f_line = document.getElementById('F_line');
 		d_line.setAttribute("points",""); // I don't like it, but it does clear the points
 		v_line.setAttribute("points",""); // I don't like it, but it does clear the points
+		cur_line.setAttribute("points",""); // I don't like it, but it does clear the points
+		f_line.setAttribute('points','');
+
+
 
 		[[t_ticks], xticklabels] = makeTicks([Math.max(...t)], 1, 9);
-		[[d_ticks, v_ticks], yticklabels] = makeTicks([Math.max(...d), Math.max(...v)], 2, 6);
-		//[zticks, zticklabels] = makeTicks(Math.max(...z), Math.max(...y), 6);
+		[[d_ticks, v_ticks], yticklabels] = makeTicks([Math.max(...d), Math.max(...v), Math.max(...cur), Math.max(...f)], 2, 6);
+		[[cur_ticks, f_ticks], zticklabels] = makeTicks([Math.max(...cur), Math.max(...f), Math.max(...d), Math.max(...v)], 2, 6);
+		
 		t_max = t_ticks[t_ticks.length-1];
 		d_max = d_ticks[d_ticks.length-1];
 		v_max = v_ticks[v_ticks.length-1];
-		//zmax = zticks[zticks.length-1];
+		cur_max = cur_ticks[cur_ticks.length-1];
+		f_max = f_ticks[f_ticks.length-1];
 
 
 
 		drawTicks('x', xticklabels, xf, x0, yf, y0, 15);
 		drawTicks('y', yticklabels, yf, y0, xf, x0, 5);
-		//drawTicks('z', zticks, zticklabels, zf, z0, xf, x0, zmax, 5);
+		drawTicks('z', zticklabels, yf, y0, xf, x0, 5);
 
 		for (i in t) {
 			var ptd = svg.createSVGPoint();
 			var ptv = svg.createSVGPoint();
+			var ptcur = svg.createSVGPoint();
+			var ptf = svg.createSVGPoint();
+
 			xq = x0 + (xf-x0)/(t_max-0)*t[i];
-			ptv.x = ptd.x = xq;
-			ptd.y = y0 + (yf-y0)/(d_max-0)*d[i];
-			ptv.y = z0 + (zf-z0)/(v_max-0)*v[i];
+			ptf.x = ptv.x = ptd.x = ptcur.x = xq;
+
+			ptd.y   = y0 + (yf-y0)/(d_max-0)*d[i];
+			ptv.y   = y0 + (yf-y0)/(v_max-0)*v[i];
+			ptcur.y = y0 + (yf-y0)/(cur_max-0)*cur[i];
+			ptf.y   = y0 + (yf-y0)/(f_max-0)*f[i];
 			d_line.points.appendItem(ptd);
 			v_line.points.appendItem(ptv);
+			cur_line.points.appendItem(ptcur);
+			f_line.points.appendItem(ptf);
 		}
 		
 		bg=document.getElementById('chart_position');
 
 		qline = document.getElementById('query_line');
 		qline.setAttribute('opacity', 0);
-
-		
-		/*bg.addEventListener('mousedown', function(e){ 
-			var clicked;
-			clicked = true;
-		});
-		bg.addEventListener('mouseup', function(e){
-			var clicked;
-			clicked = false;
-		});*/
 
 		gids('query_time', '-', 3, true);
 		gids('query_d', '-', 3, true);
@@ -447,8 +460,11 @@
 				if (tq<0) {
 					tq=0; xq=x0;
 				}
-				dq = linterp(t, d, tq);
-				vq = linterp(t, v, tq);
+				dq   = linterp(t, d, tq);
+				vq   = linterp(t, v, tq);
+				curq = linterp(t, cur, tq);
+				fq   = linterp(t, f, tq);
+				aq   = linterp(t, a, tq);
 				qline.setAttribute('opacity', 1);
 
 				qline.setAttribute('x1', xq);
@@ -457,13 +473,12 @@
 				gids('query_time', tq, 3, true);
 				gids('query_d', dq, 3, true);
 				gids('query_v', vq, 3, true);
+				gids('query_cur', curq, 3, true);
+				gids('query_f', fq, 3, true);
+				gids('query_a', aq, 3, true);
 			}
 		bg.addEventListener('mousemove', handler);
 		bg.addEventListener('mousedown', handler);
-		/*bg.addEventListener('mouseleave', function(event){
-			console.log('leaving');
-			qline.setAttribute('opacity', 0);
-		});*/
 	}
 </script>
 
@@ -689,6 +704,7 @@
   <g class="labels x-labels" id='x_labels'>
   <text x="375" y=485 class="label-title">Time [s]</text>
 </g>
+
 <g class="labels y-labels" id='y_labels'>
   <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_d_label" fill="#0074d9">Position</text>
 </g>
@@ -698,8 +714,20 @@
 <g class="labels z-labels" id='z_labels'>
   <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
+
+<g class="labels z-labels" id='z_labels'>
+  <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#444">Current [A]</text>
+</g>
+<g class="labels z-labels" id='z_labels'>
+  <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_F_label" fill="#c48900">Force</text>
+</g>
+
+<g class="labels z-labels" id='z_labels'>
+  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
+</g>
+
 <g class="query-line" id="query_line_g">
-	<line id="query_line" x1=100 x2=100 y1=20 y2=450></line>
+	<line id="query_line" x1=100 x2=100 y1=15 y2=455></line>
 </g>
 <polyline
 	id='d_line'
@@ -715,7 +743,20 @@
 	stroke-width=2
 	points="
 	"/>
-
+<polyline
+	id='cur_line'
+	fill='none'
+	stroke='#444'
+	stroke-width=2
+	points="
+	"/>
+<polyline
+	id='F_line'
+	fill='none'
+	stroke='#c48900'
+	stroke-width=2
+	points="
+	"/>
 </svg>
 	<div class="output-graph">
 		<table>
@@ -731,6 +772,18 @@
 				<th class="rowlabel">Velocity</th>
 				<td><input id="query_v" readonly /></td>
 				<td class="unit" id="unit_query_v"></td>
+			</tr><tr>
+				<th class="rowlabel">Current</th>
+				<td><input id="query_cur" readonly /></td>
+				<td class="unit">[A]</td>
+			</tr><tr>
+				<th class="rowlabel">Acceleration</th>
+				<td><input id="query_a" readonly /></td>
+				<td class="unit" id="unit_query_a"></td>
+			</tr><tr>
+				<th class="rowlabel">Actuator Force</th>
+				<td><input id="query_f" readonly /></td>
+				<td class="unit" id="unit_query_f"></td>
 			</tr>
 		</div>
 	</div>

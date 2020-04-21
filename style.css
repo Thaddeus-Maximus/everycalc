@@ -194,13 +194,9 @@ button {
   text-anchor: middle;
 }
 
-.data {
-  fill: red;
-  stroke-width: 1; 
-}
-
 .query-line line {
-  stroke: #65b050;
+  stroke: #55a040;
+  stroke-width: 2;
 }
 
 .qline-hidden {
