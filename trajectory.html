@@ -8,29 +8,29 @@
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
 
-unit_sys = 1;
-inputs_unit_map = {
-	'theta': 			['deg', 'deg', 'deg'],
-	'theta_err': 		['deg', 'deg', 'deg'],
-	'v_initial':     	['m/s', 'ft/s','in/s'],
-	'v_initial_err': 	['m/s', 'ft/s','in/s'],
-	'x_target':      	['m',   'ft',  'in'],
-	'x_target_err':  	['m',   'ft',  'in'],
-	'y_target':      	['m',   'ft',  'in'],
-	'y_target_err':  	['m',   'ft',  'in'],
-	'y_initial':     	['m',   'ft',  'in'],
-	'y_initial_err': 	['m',   'ft',  'in'],
-	'h_target':      	['mm',  'in',  'in'],
-	'h_target_err':  	['mm',  'in',  'in'],
-	'd_ball':        	['mm',  'in',  'in'],
-	'd_ball_err':    	['mm',  'in',  'in'],
-	'strike_height':    ['m',   'ft',  'in'],
-	'strike_height_err':['m',   'ft',  'in'],
-	'sweep_height':     ['m',   'ft',  'in'],
-	'sweep_height_err': ['m',   'ft',  'in'],
-	'strike_angle':     ['deg', 'deg', 'deg'],
-	'strike_angle_err': ['deg', 'deg', 'deg']
-};
+	unit_sys = 1;
+	inputs_unit_map = {
+		'theta': 			['deg', 'deg', 'deg'],
+		'theta_err': 		['deg', 'deg', 'deg'],
+		'v_initial':     	['m/s', 'ft/s','in/s'],
+		'v_initial_err': 	['m/s', 'ft/s','in/s'],
+		'x_target':      	['m',   'ft',  'in'],
+		'x_target_err':  	['m',   'ft',  'in'],
+		'y_target':      	['m',   'ft',  'in'],
+		'y_target_err':  	['m',   'ft',  'in'],
+		'y_initial':     	['m',   'ft',  'in'],
+		'y_initial_err': 	['m',   'ft',  'in'],
+		'h_target':      	['mm',  'in',  'in'],
+		'h_target_err':  	['mm',  'in',  'in'],
+		'd_ball':        	['mm',  'in',  'in'],
+		'd_ball_err':    	['mm',  'in',  'in'],
+		'strike_height':    ['m',   'ft',  'in'],
+		'strike_height_err':['m',   'ft',  'in'],
+		'sweep_height':     ['m',   'ft',  'in'],
+		'sweep_height_err': ['m',   'ft',  'in'],
+		'strike_angle':     ['deg', 'deg', 'deg'],
+		'strike_angle_err': ['deg', 'deg', 'deg']
+	};
 
 	function populate_units() {
 		if(document.getElementById('unit_metric').checked)
@@ -54,60 +54,8 @@ inputs_unit_map = {
 		compute();
 	}
 
-chart = null;
-chart_container = null;
-
-    function plot_data(datas, targ_params) {
-    	var chart; var chart_container;
-
-    	[targ_dist, targ_ht, targ_diam] = targ_params;
-
-    	chart_container = document.getElementById("chart_container");
-		chart = echarts.init(chart_container);
-
-		chart_option = {
-		    xAxis:  {},
-		    yAxis:  {show: false},
-		    series: [],
-		    tooltip: {
-		        
-		        formatter: function (params) {
-		            return "(" + params.data[0].toFixed(3) + ", " + params.data[1].toFixed(3) + ")";
-		        },
-		        axisPointer: {
-		            animation: false
-		        }
-		    }
-		};
-		if(datas) {
-			chart_option.series.push({
-			        type: 'line',
-			        color: '#f00',
-			        showSymbol: false,
-			        data: [[0, 0],[0, targ_ht-targ_diam/2]]
-			    });
-			chart_option.series.push({
-			        type: 'line',
-			        color: '#f00',
-			        showSymbol: false,
-			        data: [[0, targ_ht+targ_diam],[0, targ_ht+targ_diam/2]]
-			    });
-			for (data in datas) {
-				chart_option.series.push({
-			        type: 'line',
-			        color: '#0a0',
-			        data: datas[data]
-			    });
-			}
-		}
-		if (chart_option && typeof chart_option === "object") {
-		    chart.setOption(chart_option, true);
-		}  
-    };
-
     function mode_select() {
     	var mode = document.getElementById('mode').value;
-    	console.log(mode);
     	if (mode=='raw') {
     		document.getElementById('v_initial').readOnly = false;
     		document.getElementById('theta').readOnly     = false;
@@ -182,16 +130,16 @@ chart_container = null;
 
 	en_vm = true;
 
-	function linterp(xyn, x) {
+	function linterp(xs, ys, xq) {
 		i;
-		for (i=1; i<xyn.length-1 && !isNaN(xyn[i][0]) && x>xyn[i][0]; i++) {}
-		return xyn[i-1][1] + (xyn[i][1]-xyn[i-1][1])/(xyn[i][0]-xyn[i-1][0])*(x-xyn[i-1][0]);
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
 	}
 
-	function linterpder(xyn, x) { // interpolated derivative
+	function linterpder(xs, ys, xq) {
 		i;
-		for (i=1; i<xyn.length-1 && !isNaN(xyn[i][0]) && x>xyn[i][0]; i++) {}
-		return (xyn[i][1]-xyn[i-1][1])/(xyn[i][0]-xyn[i-1][0]);
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
 	}
 
 	function convert_to_array(xyn, to) {
@@ -222,9 +170,9 @@ chart_container = null;
 		xl=x; xh=x;
 
 		dt = xtarg/v/100;
-		res_ctr = [[x,y]];
-		res_low = [[NaN, NaN]];
-		res_high = [[NaN, NaN]];
+		res_ctr = [[x],[y]];
+		res_low = [[],[]];
+		res_high = [[],[]];
 
 		y_low=0;
 		y_high=0;
@@ -247,17 +195,21 @@ chart_container = null;
 				tof = t;
 			}
 
-			res_ctr .push([x,y]);
-			res_low .push([xl,yl]);
-			res_high.push([xh,yh]);
+			res_ctr[0] .push(x);
+			res_ctr[1] .push(y);
+			res_low[0] .push(xl);
+			res_low[1] .push(yl);
+			res_high[0].push(xh);
+			res_high[1].push(yh);
+
 			i+=1;
 		}
 
 		stats = {
-			'y_low': linterp(res_low, 0),
-			'y_high': linterp(res_high, 0),
-			'y_ctr': linterp(res_ctr, 0),
-			'ang': Math.atan(linterpder(res_ctr, 0)),
+			'y_low': linterp(res_low[0],res_low[1], 0),
+			'y_high': linterp(res_high[0],res_high[1], 0),
+			'y_ctr': linterp(res_ctr[0],res_ctr[1], 0),
+			'ang': Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
 			'tof': tof
 		}
 
@@ -334,7 +286,7 @@ chart_container = null;
 		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
 		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
 		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
-      	plot_data([max_low_run, max_high_run], targetstuff);
+      	drawchart(max_low_run, max_high_run, targetstuff);
 
       	
       	gids('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
@@ -357,9 +309,190 @@ chart_container = null;
 			return 1;
 		return x;
 	}
+</script>
 
+<script type="text/javascript">
+	function makeTicks(maxes, num_to_print, n) {
+		if (Math.min(maxes) < 0) return [0];
+		H = [];
+		bases = [];
+		for(var i=0; i<maxes.length; i++){
+			h = maxes[i]/n;
+			base = Math.floor(Math.log10(h)-Math.log10(5));
+			bases.push(base);
+			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
+		}
+
+		ticks = [];
+		ticksstr = [];
+		alive = true;
+		for(var i=0; alive; i++) {
+			alive = false;
+			labelstr = '';
+			for(var j=0; j<maxes.length; j++) {
+				if (j<num_to_print) {
+					if (ticks.length <= j+1)
+						ticks.push([]);
+					ticks[j].push(H[j]*i);
+					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
+					if (j != num_to_print-1)
+						labelstr += ' / ';
+				}
+				if (H[j]*(i) < maxes[j])
+					alive = true;
+			}
+			ticksstr.push(labelstr);
+			
+		}
+		return [ticks, ticksstr];
+	}
+
+	function sign(x) {
+		if(x>0) return 1;
+		if(x<0) return -1;
+		return 0;
+	}
+
+	chart_name = 'chart';
+
+	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
+		altaxis = axis == 'x' ? 'y':'x';
+		realaxis = axis == 'z' ? 'y':axis;
+		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
+		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
+
+		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
+		while(labels.firstChild) labels.removeChild(labels.firstChild);
+
+		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
+
+		for (i in ticklabels) {
+			line = document.createElementNS('http://www.w3.org/2000/svg','line');
+			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
+			fp = f0 + (ff-f0)*(i/ticklabels.length);
+			line.setAttribute(realaxis+'1', fp);
+			line.setAttribute(realaxis+'2', fp);
+			line.setAttribute('class', 'grid');
+			xgrid.append(line);
+
+			label = document.createElementNS('http://www.w3.org/2000/svg','text');
+			label.setAttribute(altaxis, gfl);
+			label.setAttribute(realaxis, fp);
+			label.innerHTML = i==0 ? '0' : ticklabels[i];
+			labels.append(label);
+		}
+	}
+
+	function linterp(xs, ys, xq) {
+		i;
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
+	}
+
+	function gids(id, val) {
+		document.getElementById(id).value = (typeof val == 'string' ? val : val.toFixed(3));
+	}
+
+	function clean_run(run) {
+		for (var i=run[0].length-1; i>0; i--) {
+			if (run[0][i] < 0) {
+				yint = linterp(run[0], run[1], 0);
+				arr = [run[0].slice(0,i-1).concat(0), run[1].slice(0,i-1).concat(yint)];
+
+				return arr;
+			}
+		} 
+		
+	}
+
+	function drawchart(low_run, high_run, targetstuff) {
+		console.log(low_run);
+		low_run = clean_run(low_run);
+		high_run = clean_run(high_run);
+
+		console.log(low_run);
+
+
+		var d = low_run[0].concat(high_run[0].reverse());
+		var h = low_run[1].concat(high_run[1].reverse());
+
+		svg = document.getElementById('chart');
+		x_axis = document.getElementById('chart_x_axis');
+		y_axis = document.getElementById('chart_y_axis');
+
+		x0 = Math.min(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
+		xf = Math.max(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
+		y0 = Math.max(y_axis.y1.baseVal.value, y_axis.y2.baseVal.value);
+		yf = Math.min(y_axis.y1.baseVal.value, y_axis.y2.baseVal.value);
+
+		shot_area = document.getElementById('chart_shot_area');
+		shot_area.setAttribute("points","");
+
+		[[d_ticks], d_ticklabels] = makeTicks([-Math.min(...d)], 1, 9);
+		[[h_ticks], h_ticklabels] = makeTicks([Math.max(...h)], 1, 9);
+
+		console.log(d, h);
+
+		d_max = d_ticks[d_ticks.length-1];
+		h_max = h_ticks[h_ticks.length-1];
+
+		drawTicks('x', d_ticklabels, xf, x0, yf, y0, 15);
+		drawTicks('y', h_ticklabels, yf, y0, xf, x0, 5);
+		
+		for (i in d) {
+			//if(isNaN(d[i]) || isNaN(h[i])) continue;
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(d_max-0)*(-d[i]);
+			pt.y = y0 + (yf-y0)/(h_max-0)*h[i];
+			chart_shot_area.points.appendItem(pt);
+		}
+		
+		/*bg=document.getElementById('chart');
+
+		qline = document.getElementById('chart_query_line');
+		qline.setAttribute('opacity', 0);
+
+		gids('query_time', '-');
+		gids('query_d', '-');
+		gids('query_v', '-');
+		gids('query_cur', '-');
+		gids('query_f', '-');
+
+		handler = function(event){
+			if(event.buttons != 1) return;
+				xq = event.clientX - bg.getBoundingClientRect().left;
+				yq = event.clientY - bg.getBoundingClientRect().top;
+
+				tq = (t_max-0)/(xf-x0)*(xq-x0);
+				if (tq>Math.max(...t)){
+					tq = Math.max(...t);
+					xq = x0 + (xf-x0)/(t_max-0)*tq;
+				}
+				if (tq<0) {
+					tq=0; xq=x0;
+				}
+				dq   = linterp(t, d, tq);
+				vq   = linterp(t, v, tq);
+				curq = linterp(t, cur, tq);
+				fq   = linterp(t, f, tq);
+				qline.setAttribute('opacity', 1);
+
+				qline.setAttribute('x1', xq);
+				qline.setAttribute('x2', xq);
+
+				gids('query_time', tq);
+				gids('query_d', dq);
+				gids('query_v', vq);
+				gids('query_cur', curq);
+				gids('query_f', fq);
+			}
+		bg.addEventListener('mousemove', handler);
+		bg.addEventListener('mousedown', handler);*/
+	}
 
 </script>
+</script>
+
 
 <html>
 <body onload="thload()">
@@ -463,7 +596,47 @@ chart_container = null;
 		</div>
 	</div>
 	
-		<div id="chart_container" style="height: 600px; width=1000px;"></div>
+<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
+  <title id="title">Position Chart</title>
+
+
+	<rect class="background" id="chart_background" x=70 y=20 width=730 height=430 />
+	<g class="x-grid">
+	  <line id="chart_x_axis" class="axes" x1="70" x2="800" y1="450" y2="450"></line>
+	</g>
+	<g class="y-grid">
+	  <line id="chart_y_axis" class="axes" x1="70" x2="70" y1="20" y2=450></line>
+	</g>
+
+	<g class="x-grid" id="chart_x_grid"></g>
+	<g class="y-grid" id="chart_y_grid"></g>
+
+	<g class="labels x-labels" id='chart_x_labels'>
+	  <text x=375 y=485 class="label-title">Distance [ft]</text>
+	</g>
+
+	<g class="labels y-labels" id='chart_y_labels'>
+	  <text x=-240 y=20 class="label-title" transform="rotate(270)" id="chart_y_label">Height [ft]</text>
+	</g>
+
+	<g class="labels x-labels" id='chart_x_axis_labels'></g>
+	<g class="labels y-labels" id='chart_y_axis_labels'></g>
+
+	<g class="query-line">
+		<!--<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>-->
+	</g>
+	<polyline
+		id='chart_shot_area'
+		fill='#3a6a30'
+		stroke='none'
+		stroke-width=2
+		opacity=0.5
+		points="
+		"/>
+</svg>			
+
+		</div>
 	</div>
 </body>
 </html>

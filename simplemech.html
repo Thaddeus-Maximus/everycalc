@@ -356,8 +356,8 @@
 		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
 		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
 
-		labels = document.getElementById(chart_name+'_'+axis+'_labels');
-		while(labels.children.length>1) labels.removeChild(labels.lastChild);
+		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
+		while(labels.firstChild) labels.removeChild(labels.firstChild);
 
 		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
 
@@ -378,21 +378,6 @@
 		}
 	}
 
-		
-	function removeElementsByClass(className){
-	    var elements = document.getElementsByClassName(className);
-	    while(elements.length > 0){
-	        elements[0].parentNode.removeChild(elements[0]);
-	    }
-	}
-
-	function svglen(svg, v) {
-		l = svg.createSVGLength();
-		l.baseVal = v;
-		l.animVal = v;
-		return l;
-	}
-
 	function linterp(xs, ys, xq) {
 		i;
 		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
@@ -405,6 +390,8 @@
 		v = convert_to(v_raw, inputs_unit_map['query_v'][unit_sys]);
 		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
 		a = convert_to(a_raw, inputs_unit_map['query_a'][unit_sys]);
+
+		//console.log([t,v,d,cur,f]);
 
 		svg = document.getElementById('chart');
 		x_axis = document.getElementById('chart_x_axis');
@@ -734,10 +721,14 @@
 </g>
 
 <g class="labels z-labels" id='chart_z_labels'>
-  <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#444">Current [A]</text>
+  <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#444">Current [A]</text>
   <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_f_label" fill="#c48900">Force</text>
   <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
+
+<g class="labels x-labels" id='chart_x_axis_labels'></g>
+<g class="labels z-labels" id='chart_z_axis_labels'></g>
+<g class="labels y-labels" id='chart_y_axis_labels'></g>
 
 <g class="query-line">
 	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
