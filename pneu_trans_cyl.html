@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <link rel="stylesheet" href="style.css"> 
 <script type="text/javascript" src="specs.js"></script>
 <script type="text/javascript">
@@ -19,7 +18,12 @@
 		'l_line': ['m', 'ft'],
 		'd_line': ['mm', 'in'],
 		'T_src': ['C', 'C'],
-		'P_src': ['kPa', 'psi']
+		'P_src': ['kPa', 'psi'],
+
+		'query_d': ['mm', 'in'],
+		'query_v': ['mm/s', 'in/s'],
+		'query_p': ['kPa', 'psi'],
+		'query_f': ['N', 'lbf']
 	}
 
 	function populate_units() {
@@ -36,6 +40,9 @@
 				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
 			}
 		}
+
+		document.getElementById(chart_name+'_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
+		document.getElementById(chart_name+'_p_label').innerHTML = 'Pressure ['+inputs_unit_map['query_p'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -45,12 +52,9 @@
 
 	var poschart = null, poschart_options = null;
 
-	google.charts.load('current', {'packages':['corechart', 'scatter', 'line']});
-    google.charts.setOnLoadCallback(drawStuff);
-
     function populate_direction() {
-    	document.getElementById('direction_push').readOnly = direction_push;
-    	document.getElementById('direction_pull').readOnly = !direction_push;
+    	document.getElementById('direction_push').disabled = direction_push;
+    	document.getElementById('direction_pull').disabled = !direction_push;
     }
 
     direction_push = true;
@@ -60,45 +64,6 @@
 
     	compute(true);
     }
-
-    function drawStuff() {
-      poschart = new google.visualization.LineChart(document.getElementById('poschart_div'));
-      var poschartDiv = document.getElementById('poschart_div');
-
-      poschart_options = {
-          backgroundColor: { fill:'transparent' },
-          curveType: 'function',
-          legend: {position: 'top'},
-          vAxes: {
-          	//0: {title: 'Linear Velocity (m/s)'},
-          	0: {title: 'Linear Position (m)'},
-          	1: {title: 'Cylinder Inst. Pressure (kPa)'}
-          	//3: {title: 'Temperature'},
-          	//4: {title: 'Mass'}
-          },
-          series: {
-          	//0: {targetAxisIndex: 1},
-          	0: {targetAxisIndex: 0},
-          	1: {targetAxisIndex: 1}
-          	//3: {targetAxisIndex: 0},
-          	//4: {targetAxisIndex: 1}
-          },
-          vAxis: {
-	          viewWindow: {
-	            min: 0
-	          }
-	        }
-
-      };
-
-      var posdata = new google.visualization.DataTable();
-      posdata.addColumn('number', 'Time (s)');
-      posdata.addColumn('number', 'Linear Position (m)');
-      posdata.addColumn('number', 'Cylinder Inst. Pressure (kPa)');
-      posdata.addRows([]);
-
-      poschart.draw(posdata, poschart_options);
-    };
 
 	function get_motor_data(motor,key){
 		return motor_data[motor][key];
@@ -126,9 +91,6 @@
 
 	function thload() {
 		populate_units();
-
-		drawStuff();
-
 		populate_direction();
 		
 
@@ -147,7 +109,7 @@
 		    }
 		}
 
-		compute(false);
+		compute(true);
 	}
 
 		
@@ -189,8 +151,8 @@
 		V_extra = Math.PI/4*Math.pow(d_line,2)*l_line;
 		M = gidv('mass'); // kg
 
-		F_push = P_in*A_push;
-		F_pull = P_in*A_pull;
+		F_push = (P_in-P_atm)*A_push;
+		F_pull = (P_in-P_atm)*A_pull;
 		gids("f_push", F_push);
 		gids("f_pull", F_pull);
 
@@ -204,23 +166,6 @@
 
 		if(!simulate) return;
 
-		data = [];
-		chartdata = [];
-
-		var posdata = new google.visualization.DataTable();
-		posdata.addColumn('number', 'Time (s)');
-      	//posdata.addColumn('number', 'Linear Velocity (m/s)');
-      	posdata.addColumn('number', 'Linear Position (m)');
-      	posdata.addColumn('number', 'Cylinder Inst. Pressure (kPa)');
-      	//posdata.addColumn('number', 'Cylinder Inst. Temperature (K)');
-      	//posdata.addColumn('number', 'Cylinder Air Mass (kg)');
-      	
-
-      	var xdata = new google.visualization.DataTable();
-		xdata.addColumn('number', 'Time (s)');
-      	xdata.addColumn('number', 'Angular Velocity (RPM)');
-      	xdata.addColumn('number', 'Rotational Position (rev)');
-      	xdata.addRows([[0,0,0]]);
       	i=0;
 
       	t_endstop = NaN;
@@ -232,13 +177,14 @@
       	termcrit = document.getElementById('termcrit').value;
       	if (termcrit == '') termcrit = 0;
 
+      	channels = [[0],[0],[0],[0],[0]];
+
 		while(i<3000) {
 			P_s = m_s/(x*A+V_extra)*R*T_s;
 			V_in = sign(P_in-P_s)*0.0197862*Math.pow(Math.pow(d_line,5)*(P_in-P_atm)*Math.abs(P_in-P_s)/l_line, 20/37); //magical equation
 			m_in = P_in/R/T_in*V_in;
 
-			F = convert(eval(document.getElementById('load').value), inputs_unit_map['load'][unit_sys]); // N
-			//console.log(F);
+			F = convert(eval(document.getElementById('load').value), inputs_unit_map['load'][unit_sys]);
 
 			vmterm = en_vm ? Math.pow(V_in/(Math.PI/4 * d_line*d_line), 2) : 0;
 
@@ -276,14 +222,15 @@
 
 			if (eval(termcrit)) break;
 
-			//data.push([t,x,v,P_s,T_s,m_s]);
-			chartdata.push([t,x,P_s-P_atm]); //,T_s,m_s
+			channels[0].push(t);
+			channels[1].push(x);
+			channels[2].push(P_s-P_atm);
+			channels[3].push(v);
+			channels[4].push((P_s-P_atm)*A);
 			i++;
 		}
+		drawchart(channels);
 
-		posdata.addRows(chartdata);
-
-		poschart.draw(posdata, poschart_options);
       	//xchart.draw(xdata, xchart_options);
       	document.getElementById('charts').classList.remove('uncomputed');
       	document.getElementById('t_endstop').classList.remove('uncomputed');
@@ -312,11 +259,182 @@
 
 </script>
 
+
+<script style="text/javascript" >
+	function makeTicks(maxes, num_to_print, n) {
+		if (Math.min(maxes) < 0) return [0];
+		H = [];
+		bases = [];
+		for(var i=0; i<maxes.length; i++){
+			h = maxes[i]/n;
+			base = Math.floor(Math.log10(h)-Math.log10(5));
+			bases.push(base);
+			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
+		}
+
+		ticks = [];
+		ticksstr = [];
+		alive = true;
+		for(var i=0; alive; i++) {
+			alive = false;
+			labelstr = '';
+			for(var j=0; j<maxes.length; j++) {
+				if (j<num_to_print) {
+					if (ticks.length <= j+1)
+						ticks.push([]);
+					ticks[j].push(H[j]*i);
+					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
+					if (j != num_to_print-1)
+						labelstr += ' / ';
+				}
+				if (H[j]*(i) < maxes[j])
+					alive = true;
+			}
+			ticksstr.push(labelstr);
+			
+		}
+		return [ticks, ticksstr];
+	}
+
+	function sign(x) {
+		if(x>0) return 1;
+		if(x<0) return -1;
+		return 0;
+	}
+
+	chart_name = 'chart';
+
+	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
+		altaxis = axis == 'x' ? 'y':'x';
+		realaxis = axis == 'z' ? 'y':axis;
+		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
+		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
+
+		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
+		while(labels.firstChild) labels.removeChild(labels.firstChild);
+
+		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
+
+		for (i in ticklabels) {
+			line = document.createElementNS('http://www.w3.org/2000/svg','line');
+			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
+			fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
+			line.setAttribute(realaxis+'1', fp);
+			line.setAttribute(realaxis+'2', fp);
+			line.setAttribute('class', 'grid');
+			xgrid.append(line);
+
+			label = document.createElementNS('http://www.w3.org/2000/svg','text');
+			label.setAttribute(altaxis, gfl);
+			label.setAttribute(realaxis, fp);
+			label.innerHTML = i==0 ? '0' : ticklabels[i];
+			labels.append(label);
+		}
+	}
+
+	function linterp(xs, ys, xq) {
+		i;
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
+	}
+
+	function drawchart() {
+		[t, d, p, v, f] = channels;
+
+		dc = convert_to(d, inputs_unit_map['query_d'][unit_sys]);
+		pc = convert_to(p, inputs_unit_map['query_p'][unit_sys]);
+
+		svg = document.getElementById('chart');
+		x_axis = document.getElementById('chart_x_axis');
+		y_axis = document.getElementById('chart_y_axis');
+
+		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+
+		d_line = document.getElementById('chart_d_line');
+		p_line = document.getElementById('chart_p_line');
+		d_line.setAttribute("points",""); 
+		p_line.setAttribute("points",""); 
+
+		[[t_ticks], xticklabels] = makeTicks([Math.max(...t)], 1, 9);
+		[[d_ticks], yticklabels] = makeTicks([Math.max(...dc), Math.max(...pc)], 1, 6);
+		[[p_ticks], zticklabels] = makeTicks([Math.max(...pc), Math.max(...dc)], 1, 6);
+		
+		t_max = t_ticks[t_ticks.length-1];
+		d_max = d_ticks[d_ticks.length-1];
+		p_max = p_ticks[p_ticks.length-1];
+
+		drawTicks('x', xticklabels, xf, x0, yf, y0, 15);
+		drawTicks('y', yticklabels, yf, y0, xf, x0, 5);
+		drawTicks('z', zticklabels, yf, y0, xf, x0, 5);
+
+		for (i in t) {
+			var ptd = svg.createSVGPoint();
+			var ptp = svg.createSVGPoint();
+
+			xq = x0 + (xf-x0)/(t_max-0)*t[i];
+			ptd.x = ptp.x = xq;
+
+			ptd.y   = y0 + (yf-y0)/(d_max-0)*dc[i];
+			ptp.y   = y0 + (yf-y0)/(p_max-0)*pc[i];
+			d_line.points.appendItem(ptd);
+			p_line.points.appendItem(ptp);
+		}
+		
+		
+		bg=document.getElementById('chart');
+
+		qline = document.getElementById('chart_query_line');
+		qline.setAttribute('opacity', 0);
+
+		gids('query_t', '-');
+		gids('query_d', '-');
+		gids('query_v', '-');
+		gids('query_p', '-');
+		gids('query_f', '-');
+
+		handler = function(event){
+			if(event.buttons != 1) return;
+				xq = event.clientX - bg.getBoundingClientRect().left;
+				yq = event.clientY - bg.getBoundingClientRect().top;
+
+				tq = (t_max-0)/(xf-x0)*(xq-x0);
+				if (tq>Math.max(...t)){
+					tq = Math.max(...t);
+					xq = x0 + (xf-x0)/(t_max-0)*tq;
+				}
+				if (tq<0) {
+					tq=0; xq=x0;
+				}
+				dq   = linterp(t, d, tq);
+				vq   = linterp(t, v, tq);
+				pq   = linterp(t, p, tq);
+				fq   = linterp(t, f, tq);
+				qline.setAttribute('opacity', 1);
+
+				qline.setAttribute('x1', xq);
+				qline.setAttribute('x2', xq);
+
+				gids('query_t', tq);
+				gids('query_d', dq);
+				gids('query_v', vq);
+				gids('query_p', pq);
+				gids('query_f', fq);
+			}
+		bg.addEventListener('mousemove', handler);
+		bg.addEventListener('mousedown', handler);
+	}
+
+</script>
+
+
 <html>
 <body onload="thload()">
 	<div style="width: 420px; float: left;" class="container">
 		<h3>Thad's Pneumatic Piston Calculator</h3>
-		<center><a href="./">Back To Index</a></center>
+		<center><a href="./">Back To Index</a><br/>This model is dubious. The Force (Push/Pull) values should be good. Everything else is suspect.</center>
 
 		<div class="even">
 		<center>
@@ -370,35 +488,35 @@
 				<td><input id="mass" value=0.7></td>
 				<td class="unit" id='unit_mass'></td>
 			</tr><tr>
-				<th class="rowlabel">Alt. Termination Criteria</th>
+				<th class="rowlabel">Alt. Termination Crit</th>
 				<td><input id="termcrit" value=''></td>
 			</tr>
 		</table>
-		<button type="button" onclick="compute()">Compute!</button>
+		<center><button type="button" onclick="compute()">Compute!</button></center>
 		</div><div class="output">
 			<table>
 				<tr>
-					<th class='rowlabel'>Force (Push)</th>
+					<th class='rowlabel'>Force (Push)<span class="ttt">Push force of the cylinder at steady-state (not considering any external load)</span></th>
 					<td><input id='f_push' readonly /></td>
 					<td class='unit' id='unit_f_push'></td>
 				</tr><tr>
-					<th class='rowlabel'>Force (Pull)</th>
+					<th class='rowlabel'>Force (Pull)<span class="ttt">Pull force of the cylinder at steady-state (not considering any external load)</span></th>
 					<td><input id='f_pull' readonly /></td>
 					<td class='unit' id='unit_f_pull'></td>
 				</tr><tr>
-					<th class='rowlabel'>Time to Reach Endstop</th>
+					<th class='rowlabel'>Time to Endstop</th>
 					<td><input id='t_endstop' readonly /></td>
 					<td class='unit'>[s]</td>
 				</tr><tr>
-					<th class='rowlabel'>Time to Reach Steady-State</th>
+					<th class='rowlabel'>Time to Steady-State</th>
 					<td><input id='t_steady' readonly /></td>
 					<td class='unit'>[s]</td>
 				</tr><tr>
-					<th class='rowlabel'>Velocity Hitting Endstop</th>
+					<th class='rowlabel'>Velocity @ Endstop</th>
 					<td><input id='v_endstop' readonly /></td>
 					<td class='unit' id='unit_v_endstop'></td>
 				</tr><tr>
-					<th class='rowlabel'>Kinetic Energy Hitting Endstop</th>
+					<th class='rowlabel'>Kinetic En. @ Endstop</th>
 					<td><input id='E_endstop' readonly /></td>
 					<td class='unit' id='unit_E_endstop'></td>
 				</tr><tr>
@@ -408,8 +526,90 @@
 				</tr>
 			</table>
 		</div>
-	</div><div style="margin-left: 0px;" class="container" id="charts">
-	 <div id="poschart_div" style="width: 900px; height: 500px"></div>
 	</div>
+
+
+<div style="margin-left: 0px;" class="container" id="charts">
+
+
+<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
+  <title id="title">Position/Velocity Data</title>
+
+
+<rect class="background" id="chart_background" x=90 y=20 width=615 height=430 />
+<g class="x-grid">
+  <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
+</g>
+<g class="y-grid">
+  <line id="chart_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
+  <line id="chart_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+</g>
+
+<g class="x-grid" id="chart_x_grid"></g>
+<g class="y-grid" id="chart_y_grid"></g>
+<g class="z-grid" id="chart_z_grid"></g>
+
+<g class="labels x-labels" id='chart_x_labels'>
+  <text x="375" y=485 class="label-title">Time [s]</text>
+</g>
+
+<g class="labels y-labels" id='chart_y_labels'>
+  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_d_label" fill="#0074d9">Position</text>
+</g>
+
+<g class="labels z-labels" id='chart_z_labels'>
+  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_p_label" fill="#d91200">Pressure</text>
+</g>
+
+<g class="labels x-labels" id='chart_x_axis_labels'></g>
+<g class="labels z-labels" id='chart_z_axis_labels'></g>
+<g class="labels y-labels" id='chart_y_axis_labels'></g>
+
+<g class="query-line">
+	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
+</g>
+<polyline
+	id='chart_d_line'
+	fill='none'
+	stroke='#0074d9'
+	stroke-width=2
+	points="
+	"/>
+<polyline
+	id='chart_p_line'
+	fill='none'
+	stroke='#d91200'
+	stroke-width=2
+	points="
+	"/>
+</svg>
+	
+<div class="output-graph">
+	<table>
+		<tr>
+			<th class="rowlabel">Queried Time</th>
+			<td><input id="query_t" readonly /></td>
+			<td class="unit">[s]</td>
+		</tr><tr>
+			<th class="rowlabel">Position</th>
+			<td><input id="query_d" readonly /></td>
+			<td class="unit" id="unit_query_d"></td>
+		</tr><tr>
+			<th class="rowlabel">Velocity</th>
+			<td><input id="query_v" readonly /></td>
+			<td class="unit" id="unit_query_v"></td>
+		</tr><tr>
+			<th class="rowlabel">Pressure</th>
+			<td><input id="query_p" readonly /></td>
+			<td class="unit" id="unit_query_p"></td>
+		</tr><tr>
+			<th class="rowlabel">Force</th>
+			<td><input id="query_f" readonly /></td>
+			<td class="unit" id="unit_query_f"></td>
+		</tr>
+	</table>
+</div>
+
+</div>
 </body>
 </html>

@@ -144,6 +144,7 @@ var unit_conversions = {
 	"m/s": 1,
 	"ft/s": 0.3048,
 	"in/s": 0.0254,
+	"mm/s": 1e-3,
 
 	"m/s^2": 1,
 	"ft/s^2": .09290,
