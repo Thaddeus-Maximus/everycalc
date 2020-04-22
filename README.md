@@ -8,10 +8,10 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 ![xkcd 927](https://imgs.xkcd.com/comics/standards.png)
 
 # Aims
-- Make something that works without fancy macros, but is still interactive (currently, using vanilla JS + google charting)
+- Make something that works without fancy macros, but is still interactive
+- Make something that can be used offline (i.e. by downloading this whole repo)
 - Provide all the useful analysis tools I've seen to make mechatronic mechanisms in FRC
 - Maybe provide basic structural analysis tools (like beam deflection/strength calculators)
-- Material comparisons (would require a hefty database... or a scraper... hmm)
 
 # Documentation
 
