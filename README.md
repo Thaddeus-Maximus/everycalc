@@ -18,3 +18,6 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 [Rocker Pod Model](docs/rocker_pod_model.pdf)
 
 [Adiabatic Cylinder Model](docs/adiabatic_cylinder_model.pdf)
+
+# Credits
+Using [hiddentao's linear-algebra package](https://github.com/hiddentao/linear-algebra) for beam calculator (as some rudimentary FEA is performed).
