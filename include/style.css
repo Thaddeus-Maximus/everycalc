@@ -203,4 +203,8 @@ button {
 }
 .uncomputed {
   background: #fd6 !important;
-}how 
+}
+
+#k_table td {
+  width: 100px;
+}
