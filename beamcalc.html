@@ -145,37 +145,63 @@
 		}
 	}
 
-	function compute() {
-		var K = math.matrix(math.zeros([12,12]));
-		F = math.matrix(math.zeros([12,1]));
-		F.subset(math.index(4, 1), 10);
-		dofs_to_remove = [2,8,9];
+	function run_fe(EI, nodes, forces, moments, pinned, fixed) {
+		numel = nodes.length-1;
 
-		for (i=0;i<5;i++) {
+		numnode = (numel+1)*2;
+		
+		var K = math.matrix(math.zeros([numnode,numnode]));
+		F = math.matrix(math.zeros([numnode,1]));
+		dofs_to_remove = [];
+		for (i in forces){
+			F.subset(math.index(parseInt(i)*2,0), forces[i]);
+		}
+		for (i in moments){
+			F.subset(math.index(parseInt(i)*2+1,0), forces[i]);
+		}
+		for (i of pinned){
+			dofs_to_remove.push(i*2);
+		}
+		for (i of fixed){
+			dofs_to_remove.push(i*2);
+			dofs_to_remove.push(i*2+1);
+		}
+
+		for (i=0;i<numel;i++) {
 			idx = math.index(math.range(i*2, i*2+4), math.range(i*2, i*2+4));
 			ss = K.subset(idx);
-			Ks = make_stiffness_matrix(4e9*0.00007, 0.05);
+			Ks = make_stiffness_matrix(EI, nodes[i+1]-nodes[i]);
 			K.subset(idx,
 				math.add(ss, Ks));
 		}
 
 		idx_rmv_l = [];
-		for (i=0;i<12;i++) {
+		for (i=0;i<numnode;i++) {
 			if (! dofs_to_remove.includes(i)) idx_rmv_l.push(i);
 		}
 		idx_rmv = math.index(idx_rmv_l, idx_rmv_l);
 		K = K.subset(idx_rmv);
-		F = F.subset(math.index(idx_rmv_l, 1));
-		drawtbl(K);
-		console.log(F);
+		F = F.subset(math.index(idx_rmv_l, 0));
 		q = math.multiply(math.inv(K), F);
 		fq = [];
 		offs = 0;
-		for (i=0;i<12;i++) {
+		for (i=0;i<numnode;i++) {
 			if (dofs_to_remove.includes(i)){fq.push(0); offs++}
 			else fq.push(q._data[i-offs][0]);
 		}
 		console.log(fq);
+		return fq;
+	}
+
+	function compute() {
+		nodes  = [0, 0.1, 0.2, 0.5, 0.6];
+		forces = {2: 100};
+		moments = {};
+		pinned = [1,3];
+		fixed  = [];
+		EI = 4e9*0.00007;
+
+		run_fe(EI, nodes, forces, moments, pinned, fixed);
 	}
 </script>
 
