@@ -29,12 +29,7 @@ h1{font-size:36px}h2{font-size:30px}h3{font-size:24px;text-align: center;}h4{fon
 h1,h2,h3,h4,h5,h6{font-family:"Segoe UI",Arial,sans-serif;font-weight:400;margin:10px 0}.w3-wide{letter-spacing:4px}
 hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
-.error {
-  background: #fd6;
-}
-.uncomputed {
-  background: #d99;
-}
+
 
 .collabel{
 	text-align: top;
@@ -202,3 +197,10 @@ button {
 .qline-hidden {
   opacity: 0;
 }
+
+.error {
+  background: #d99 !important;
+}
+.uncomputed {
+  background: #fd6 !important;
+}how 

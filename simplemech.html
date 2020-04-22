@@ -44,7 +44,7 @@
 
 		document.getElementById(chart_name+'_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
 		document.getElementById(chart_name+'_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
-		document.getElementById(chart_name+'_f_label').innerHTML = 'Force ['+inputs_unit_map['query_f'][unit_sys]+']';
+		document.getElementById(chart_name+'_f_label').innerHTML = 'Force ['  +inputs_unit_map['query_f'][unit_sys]+']';
 	}
 
 
@@ -364,7 +364,7 @@
 		for (i in ticklabels) {
 			line = document.createElementNS('http://www.w3.org/2000/svg','line');
 			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(i/ticklabels.length);
+			fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
 			line.setAttribute(realaxis+'1', fp);
 			line.setAttribute(realaxis+'2', fp);
 			line.setAttribute('class', 'grid');
@@ -505,9 +505,9 @@
 
 	<div class="odd">
 		<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
+			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked>
 			  <label for="english">English</label>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
+			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()">
 			  <label for="metric">Metric</label><br>
 		</center>
 	</div>
@@ -572,9 +572,9 @@
 	</div>
 	<table id='detail_gratio' style="display:none;">
 		<tr>
-			<td><input id="G1A" oninput="calc_ratio()" /></td>
+			<td><input id="G1A" oninput="calc_ratio()" value=12 /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="calc_ratio()" /></td>
+			<td><input id="G1B" oninput="calc_ratio()" value=72 /></td>
 		</tr><tr>
 			<td><input id="G2A" oninput="calc_ratio()" /></td>
 			<td class="tiny">:</td>
@@ -617,7 +617,7 @@
 		<table>
 		<tr>
 			<th class="rowlabel">Radius <span class="ttt">Radius of the output.<br/>If this is an arm, input the length of the arm.<br/>If this is an elevator, input the radius of the spool.<br/>If this is a drivetrain, input the radius of the wheel.</span></th>
-			<td><input id="radius" oninput="" value=0.1 /></td>
+			<td><input id="radius" oninput="" value=2 /></td>
 			<td class="unit" id="unit_radius"></td>
 		</tr><tr>
 			<th class="rowlabel">Load Equation<span class="ttt">(Optional) Load equation. You can put a simple number here, or you can put an expression.<br/>If you put an expression, you can use any javascript operators (+,-,*,/,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
@@ -625,11 +625,11 @@
 			<td class="unit" id="unit_load"></td>
 		</tr><tr>
 			<th class="rowlabel">Mass<span class="ttt">(Optional) [Equivalent] Mass.<br/>If you're running a linear device, you can just put its mass in here.<br/>If you are analyzing a rotational device, you can put the moment of inertia, divided by the radius squared here.</span></th>
-			<td><input id="mass" oninput="" value=1.0 /></td>
+			<td><input id="mass" oninput="" value=30 /></td>
 			<td class="unit" id="unit_mass"></td>
 		</tr><tr>
 			<th class="rowlabel">End Condition<span class="ttt">(Optional) End condition. Must be an expression that logically evaluates.<br/>You can use any javascript operators/comparators (+,-,*,/,>,<,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
-			<td><input id="endcond" oninput="" value="t > 5"/></td>
+			<td><input id="endcond" oninput="" value="x > 5"/></td>
 		</tr>
 	</table>
 <div class="even">

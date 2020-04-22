@@ -47,6 +47,11 @@
 				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
 			}
 		}
+
+
+
+		document.getElementById(chart_name+'_x_label').innerHTML = 'Distance ['+inputs_unit_map['y_target'][unit_sys]+']';
+		document.getElementById(chart_name+'_y_label').innerHTML = 'Height ['+inputs_unit_map['y_target'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -82,8 +87,9 @@
 			v = eval(v);
 		}
 		
-		if (typeof inputs_unit_map[id] !== 'undefined')
+		if (typeof inputs_unit_map[id] !== 'undefined') {
 			v = convert(v, inputs_unit_map[id][unit_sys]);
+		}
 		return v;
 	}
 
@@ -93,8 +99,11 @@
 		if (typeof value === 'string') {
 			document.getElementById(id).value = value;
 		} else {
-			if (typeof inputs_unit_map[id] !== 'undefined')
+			if (typeof inputs_unit_map[id] !== 'undefined'){
+
+				
 				value = convert_to(value, inputs_unit_map[id][unit_sys]);
+			}
 			document.getElementById(id).value = value.toFixed(places);
 		}
 	}
@@ -113,7 +122,7 @@
 		    	if (key==13) {
 		    		compute(true);
 		    	} else {
-		    		
+		    		compute(false);
 		    	}
 		    }
 		}
@@ -232,7 +241,7 @@
     		var v = gidv('v_initial');
 
     		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
-
+    		
     		gids('theta', theta);
     	} else if (mode=='find_v') {
     		var x = gidv('x_target');
@@ -251,6 +260,13 @@
 
     		gids('theta', theta);
     		gids('v_initial', v);
+    	}
+
+    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'time_of_flight', 'time_of_flight_err']
+    	for (id of computable_ids) {
+	    	document.getElementById(id).classList.remove('error');    
+	    	document.getElementById(id).classList.remove('uncomputed');    
+	    	document.getElementById(id).classList.add(isNaN(v) ? 'error':'uncomputed');
     	}
 
 
@@ -288,7 +304,10 @@
 		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
       	drawchart(max_low_run, max_high_run, targetstuff);
 
-      	
+		for (id of computable_ids){
+			document.getElementById(id).classList.remove('error');    
+	    	document.getElementById(id).classList.remove('uncomputed');    	
+		}
       	gids('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
       	gids('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
       	gids('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
@@ -312,37 +331,34 @@
 </script>
 
 <script type="text/javascript">
-	function makeTicks(maxes, num_to_print, n) {
-		if (Math.min(maxes) < 0) return [0];
-		H = [];
-		bases = [];
-		for(var i=0; i<maxes.length; i++){
-			h = maxes[i]/n;
-			base = Math.floor(Math.log10(h)-Math.log10(5));
-			bases.push(base);
-			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
-		}
+	function makeTicks(start_at, go_to, num_to_print, n) {
+		//if (Math.min(maxes) < 0) return [0];
 
-		ticks = [];
-		ticksstr = [];
-		alive = true;
-		for(var i=0; alive; i++) {
-			alive = false;
-			labelstr = '';
-			for(var j=0; j<maxes.length; j++) {
-				if (j<num_to_print) {
-					if (ticks.length <= j+1)
-						ticks.push([]);
-					ticks[j].push(H[j]*i);
-					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-					if (j != num_to_print-1)
-						labelstr += ' / ';
-				}
-				if (H[j]*(i) < maxes[j])
-					alive = true;
+		
+		if(start_at < 0) { //  thats not very general purpose of u
+			h = (-start_at)/n;
+			base = Math.floor(Math.log10(h)-Math.log10(5));
+			H = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
+
+			ticks = [];
+			ticksstr = [];
+			for(var i=-1; i<n+1; i++) {
+				ticks.unshift(-H*i);
+				labelstr = (-H*i).toFixed(base > 0 ? 0:-base);
+				ticksstr.unshift(labelstr);
 			}
-			ticksstr.push(labelstr);
-			
+		} else {
+			h = (go_to)/n;
+			base = Math.floor(Math.log10(h)-Math.log10(5));
+			H = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
+
+			ticks = [];
+			ticksstr = [];
+			for(var i=0; i<n+1; i++) {
+				ticks.push(H*i);
+				labelstr = (H*i).toFixed(base > 0 ? 0:-base);
+				ticksstr.push(labelstr);
+			}
 		}
 		return [ticks, ticksstr];
 	}
@@ -369,7 +385,7 @@
 		for (i in ticklabels) {
 			line = document.createElementNS('http://www.w3.org/2000/svg','line');
 			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(i/ticklabels.length);
+			fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
 			line.setAttribute(realaxis+'1', fp);
 			line.setAttribute(realaxis+'2', fp);
 			line.setAttribute('class', 'grid');
@@ -378,19 +394,9 @@
 			label = document.createElementNS('http://www.w3.org/2000/svg','text');
 			label.setAttribute(altaxis, gfl);
 			label.setAttribute(realaxis, fp);
-			label.innerHTML = i==0 ? '0' : ticklabels[i];
+			label.innerHTML = ticklabels[i];
 			labels.append(label);
 		}
-	}
-
-	function linterp(xs, ys, xq) {
-		i;
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
-	}
-
-	function gids(id, val) {
-		document.getElementById(id).value = (typeof val == 'string' ? val : val.toFixed(3));
 	}
 
 	function clean_run(run) {
@@ -405,13 +411,19 @@
 		
 	}
 
+
+	function makept(scaling, xq, yq) {
+		[x0, y0, xf, yf, xl, xm, ym] = scaling;
+		var pt = svg.createSVGPoint();
+		pt.x = x0 + (xf-x0)/(xm-xl)*(xq-xl);
+		pt.y = y0 + (yf-y0)/(ym-0)*yq;
+		return pt;
+	}
+
 	function drawchart(low_run, high_run, targetstuff) {
-		console.log(low_run);
+		[target_d, target_h, target_diam] = targetstuff;
 		low_run = clean_run(low_run);
 		high_run = clean_run(high_run);
-
-		console.log(low_run);
-
 
 		var d = low_run[0].concat(high_run[0].reverse());
 		var h = low_run[1].concat(high_run[1].reverse());
@@ -428,13 +440,23 @@
 		shot_area = document.getElementById('chart_shot_area');
 		shot_area.setAttribute("points","");
 
-		[[d_ticks], d_ticklabels] = makeTicks([-Math.min(...d)], 1, 9);
-		[[h_ticks], h_ticklabels] = makeTicks([Math.max(...h)], 1, 9);
+		maxht = Math.max(Math.max(...h), target_h+target_diam);
+		mindist = Math.min(...d);
 
-		console.log(d, h);
+		[d_ticks, d_ticklabels] = makeTicks(mindist, 0, 1, 6);
+		[h_ticks, h_ticklabels] = makeTicks(0,    maxht, 1, 6);
+
 
 		d_max = d_ticks[d_ticks.length-1];
+		d_min = d_ticks[0];
 		h_max = h_ticks[h_ticks.length-1];
+
+		if (document.getElementById('equal_axes').checked) {
+			ideal_yf = y0 - (xf-x0)/(d_max-d_min) * h_max;
+			ideal_xf = x0 - (yf-y0)/(h_max) * (d_max-d_min);
+			if 		(ideal_yf > yf) yf = ideal_yf;
+			else if (ideal_xf < xf) xf = ideal_xf;
+		}
 
 		drawTicks('x', d_ticklabels, xf, x0, yf, y0, 15);
 		drawTicks('y', h_ticklabels, yf, y0, xf, x0, 5);
@@ -442,11 +464,40 @@
 		for (i in d) {
 			//if(isNaN(d[i]) || isNaN(h[i])) continue;
 			var pt = svg.createSVGPoint();
-			pt.x = x0 + (xf-x0)/(d_max-0)*(-d[i]);
+			pt.x = x0 + (xf-x0)/(d_max-d_min)*(d[i]-d_min);
 			pt.y = y0 + (yf-y0)/(h_max-0)*h[i];
 			chart_shot_area.points.appendItem(pt);
 		}
-		
+
+		target_low  = document.getElementById('chart_target_low');
+		target_high = document.getElementById('chart_target_high');
+
+		target_low.setAttribute("points","");
+		target_high.setAttribute("points","");
+
+		scaling = [x0, y0, xf, yf, d_min, d_max, h_max];
+		target_low.points.appendItem(makept(scaling,      0, 			0));
+		target_low.points.appendItem(makept(scaling,      0, 			target_h-target_diam/2));
+		target_low.points.appendItem(makept(scaling,      0+target_h/5,  target_h-target_diam/2));
+		target_low.points.appendItem(makept(scaling,      0+target_h/5,  0));
+
+		target_high.points.appendItem(makept(scaling,     0,				target_h+target_diam));
+		target_high.points.appendItem(makept(scaling,     0, 			target_h+target_diam/2));
+		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam/2));
+		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam));
+
+		/*
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = 0; target_low.points.appendItem(pt);
+
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
+		*/
+
 		/*bg=document.getElementById('chart');
 
 		qline = document.getElementById('chart_query_line');
@@ -498,7 +549,7 @@
 <body onload="thload()">
 	<div style="width: 100%; float: left;" class="container">
 		<h3>Thad's Ballistic Trajectory Calculator</h3>
-		<center><a href="./">Back To Index</a><br/>WARNING: PLOT DOESNT HAVE SCALED AXES YET!</center>
+		<center><a href="./">Back To Index</a><br/></center>
 
 		<div class="even" style=''>
 			<table>
@@ -570,6 +621,7 @@
 			</table>
 		</div><div class="output" style='display:table-cell'>
 			<button type="button" onclick="compute()">Compute!</button>
+			<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
@@ -601,9 +653,9 @@
   <title id="title">Position Chart</title>
 
 
-	<rect class="background" id="chart_background" x=70 y=20 width=730 height=430 />
+	<rect class="background" id="chart_background" x=70 y=20 width=710 height=430 />
 	<g class="x-grid">
-	  <line id="chart_x_axis" class="axes" x1="70" x2="800" y1="450" y2="450"></line>
+	  <line id="chart_x_axis" class="axes" x1="70" x2="780" y1="450" y2="450"></line>
 	</g>
 	<g class="y-grid">
 	  <line id="chart_y_axis" class="axes" x1="70" x2="70" y1="20" y2=450></line>
@@ -613,11 +665,11 @@
 	<g class="y-grid" id="chart_y_grid"></g>
 
 	<g class="labels x-labels" id='chart_x_labels'>
-	  <text x=375 y=485 class="label-title">Distance [ft]</text>
+	  <text x=375 y=485 class="label-title" id="chart_x_label">Distance [ft]</text>
 	</g>
 
 	<g class="labels y-labels" id='chart_y_labels'>
-	  <text x=-240 y=20 class="label-title" transform="rotate(270)" id="chart_y_label">Height [ft]</text>
+	  <text x=-360 y=20 class="label-title" transform="rotate(270)" id="chart_y_label">Height [ft]</text>
 	</g>
 
 	<g class="labels x-labels" id='chart_x_axis_labels'></g>
@@ -634,6 +686,18 @@
 		opacity=0.5
 		points="
 		"/>
+	<polyline
+		id='chart_target_low'
+		fill="#444"
+		stroke='none'
+		opacity=1.0
+		points=""/>
+	<polyline
+		id='chart_target_high'
+		fill="#444"
+		stroke='none'
+		opacity=1.0
+		points=""/>
 </svg>			
 
 		</div>
