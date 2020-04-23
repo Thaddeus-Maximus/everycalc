@@ -158,8 +158,10 @@ var unit_conversions = {
 
 	'kPa': 1000,
 	'MPa': 1e6,
+	'GPa': 1e9,
 	'Pa': 1,
 	'psi': 6894.76,
+	'10^6 psi': 6894.76e+6,
 
 	'J': 1, //note: ft-lbf is covered by the torque section; and conversion factor is the same.
 
@@ -176,7 +178,10 @@ var unit_conversions = {
 	'RPM': Math.PI*2/60,
 
 	'rad/s^2': 1,
-	'RPM/s': Math.PI*2/60
+	'RPM/s': Math.PI*2/60,
+
+	'mm^4': 1e-12,
+	'in^4': Math.pow(0.0254, 4)
 
 }
 
