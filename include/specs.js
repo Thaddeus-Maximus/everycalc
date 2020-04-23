@@ -181,7 +181,10 @@ var unit_conversions = {
 	'RPM/s': Math.PI*2/60,
 
 	'mm^4': 1e-12,
-	'in^4': Math.pow(0.0254, 4)
+	'in^4': Math.pow(0.0254, 4),
+
+	'mm^2': 1e-6,
+	'in^2': Math.pow(0.0254, 2)
 
 }
 

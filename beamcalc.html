@@ -8,17 +8,22 @@
 		'force':           ['N', 'lbf'],
 		'elastic_modulus': ['GPa', '10^6 psi'],
 		'moi':       ['mm^4', 'in^4'],
+		'area': 	 ['mm^2', 'in^2'],
 		'section_1': ['mm', 'in'],
 		'section_2': ['mm', 'in'],
 		'section_3': ['mm', 'in'],
 		'section_4': ['mm', 'in'],
 		'length':    ['mm', 'in'],
 		'rmax':      ['mm', 'in'],
+		'rmin':      ['mm', 'in'],
 		'query_l':   ['mm', 'in'],
 		'query_q':   ['mm', 'in'],
 		'query_m':   ['N-m', 'ft-lbf'],
 		'query_sl':  ['deg', 'deg'],
-		'query_sh':  ['N', 'psi']
+		'query_sh':  ['N', 'lbf'],
+		'query_stress_bend_top': ['MPa', 'psi'],
+		'query_stress_bend_bot': ['MPa', 'psi'],
+		'query_stress_shear':    ['MPa', 'psi']
 	}
 
 	function switch_units() {
@@ -35,6 +40,10 @@
 				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
 			}
 		}
+
+		document.getElementById('chart_q_label').innerHTML = `Deflection [${inputs_unit_map["query_q"][unit_sys]}]`;
+		document.getElementById('chart_m_label').innerHTML = `Bending Moment [${inputs_unit_map["query_m"][unit_sys]}]`;
+		document.getElementById('chart_x_label').innerHTML = `Position [${inputs_unit_map["query_l"][unit_sys]}]`;
 	}
 
 	var poschart = null, poschart_options = null;
@@ -83,6 +92,7 @@
 		add_load({where: 10, amount: -10, type: 3});
 		document.getElementById('length').value=100;
 		shape_select();		
+		moi_compute();
 		
 		register_callbacks();
 
@@ -122,53 +132,70 @@
 
 	function moi_compute() {
 		shape = document.getElementById('section').value;
-		var moi;
+		var moi, area, rmax, rmin;
+		// TODO: unsupported sections
 		if (shape == 'custom') {
 			
 		} else if (shape == 'rndbar') {
 			d = gidv('section_1');
+			rmax = rmin = d/2;
+			area = Math.PI/4 * d*d;
 			moi = Math.PI/64*Math.pow(d,4);
 		} else if (shape == 'boxbar') {
 			w = gidv('section_1');
 			h = gidv('section_2');
+			rmax = rmin = h/2;
+			area = w*h;
 			moi = w*Math.pow(h,3)/12;
 		} else if (shape == 'boxtube') {
 			w = gidv('section_1');
 			h = gidv('section_2');
 			t = gidv('section_3');
+			rmax = rmin = h/2;
+			area = w*h - (w-2*t)*(w-2*t);
 			moi = (w*Math.pow(h,3) - (w-2*t)*Math.pow(h-2*t,3))/12;
 		} else if (shape == 'angle') {
 			w = gidv('section_1');
 			h = gidv('section_2');
 			t = gidv('section_3');
-			moi = "NOT SUPPORTED YET";
+			area = rmax = rmin = moi = "NOT SUPPORTED YET";
 		} else if (shape == 'rndtube') {
 			d = gidv('section_1');
 			t = gidv('section_2');
+			rmax = rmin = d/2;
+			area = Math.PI/4 * (d*d-(d-2*t)*(d-2*t));
 			moi = Math.PI/64*(Math.pow(d,4)-Math.pow(d-2*t,4));
 		} else if (shape == 'hex') {
 			w = gidv('section_1');
 			id = gidv('section_2');
 			od = gidv('section_3');
-			moi = "NOT SUPPORTED YET";
+			area = rmax = rmin = moi = "NOT SUPPORTED YET";
 		}
 		gids("moi", moi);
+		gids("area", area);
+		gids("rmax", rmax);
+		gids("rmin", rmin);
 	}
 
 	function shape_select() {
 		shape = document.getElementById('section').value;
+		document.getElementById('moi').readOnly = true;
+		document.getElementById('area').readOnly = true;
+		document.getElementById('rmax').readOnly = true;
+		document.getElementById('rmin').readOnly = true;
 		if (shape == 'custom') {
-			document.getElementById('moi').readOnly = false;
+			document.getElementById('moi').readOnly  = false;
+			document.getElementById('area').readOnly = false;
+			document.getElementById('rmax').readOnly = false;
+			document.getElementById('rmin').readOnly = false;
 			for (i=1;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'rndbar') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'Diameter';
 			for (i=2;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'boxbar') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'Width';
 			document.getElementById('section_2_row').style.display = '';
@@ -176,7 +203,6 @@
 			for (i=3;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'boxtube') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'Width';
 			document.getElementById('section_2_row').style.display = '';
@@ -186,7 +212,6 @@
 			for (i=4;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'angle') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'Width';
 			document.getElementById('section_2_row').style.display = '';
@@ -196,7 +221,6 @@
 			for (i=4;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'rndtube') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'OD';
 			document.getElementById('section_2_row').style.display = '';
@@ -204,7 +228,6 @@
 			for (i=3;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} else if (shape == 'hex') {
-			document.getElementById('moi').readOnly = true;
 			document.getElementById('section_1_row').style.display = '';
 			document.getElementById('section_1_label').innerHTML = 'Width';
 			document.getElementById('section_2_row').style.display = '';
@@ -224,15 +247,16 @@
 		x = current_load_number;
 		current_load_number ++;
 		load_div.innerHTML = `
-		<span><button onclick="remove_load(${x})">-</button>
-			<select id="load_type_${x}" onchange="change_load(${x})">
-				<option value="pin" selected='selected' >Pinned</option>
-				<option value="fix">Fixed</option>
-				<option value="force">Force </option>
-				<option value="moment">Moment</option>
-			</select>
-		</span>
 		<table>
+			<tr>
+				<td>[${x}] <button onclick="remove_load(${x}); compute();" title="Remove">-</button></td>
+				<td><select id="load_type_${x}" onchange="change_load(${x}); compute();">
+					<option value="pin" selected='selected' >Pinned</option>
+					<option value="fix">Fixed</option>
+					<option value="force">Force </option>
+					<option value="moment">Moment</option>
+				</select></td>
+			</tr>
 			<tr id="load_${x}_1_row">
 				<th class="rowlabel" id="load_${x}_1_label">L1</th>
 				<td><input id="load_${x}_1" onchange="drawbeam()"/></td>
@@ -277,7 +301,7 @@
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
 			document.getElementById(`load_${i}_2_row`).style.display = '';
-			document.getElementById(`load_${i}_2_label`).innerHTML = 'Amount';
+			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'force' ? 'F=' : 'M=';
 			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
 			inputs_unit_map[`load_${i}_2`] = type == 'force' ? ['N', 'lbf'] : ['N-m', 'ft-lbf'];
 			for (j=3;j<=4;j++)
@@ -298,6 +322,7 @@
 				loads.children[i].classList.add(i%2 ? 'even' : 'odd');
 			}
 		}
+		compute();
 	}
 </script>
 
@@ -323,7 +348,7 @@
 		}
 	}
 
-	function run_fe(E, I, rmax, order, poses, forces, moments, pinned, fixed) {
+	function run_fe(E, I, order, poses, forces, moments, pinned, fixed) {
 		numel = order.length-1;
 
 		numnode = (numel+1)*2;
@@ -368,7 +393,7 @@
 			else fq.push(q._data[i-offs][0]);
 		}
 
-		console.log(fq);
+		//console.log(fq);
 		
 		xp = []; // x; position
 		tp = []; // theta; angle
@@ -434,7 +459,9 @@
 		moi_compute();
 
 		L = gidv('length');
-		console.log('length', L);
+		//console.log('length', L);
+
+		document.getElementById('charts').classList.add('error');
 
 		order   = [0,   1]; // node ids, in order (sort later)
 		poses   = {0:0, 1:L}; // positions
@@ -492,17 +519,20 @@
 			}
 		}
 
-		displ = run_fe(gidv('moi'), gidv('elastic_modulus'), gids('rmax'),
+		displ = run_fe(gidv('moi'), gidv('elastic_modulus'),
 			order, poses, forces, moments, pinned, fixed);
 
 		drawchart(displ, [poses, forces, moments, pinned, fixed]);
+
+
+		document.getElementById('charts').classList.remove('error');
 	}
 </script>
 
 <script>
 	function makeTicks(mins, maxes, num_to_print, n) {
 		all_positive = !(mins);
-		console.log(all_positive);
+		//console.log(all_positive);
 		H = [];
 		bases = [];
 		for(var i=0; i<maxes.length; i++){
@@ -550,7 +580,7 @@
 			ticksstr.unshift(labelstr);
 			
 		}
-		console.log(ticks, ticksstr);
+		//console.log(ticks, ticksstr);
 		return [ticks, ticksstr];
 	}
 
@@ -626,6 +656,11 @@
 			
 			position = gidv(`load_${x}_1`);
 			cp = x0 + (xf-x0)*position/len;
+
+			subhandler = function (event) {
+				focus_handler(event.target.getAttribute('cp'));
+			}
+
 			if (type == 'fix') {
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
 				y2 = y0 + 20;
@@ -634,6 +669,8 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${x2},${y0} ${x1},${y0} ${x1},${y2} ${x2},${y2}`);
+				shape.addEventListener('click', subhandler);
+				shape.setAttribute('cp', cp);
 				beam_items.append(shape);
 			} else if (type == 'pin') {
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
@@ -643,6 +680,8 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${cp},${y0} ${x1},${y2} ${x2},${y2}`);
+				shape.addEventListener('click', subhandler);
+				shape.setAttribute('cp', cp);
 				beam_items.append(shape);
 			} else if (type == 'force') {
 				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
@@ -652,16 +691,20 @@
 				shape.setAttribute('points', `${cp},${y0} ${cp},${y2}`);
 				shape.classList.add('beam-arrow');
 				shape.setAttribute('stroke', '#111');
+				shape.addEventListener('click', subhandler);
+				shape.setAttribute('cp', cp);
 				beam_items.append(shape);
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				x1 = cp - 9*sgn;
-				x2 = cp + 9*sgn;
+				x1 = cp - 12*sgn;
+				x2 = cp + 12*sgn;
 				y1 = y0 - 30*sgn;
-				y2 = y0 - 45*sgn;
+				y2 = y0 - 50*sgn;
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
+				shape.addEventListener('click', subhandler);
+				shape.setAttribute('cp', cp);
 				beam_items.append(shape);
 			} else if (type == 'moment') {
 				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
@@ -672,12 +715,63 @@
 				shape.setAttribute('cx', cp);
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
+				shape.addEventListener('click', subhandler);
+				shape.setAttribute('cp', cp);
 				beam_items.append(shape);
 			}
 		}
 	}
 
+	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
+	function focus_handler(event){
+			var xq;
+			if (!isNaN(event)) {
+				xq = event;
+			}else{
+				if(event.buttons != 1) return;
+				bg = document.getElementById('chart');
+				xq = event.clientX - bg.getBoundingClientRect().left;
+				//yq = event.clientY - bg.getBoundingClientRect().top;
+			}
+			query_l_unit = inputs_unit_map['query_l'][unit_sys];
+
+
+				lq = (convert(l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
+				if (lq > Math.max(...focus_l)){
+					//console.log('overflow');
+					lq = Math.max(...focus_l);
+					xq = focus_x0 + (focus_xf-focus_x0)/(convert(l_max, query_l_unit)-0)*lq;
+				}
+				if (lq<0) {
+					lq=0; xq=focus_x0;
+				}
+				qq   = linterp(focus_l, focus_q, lq);
+				mq   = linterp(focus_l, focus_m, lq);
+				slq   = linterp(focus_l, focus_sl, lq);
+				shq   = linterp(focus_l, focus_sh, lq);
+				qline.setAttribute('opacity', 1);
+
+				qline.setAttribute('x1', xq);
+				qline.setAttribute('x2', xq);
+
+				//console.log(l, q, lq, qq);
+				gids('query_l', lq);
+				gids('query_q', qq, 5);
+				gids('query_m', mq);
+				gids('query_sl', slq, 6);
+				gids('query_sh', shq);
+
+				smid = shq / gidv('area');
+				stop =   mq * gidv('rmax') / gidv('moi');
+				sbot = - mq * gidv('rmin') / gidv('moi');
+
+				gids("query_stress_bend_top", stop);
+				gids("query_stress_bend_bot", sbot);
+				gids("query_stress_shear",    smid);
+			}
+
 	function drawchart(channels) {
+		//var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
 		drawbeam();
 		beam_items = document.getElementById('beam_items');
 		
@@ -719,7 +813,7 @@
 		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
 		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
 
-		console.log(lc, qc, mc);
+		//console.log(lc, qc, mc);
 
 		for (i in lc) {
 			var ptq = svg.createSVGPoint();
@@ -728,54 +822,39 @@
 			xq = x0 + (xf-x0)/(l_max-0)*lc[i];
 			ptq.x = ptm.x = xq;
 
+
 			ptq.y   = y0 + (yf-y0)/(q_max-q_min)*(qc[i]-q_min);
 			ptm.y   = y0 + (yf-y0)/(m_max-m_min)*(mc[i]-m_min);
 			q_line.points.appendItem(ptq);
 			m_line.points.appendItem(ptm);
 		}
 		
-		bg=document.getElementById('chart');
+		bg=document.getElementById('chart_background');
 
 		qline = document.getElementById('chart_query_line');
 		qline.setAttribute('opacity', 0);
 
 		gids('query_l', '-');
 		gids('query_q', '-');
+		gids('query_m', '-');
+		gids('query_sl', '-');
+		gids('query_sh', '-');
 
-		handler = function(event){
-			if(event.buttons != 1) return;
-			query_l_unit = inputs_unit_map['query_l'][unit_sys];
+		gids("query_stress_bend_top", '-');
+		gids("query_stress_bend_bot", '-');
+		gids("query_stress_shear",    '-');
 
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				yq = event.clientY - bg.getBoundingClientRect().top;
+		focus_l = l
+		focus_q = q;
+		focus_m = m;
+		focus_sl = sl;
+		focus_sh = sh;
+		focus_xf = xf;
+		focus_x0 = x0;
+		//[focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, x0] = [l, q, m, sl, sh, xf, x0];
 
-				lq = (convert(l_max, query_l_unit)-0)/(xf-x0)*(xq-x0);
-				if (lq > Math.max(...l)){
-					console.log('overflow');
-					lq = Math.max(...l);
-					xq = x0 + (xf-x0)/(convert(l_max, query_l_unit)-0)*lq;
-				}
-				if (lq<0) {
-					lq=0; xq=x0;
-				}
-				qq   = linterp(l, q, lq);
-				mq   = linterp(l, m, lq);
-				slq   = linterp(l, sl, lq);
-				shq   = linterp(l, sh, lq);
-				qline.setAttribute('opacity', 1);
-
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
-
-				console.log(l, q, lq, qq);
-				gids('query_l', lq);
-				gids('query_q', qq, 5);
-				gids('query_m', mq);
-				gids('query_sl', slq, 6);
-				gids('query_sh', shq);
-			}
-		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);
+		bg.addEventListener('mousemove', focus_handler);
+		bg.addEventListener('mousedown', focus_handler);
 	}
 </script>
 
@@ -826,9 +905,17 @@
 					<td><input id='moi' readonly /></td>
 					<td class='unit' id='unit_moi'></td>
 				</tr><tr>
-					<th class='rowlabel'>Max Radius<span class="ttt">The largest distance from neutral axis</span></th>
+					<th class='rowlabel'>Area<span class="ttt">Cross-sectional area</span></th>
+					<td><input id='area' readonly /></td>
+					<td class='unit' id='unit_area'></td>
+				</tr><tr>
+					<th class='rowlabel'>Top Height<span class="ttt">Distance from neutral axis to top of section</span></th>
 					<td><input id='rmax' readonly /></td>
 					<td class='unit' id='unit_rmax'></td>
+				</tr><tr>
+					<th class='rowlabel'>Bottom Height<span class="ttt">Distance from neutral axis to bottom of section</span></th>
+					<td><input id='rmin' readonly /></td>
+					<td class='unit' id='unit_rmin'></td>
 				</tr><tr id='section_1_row'>
 					<th class='rowlabel' id='section_1_label'>D1</th>
 					<td><input id='section_1' /></td>
@@ -877,17 +964,17 @@
   <title id="title">Position/Velocity Data</title>
 
 
-<rect class="background" id="chart_background" x=90 y=20 width=515 height=430 />
+<rect class="background" id="chart_background" x=70 y=20 width=555 height=430 />
 <g class="x-grid">
-  <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
+  <line id="chart_x_axis" class="axes" x1=70 x2=70 y1=20 y2=450 ></line>
 </g>
 <g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1="90" x2="605" y1=235 y2=235></line>
-  <line id="chart_z_axis" class="axes" x1="605" x2="605" y1="20" y2=450></line>
+  <line id="chart_y_axis" class="axes" x1=70 x2=625 y1=235 y2=235></line>
+  <line id="chart_z_axis" class="axes" x1=625 x2=625 y1=20 y2=450></line>
 </g>
 
 <g class="beam">
-  <line id="chart_beam" class="beam" x1=90 x2=605 y1=550 y2=550 ></line>
+  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
 </g>
 <g id="chart_beam_items"></g>
 
@@ -896,7 +983,7 @@
 <g class="z-grid" id="chart_z_grid"></g>
 
 <g class="labels x-labels" id='chart_x_labels'>
-  <text x="325" y=485 class="label-title">Position [mm]</text>
+  <text x="325" y=485 class="label-title" id="chart_x_label">Position [mm]</text>
 </g>
 
 <g class="labels y-labels" id='chart_y_labels'>
@@ -942,17 +1029,29 @@
 				<td><input id="query_q" readonly /></td>
 				<td class="unit" id="unit_query_q"></td>
 			</tr><tr>
-				<th class="rowlabel">Bending Moment</th>
-				<td><input id="query_m" readonly /></td>
-				<td class="unit" id="unit_query_m"></td>
-			</tr><tr>
 				<th class="rowlabel">Slope</th>
 				<td><input id="query_sl" readonly /></td>
 				<td class="unit" id="unit_query_sl"></td>
 			</tr><tr>
-				<th class="rowlabel">Shear</th>
+				<th class="rowlabel">Bending Moment</th>
+				<td><input id="query_m" readonly /></td>
+				<td class="unit" id="unit_query_m"></td>
+			</tr><tr>
+				<th class="rowlabel">Shear Force<span class="ttt">Note: Shear force at a load/constraint is not properly defined. Query before and after.</span></th>
 				<td><input id="query_sh" readonly /></td>
 				<td class="unit" id="unit_query_sh"></td>
+			</tr><tr>
+				<th class="rowlabel">Bending Stress @ Top<span class="ttt">Positive is tension</span></th>
+				<td><input id="query_stress_bend_top" readonly /></td>
+				<td class="unit" id="unit_query_stress_bend_top"></td>
+			</tr><tr>
+				<th class="rowlabel">Bending Stress @ Bottom<span class="ttt">Positive is tension</span></th>
+				<td><input id="query_stress_bend_bot" readonly /></td>
+				<td class="unit" id="unit_query_stress_bend_bot"></td>
+			</tr><tr>
+				<th class="rowlabel">Shear Stress @ Center</th>
+				<td><input id="query_stress_shear" readonly /></td>
+				<td class="unit" id="unit_query_stress_shear"></td>
 			</tr>
 		</div>
 
