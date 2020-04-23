@@ -192,10 +192,11 @@ function convert(number, from_unit) {
 
 function convert_to(number, to_unit) {
 	uconv = unit_conversions[to_unit];
+	newnumber = [];
 	if (typeof number == 'object') {
 		for (var i=0;i<number.length;i++)
-			number[i] = number[i]/uconv;
-		return number;
+			newnumber.push(number[i]/uconv);
+		return newnumber;
 	}
 	return number/uconv;
 }

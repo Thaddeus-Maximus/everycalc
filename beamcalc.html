@@ -16,7 +16,9 @@
 		'rmax':      ['mm', 'in'],
 		'query_l':   ['mm', 'in'],
 		'query_q':   ['mm', 'in'],
-		'query_s':   ['MPa', 'psi'],
+		'query_m':   ['N-m', 'ft-lbf'],
+		'query_sl':  ['deg', 'deg'],
+		'query_sh':  ['N', 'psi']
 	}
 
 	function switch_units() {
@@ -57,12 +59,8 @@
 		}
 	}
 
-	function thload() {
-		switch_units();
-		shape_select();		
-
+	function register_callbacks() {
 		var inputs, index;
-
 		inputs = document.getElementsByTagName('input');
 		for (index = 0; index < inputs.length; ++index) {
 		    inputs[index].onkeyup = function(e) {
@@ -75,6 +73,18 @@
 		    	}
 		    }
 		}
+	}
+
+	function thload() {
+		switch_units();
+		add_load({where: 10, amount: 0, type: 0});
+		add_load({where: 50, amount: 0, type: 0});
+		add_load({where: 90, amount: 100, type: 2});
+		add_load({where: 10, amount: -10, type: 3});
+		document.getElementById('length').value=100;
+		shape_select();		
+		
+		register_callbacks();
 
 		compute();
 	}
@@ -208,7 +218,7 @@
 	}
 
 	var current_load_number = 0;
-	function add_load() {
+	function add_load(params) {
 		loads = document.getElementById('loads');
 		load_div = document.createElement('div');
 		x = current_load_number;
@@ -216,8 +226,8 @@
 		load_div.innerHTML = `
 		<span><button onclick="remove_load(${x})">-</button>
 			<select id="load_type_${x}" onchange="change_load(${x})">
-				<option value="pin" selected="selected">Pin</option>
-				<option value="fix">Fix</option>
+				<option value="pin" selected='selected' >Pinned</option>
+				<option value="fix">Fixed</option>
 				<option value="force">Force </option>
 				<option value="moment">Moment</option>
 			</select>
@@ -246,7 +256,13 @@
 		load_div.classList.add(x%2 ? 'even' : 'odd');
 		loads.insertBefore(load_div, loads.lastChild);
 
+		if (typeof params != 'undefined') {
+			document.getElementById(`load_${x}_1`).value = params.where;
+			document.getElementById(`load_${x}_2`).value = params.amount;
+			document.getElementById(`load_type_${x}`).selectedIndex = params.type;
+		}
 		change_load(x);
+		register_callbacks();
 	}
 
 	function change_load(i) {
@@ -354,20 +370,24 @@
 
 		console.log(fq);
 		
-		xp = [];
-		qp = [];
-		sp = [];
+		xp = []; // x; position
+		tp = []; // theta; angle
+		qp = []; // q; deflection
+		mp = []; // m; bending moment
+		sp = []; // s; shear force
 		for (i=0;i<numel;i++) {
 			q_seg = fq.slice(i*2, i*2+4);
 			dl = poses[order[i+1]] - poses[order[i]];
 			for (zeta=-1; zeta<=1; zeta+=0.05) {
 				xp.push(poses[order[i]] + (zeta+1)/2*dl);
+				tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
 				qp.push(beam_shape_fcn(q_seg, zeta, dl));
-				sp.push(0); //TODO: Stress from bending
+				mp.push(-E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
+				sp.push(-E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
 			}
 		}
 
-		return [xp, qp, sp];
+		return [xp, qp, tp, mp, sp];
 	}
 
 	function beam_shape_fcn(arr, zeta, dl) {
@@ -378,10 +398,43 @@
 		return math.dot(arr, Hfns);
 	}
 
+	function beam_shape_fcn_slope(arr, zeta, dl) {
+		Hfns = [3/4*(zeta*zeta-1),
+				dl/8*(3*zeta*zeta-2*zeta-1),
+				-3/4*(zeta*zeta-1),
+				dl/8*(3*zeta*zeta+2*zeta-1)];
+		return math.dot(arr, Hfns);
+	}
+
+	function beam_shape_fcn_curv(arr, zeta, dl) {
+		Hfns = [6*zeta/dl/dl,
+				(3*zeta-1)/dl,
+				-6*zeta/dl/dl,
+				(3*zeta+1)/dl];
+		/*Hfns = [(4*x-6*dl)/dl/dl/dl,
+				(6*x-4*dl)/dl/dl,
+				(-12*x+6*dl)/dl/dl/dl,
+				(6*x-2*dl)/dl/dl];*/
+		return math.dot(arr, Hfns);
+	}
+
+	function beam_shape_fcn_dcurv(arr, zeta, dl) {
+		Hfns = [3/2*Math.pow(2/dl, 3),
+				3/4*dl*Math.pow(2/dl, 3),
+				-3/2*Math.pow(2/dl, 3),
+				3/4*dl*Math.pow(2/dl, 3)];
+		/*Hfns = [(4*x-6*dl)/dl/dl/dl,
+				(6*x-4*dl)/dl/dl,
+				(-12*x+6*dl)/dl/dl/dl,
+				(6*x-2*dl)/dl/dl];*/
+		return math.dot(arr, Hfns);
+	}
+
 	function compute() {
 		moi_compute();
 
 		L = gidv('length');
+		console.log('length', L);
 
 		order   = [0,   1]; // node ids, in order (sort later)
 		poses   = {0:0, 1:L}; // positions
@@ -629,10 +682,12 @@
 		beam_items = document.getElementById('beam_items');
 		
 
-		[l, q, s] = channels;
+		[l, q, sl, m, sh] = channels; //[xp, qp, tp, mp, sp];
 		lc = convert_to(l, inputs_unit_map['query_l'][unit_sys]);
 		qc = convert_to(q, inputs_unit_map['query_q'][unit_sys]);
-		sc = convert_to(s, inputs_unit_map['query_s'][unit_sys]);
+		mc = convert_to(m, inputs_unit_map['query_m'][unit_sys]);
+		slc = convert_to(q, inputs_unit_map['query_sl'][unit_sys]);
+		shc = convert_to(m, inputs_unit_map['query_sh'][unit_sys]);
 
 		svg    = document.getElementById('chart');
 		x_axis = document.getElementById('chart_x_axis');
@@ -644,39 +699,39 @@
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 
 		q_line = document.getElementById('chart_q_line');
-		s_line = document.getElementById('chart_s_line');
+		m_line = document.getElementById('chart_m_line');
 		q_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		s_line.setAttribute('points','');
+		m_line.setAttribute('points','');
 
 		[[l_ticks], xticklabels] = makeTicks(null, [Math.max(...lc)], 1, 9);
-		[[q_ticks], yticklabels] = makeTicks([Math.min(...qc)/*, Math.min(...sc)*/], [Math.max(...qc)/*, Math.max(...sc)*/], 1, 6);
-		//[[s_ticks], zticklabels] = makeTicks([Math.min(...sc), Math.min(...qc)], [Math.max(...sc), Math.max(...qc)], 2, 6);
+		[[q_ticks], yticklabels] = makeTicks([Math.min(...qc), Math.min(...mc)], [Math.max(...qc), Math.max(...mc)], 1, 6);
+		[[m_ticks], zticklabels] = makeTicks([Math.min(...mc), Math.min(...qc)], [Math.max(...mc), Math.max(...qc)], 1, 6);
 
 		l_ticks.pop(); xticklabels.pop();
 		
-		//l_max = l_ticks[l_ticks.length-1];
 		l_max = Math.max(...lc);
 		q_max = q_ticks[q_ticks.length-1];
 		q_min = q_ticks[0];
-		//s_max = s_ticks[s_ticks.length-1];
+		m_max = m_ticks[m_ticks.length-1];
+		m_min = m_ticks[0];
 
 		drawTicks('x', l_ticks, l_max, xticklabels, xf, x0, yf, y0, 15);
 		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
-		//drawTicks('z', zticklabels, yf, y0, xf, x0, 5);
+		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
 
-		console.log(lc, qc);
+		console.log(lc, qc, mc);
 
-		for (i in l) {
+		for (i in lc) {
 			var ptq = svg.createSVGPoint();
-			var pts = svg.createSVGPoint();
+			var ptm = svg.createSVGPoint();
 
-			xq = x0 + (xf-x0)/(l_max-0)*l[i];
-			ptq.x = pts.x = xq;
+			xq = x0 + (xf-x0)/(l_max-0)*lc[i];
+			ptq.x = ptm.x = xq;
 
-			ptq.y   = y0 + (yf-y0)/(q_max-q_min)*(qc[i]-q_min)
-			//pts.y   = y0 + (yf-y0)/(s_max-0)*sc[i];
+			ptq.y   = y0 + (yf-y0)/(q_max-q_min)*(qc[i]-q_min);
+			ptm.y   = y0 + (yf-y0)/(m_max-m_min)*(mc[i]-m_min);
 			q_line.points.appendItem(ptq);
-			//s_line.points.appendItem(pts);
+			m_line.points.appendItem(ptm);
 		}
 		
 		bg=document.getElementById('chart');
@@ -689,25 +744,35 @@
 
 		handler = function(event){
 			if(event.buttons != 1) return;
+			query_l_unit = inputs_unit_map['query_l'][unit_sys];
+
 				xq = event.clientX - bg.getBoundingClientRect().left;
 				yq = event.clientY - bg.getBoundingClientRect().top;
 
-				lq = (l_max-0)/(xf-x0)*(xq-x0);
-				if (lq>Math.max(...l)){
+				lq = (convert(l_max, query_l_unit)-0)/(xf-x0)*(xq-x0);
+				if (lq > Math.max(...l)){
+					console.log('overflow');
 					lq = Math.max(...l);
-					xq = x0 + (xf-x0)/(l_max-0)*lq;
+					xq = x0 + (xf-x0)/(convert(l_max, query_l_unit)-0)*lq;
 				}
 				if (lq<0) {
 					lq=0; xq=x0;
 				}
 				qq   = linterp(l, q, lq);
+				mq   = linterp(l, m, lq);
+				slq   = linterp(l, sl, lq);
+				shq   = linterp(l, sh, lq);
 				qline.setAttribute('opacity', 1);
 
 				qline.setAttribute('x1', xq);
 				qline.setAttribute('x2', xq);
 
+				console.log(l, q, lq, qq);
 				gids('query_l', lq);
-				gids('query_q', qq);
+				gids('query_q', qq, 5);
+				gids('query_m', mq);
+				gids('query_sl', slq, 6);
+				gids('query_sh', shq);
 			}
 		bg.addEventListener('mousemove', handler);
 		bg.addEventListener('mousedown', handler);
@@ -839,7 +904,7 @@
 </g>
 
 <g class="labels z-labels" id='chart_z_labels'>
-  <text x=-240 y=700 class="label-title" transform="rotate(270)" id="chart_s_label" fill="#d91200">Stress [MPa]</text>
+  <text x=-240 y=700 class="label-title" transform="rotate(270)" id="chart_m_label" fill="#d91200">Bending Moment [N-m]</text>
 </g>
 
 <g class="labels x-labels" id='chart_x_axis_labels'></g>
@@ -847,7 +912,7 @@
 <g class="labels y-labels" id='chart_y_axis_labels'></g>
 
 <g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
+	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=555></line>
 </g>
 <polyline
 	id='chart_q_line'
@@ -857,7 +922,7 @@
 	points="
 	"/>
 <polyline
-	id='chart_s_line'
+	id='chart_m_line'
 	fill='none'
 	stroke='#d91200'
 	stroke-width=2
@@ -871,15 +936,23 @@
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
 				<td><input id="query_l" readonly /></td>
-				<td class="unit">[s]</td>
+				<td class="unit" id="unit_query_l"></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>
 				<td><input id="query_q" readonly /></td>
 				<td class="unit" id="unit_query_q"></td>
 			</tr><tr>
-				<th class="rowlabel">Stress</th>
-				<td><input id="query_s" readonly /></td>
-				<td class="unit" id="unit_query_s"></td>
+				<th class="rowlabel">Bending Moment</th>
+				<td><input id="query_m" readonly /></td>
+				<td class="unit" id="unit_query_m"></td>
+			</tr><tr>
+				<th class="rowlabel">Slope</th>
+				<td><input id="query_sl" readonly /></td>
+				<td class="unit" id="unit_query_sl"></td>
+			</tr><tr>
+				<th class="rowlabel">Shear</th>
+				<td><input id="query_sh" readonly /></td>
+				<td class="unit" id="unit_query_sh"></td>
 			</tr>
 		</div>
 
