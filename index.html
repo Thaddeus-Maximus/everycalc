@@ -1,19 +1,56 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 
+<style>
+  #container_menu {
+  display: block;
+  width: 100%;
+  position: relative;
+  border: none;
+  text-align: center;
+}
+.voucher {
+  display: inline-block;
+  position: relative;
+  width: 310px;
+  height: 250px;
+  margin: 0px;
+  border: dashed 1px #ddd;
+  text-align: center;
+  font-size: 16pt;
+}
+a {
+  text-decoration: underline;
+  font-weight: bold;
+  color: #170;
+}
+#title {
+  text-align: center;
+  margin: 5px;
+}
+#title h1 {
+  text-align: center;
+  font-weight: bold;
+}
+</style>
+
 <body>
-<div class="container-oall">
-  <div class="odd">
-  	<h3><a href="http://thaddeus-maximus.github.io">Thad's</a> Swiss Army Engineer</h3>
-  	Please add feature requests / bugs to issue tracker at <a href="http://github.com/Thaddeus-Maximus/swissarmyengineer">github.com/Thaddeus-Maximus/swissarmyengineer</a></div
-  	><div class="odd"><h3><a href=specview >Specs used in these tools</a></h3></div
-  	><div class="even"><h3><a href=simplemech >Simple Mechanism</a></h3></div
-  	><div class="odd"><h3><a href=trajectory >Ballistic Trajectory</a></h3></div
-  	><div class="even"><h3><a href=rockerpod >Rocker Pod</a></h3></div
-  	><div class="odd"><h3><a href=beltsize >Belt Sizing</a></h3></div
-  	><div class="even"><h3><a href=pneu_trans_cyl >Pneumatic Piston</a></h3></div
-  	><div class="odd"><h3><a href=beamcalc >Beam Deflection/Stress</a></h3></div
-    >
+<div id="container_menu">
+  <div id="title">
+    <h1><a href="http://thaddeus-maximus.github.io">Thad's</a> Swiss Army Engineer Tool</h1>
+    <!--Please add feature requests / bugs to issue tracker at <a href="http://github.com/Thaddeus-Maximus/swissarmyengineer">github.com/Thaddeus-Maximus/swissarmyengineer</a>-->
+  </div>
+
+
+    <div class="voucher"><a href=beltsize><img src="include/menu_beltsize.svg" />Belt Sizing</a></div>
+    <div class="voucher"><a href=simplemech><img src="include/menu_simplemech.svg" />Simple Mechanism</a></div>
+    <div class="voucher"><a href=trajectory><img src="include/menu_trajectory.svg" />Ballistic Trajectory</a></div>
+    <div class="voucher"><a href=rockerpod><img src="include/menu_rockerpod.svg" />Rocker Pod</a></div>
+    <div class="voucher"><a href=beamcalc><img src="include/menu_beam.svg" />Beam Tool</a></div>
+    <div class="voucher"><a href=pneu_trans_cyl><img src="include/menu_cylinder.svg" />Pneumatic Cylinder</a></div>
+    <div class="voucher"><a href=specview><img src="include/menu_specs.svg" />Specs</a></div>
+    <div class="voucher"><a href=docs><img src="include/menu_docs.svg" />Documentation</a></div>
+    <div class="voucher"><a href="http://github.com/Thaddeus-Maximus/swissarmyengineer"><img src="include/menu_github.svg" />Github (Bugs/Requests)</a></div>
 </div>
 </body>
 </html>
