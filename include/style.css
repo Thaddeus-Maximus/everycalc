@@ -65,11 +65,17 @@ hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
 
 select, input {
-  background-color: #fff;
   border: 1px solid #aaa;
-  width: 120px;
+  width: 90px;
   margin: 1px;
   padding: 1px;
+}
+select {
+  font-weight: bold;
+  background-color: #eef;
+}
+input {
+  background-color: #ffe;
 }
 input.narrow  {
   width: 45px;
