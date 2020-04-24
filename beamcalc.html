@@ -693,7 +693,7 @@
 				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				y2 = y0 - 30;
+				y2 = y0 - 25*sgn;
 				shape.setAttribute('points', `${cp},${y0} ${cp},${y2}`);
 				shape.classList.add('beam-arrow');
 				shape.setAttribute('stroke', '#111');
@@ -704,8 +704,8 @@
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
 				x1 = cp - 12*sgn;
 				x2 = cp + 12*sgn;
-				y1 = y0 - 30*sgn;
-				y2 = y0 - 50*sgn;
+				y1 = y0 - 25*sgn;
+				y2 = y0 - 45*sgn;
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
