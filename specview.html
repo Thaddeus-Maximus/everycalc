@@ -7,6 +7,10 @@
 		return motor_data[motor][key];
 	}
 
+	function handleNaN(x) {
+		return isNaN(x) ? '-':x;
+	}
+
 	function thload() {
 		table = document.getElementById("motor_data_table");
 		i=0;
@@ -49,9 +53,24 @@
 					(firstone ? "<th class='rowlabel'>" + belt_mfrs[mfr] + "</th><td>" : "<td></td><td>") 
 					+ series + "</td><td>"
 					+ belts_data[mfr][series].join(', ') + "</td>";
-				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+				row.classList.add(i%2 ? 'oddrow' : 'evenrow');
 				firstone = false
 			}
+		}
+
+		table = document.getElementById("material_data_table");
+		i=0;
+		convs = {
+			"E": 1e9, "Ef": 1e9, "St": 1e6, "Sf": 1e6, "density": 1000
+		}
+		for(matl in materials) {
+			i++;
+			row = table.insertRow(i);
+			row.innerHTML = "<th class='rowlabel'>" + matl + "</th>";
+			for (property of ["E", "Ef", "St", "Sf", "density"]) {
+				row.innerHTML += '<td>' + handleNaN((materials[matl][property]/convs[property]).toFixed(3)) + "</td>";
+			}
+			row.classList.add(i%2 ? 'evenrow' : 'oddrow');
 		}
 	}
 </script>
@@ -118,6 +137,24 @@ td {
 				<th class="collabel">Manufacturer</th>
 				<th class="collabel">Size</th>
 				<th class="collabel">Teeth</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+	<div class="even">
+		<h3>Material Data</h3>
+
+		<center>
+			Generic materials do not have strength properties as they vary with alloy or heat treatment.
+		<table id="material_data_table">
+			<tr>
+				<th class="collabel">Material</th>
+				<th class="collabel">Elastic Modulus [GPa]</th>
+				<th class="collabel">Flexural Modulus [GPa]</th>
+				<th class="collabel">Tensile Strength [MPa]</th>
+				<th class="collabel">Flexural Strength [MPa]</th>
+				<th class="collabel">Density [g/cm^3]</th>
 			</tr>
 		</table>
 	</center>

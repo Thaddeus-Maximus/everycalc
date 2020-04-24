@@ -247,7 +247,7 @@ var materials = { // 1 g/cm^3 = 1000 kg/m^3
 	'Titanium': {
 		'Ef': 110e9,
 		'E':  110e9,
-		'density': 4.4
+		'density': 4.4e3
 	},
 	'Magnesium': { // AM100A-F
 		'Ef': 46e9,
