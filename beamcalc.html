@@ -75,6 +75,7 @@
 		var inputs, index;
 		inputs = document.getElementsByTagName('input');
 		for (index = 0; index < inputs.length; ++index) {
+			if (inputs[index].id.startsWith('query_')) continue;
 		    inputs[index].onkeyup = function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 
@@ -768,7 +769,7 @@
 	}
 
 	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0, focus_l_max;
-	function focus_handler(event){
+	function focus_handler(event, disable_position_write){
 		var xq, lq;
 		query_l_unit = inputs_unit_map['query_l'][unit_sys];
 		if (!isNaN(event)) {
@@ -789,32 +790,30 @@
 				lq=0; xq=focus_x0;
 			}
 		}
-
-
 			
-			qq   = linterp(focus_l, focus_q, lq);
-			mq   = linterp(focus_l, focus_m, lq);
-			slq  = linterp(focus_l, focus_sl, lq);
-			shq  = linterp(focus_l, focus_sh, lq);
-			qline.setAttribute('opacity', 1);
+		qq   = linterp(focus_l, focus_q, lq);
+		mq   = linterp(focus_l, focus_m, lq);
+		slq  = linterp(focus_l, focus_sl, lq);
+		shq  = linterp(focus_l, focus_sh, lq);
+		qline.setAttribute('opacity', 1);
 
-			qline.setAttribute('x1', xq);
-			qline.setAttribute('x2', xq);
+		qline.setAttribute('x1', xq);
+		qline.setAttribute('x2', xq);
 
-			gids('query_l', lq);
-			gids('query_q', qq, 5);
-			gids('query_m', mq);
-			gids('query_sl', slq, 6);
-			gids('query_sh', shq);
+		if (!disable_position_write) gids('query_l', lq);
+		gids('query_q', qq, 5);
+		gids('query_m', mq);
+		gids('query_sl', slq, 6);
+		gids('query_sh', shq);
 
-			smid = shq / gidv('area');
-			stop = - mq * gidv('rmax') / gidv('moi');
-			sbot = + mq * gidv('rmin') / gidv('moi');
+		smid = shq / gidv('area');
+		stop = - mq * gidv('rmax') / gidv('moi');
+		sbot = + mq * gidv('rmin') / gidv('moi');
 
-			gids("query_stress_bend_top", stop);
-			gids("query_stress_bend_bot", sbot);
-			gids("query_stress_shear",    smid);
-		}
+		gids("query_stress_bend_top", stop);
+		gids("query_stress_bend_bot", sbot);
+		gids("query_stress_shear",    smid);
+	}
 
 	function find_extrema_handler(event) {
 		if (event.buttons != 2) return;
@@ -849,6 +848,7 @@
 	}
 
 	function drawchart(channels) {
+		console.log('drawchart');
 		//var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
 		drawbeam();
 		beam_items = document.getElementById('beam_items');
@@ -1143,7 +1143,7 @@
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
-				<td><input id="query_l" readonly /></td>
+				<td><input id="query_l" onkeyup="focus_handler(gidv('query_l'), true);" /></td>
 				<td class="unit" id="unit_query_l"></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>
