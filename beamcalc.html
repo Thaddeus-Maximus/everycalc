@@ -424,10 +424,10 @@
 	}
 
 	function beam_shape_fcn_slope(arr, zeta, dl) {
-		Hfns = [3/4*(zeta*zeta-1),
-				dl/8*(3*zeta*zeta-2*zeta-1),
-				-3/4*(zeta*zeta-1),
-				dl/8*(3*zeta*zeta+2*zeta-1)];
+		Hfns = [3/4*(zeta*zeta-1)*2/dl,
+				dl/8*(3*zeta*zeta-2*zeta-1)*2/dl,
+				-3/4*(zeta*zeta-1)*2/dl,
+				dl/8*(3*zeta*zeta+2*zeta-1)*2/dl];
 		return math.dot(arr, Hfns);
 	}
 
@@ -670,7 +670,7 @@
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${x2},${y0} ${x1},${y0} ${x1},${y2} ${x2},${y2}`);
 				shape.addEventListener('click', subhandler);
-				shape.setAttribute('cp', cp);
+				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'pin') {
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
@@ -681,7 +681,7 @@
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${cp},${y0} ${x1},${y2} ${x2},${y2}`);
 				shape.addEventListener('click', subhandler);
-				shape.setAttribute('cp', cp);
+				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'force') {
 				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
@@ -692,7 +692,7 @@
 				shape.classList.add('beam-arrow');
 				shape.setAttribute('stroke', '#111');
 				shape.addEventListener('click', subhandler);
-				shape.setAttribute('cp', cp);
+				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
@@ -704,7 +704,7 @@
 				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
 				shape.addEventListener('click', subhandler);
-				shape.setAttribute('cp', cp);
+				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'moment') {
 				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
@@ -716,7 +716,7 @@
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
 				shape.addEventListener('click', subhandler);
-				shape.setAttribute('cp', cp);
+				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			}
 		}
@@ -724,37 +724,38 @@
 
 	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
 	function focus_handler(event){
-			var xq;
+			var xq, lq;
+			query_l_unit = inputs_unit_map['query_l'][unit_sys];
 			if (!isNaN(event)) {
-				xq = event;
+				lq = parseFloat(event);
+				xq = x0 + (xf-x0)*lq/len;
 			}else{
 				if(event.buttons != 1) return;
 				bg = document.getElementById('chart');
 				xq = event.clientX - bg.getBoundingClientRect().left;
 				//yq = event.clientY - bg.getBoundingClientRect().top;
-			}
-			query_l_unit = inputs_unit_map['query_l'][unit_sys];
-
 
 				lq = (convert(l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
 				if (lq > Math.max(...focus_l)){
-					//console.log('overflow');
 					lq = Math.max(...focus_l);
 					xq = focus_x0 + (focus_xf-focus_x0)/(convert(l_max, query_l_unit)-0)*lq;
 				}
 				if (lq<0) {
 					lq=0; xq=focus_x0;
 				}
+			}
+
+
+				
 				qq   = linterp(focus_l, focus_q, lq);
 				mq   = linterp(focus_l, focus_m, lq);
-				slq   = linterp(focus_l, focus_sl, lq);
-				shq   = linterp(focus_l, focus_sh, lq);
+				slq  = linterp(focus_l, focus_sl, lq);
+				shq  = linterp(focus_l, focus_sh, lq);
 				qline.setAttribute('opacity', 1);
 
 				qline.setAttribute('x1', xq);
 				qline.setAttribute('x2', xq);
 
-				//console.log(l, q, lq, qq);
 				gids('query_l', lq);
 				gids('query_q', qq, 5);
 				gids('query_m', mq);
@@ -829,7 +830,7 @@
 			m_line.points.appendItem(ptm);
 		}
 		
-		bg=document.getElementById('chart_background');
+		bg=document.getElementById('chart_query_area');
 
 		qline = document.getElementById('chart_query_line');
 		qline.setAttribute('opacity', 0);
@@ -964,6 +965,7 @@
   <title id="title">Position/Velocity Data</title>
 
 
+
 <rect class="background" id="chart_background" x=70 y=20 width=555 height=430 />
 <g class="x-grid">
   <line id="chart_x_axis" class="axes" x1=70 x2=70 y1=20 y2=450 ></line>
@@ -1015,6 +1017,8 @@
 	stroke-width=2
 	points="
 	"/>
+
+<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
 </svg>
 
 <div class="output-graph">
