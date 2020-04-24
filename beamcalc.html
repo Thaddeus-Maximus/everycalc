@@ -403,13 +403,19 @@
 		for (i=0;i<numel;i++) {
 			q_seg = fq.slice(i*2, i*2+4);
 			dl = poses[order[i+1]] - poses[order[i]];
-			for (zeta=-1; zeta<=1; zeta+=0.05) {
+			for (zeta=-1; zeta<1; zeta+=0.05) {
 				xp.push(poses[order[i]] + (zeta+1)/2*dl);
 				tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
 				qp.push(beam_shape_fcn(q_seg, zeta, dl));
 				mp.push(E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
 				sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
 			}
+			zeta = 1;
+			xp.push(poses[order[i]] + (zeta+1)/2*dl);
+			tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
+			qp.push(beam_shape_fcn(q_seg, zeta, dl));
+			mp.push(E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
+			sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
 		}
 
 		return [xp, qp, tp, mp, sp];
