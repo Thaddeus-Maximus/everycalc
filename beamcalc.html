@@ -763,8 +763,8 @@
 				gids('query_sh', shq);
 
 				smid = shq / gidv('area');
-				stop =   mq * gidv('rmax') / gidv('moi');
-				sbot = - mq * gidv('rmin') / gidv('moi');
+				stop = - mq * gidv('rmax') / gidv('moi');
+				sbot = + mq * gidv('rmin') / gidv('moi');
 
 				gids("query_stress_bend_top", stop);
 				gids("query_stress_bend_bot", sbot);
