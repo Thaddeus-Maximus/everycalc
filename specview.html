@@ -15,31 +15,112 @@
 			row = table.insertRow(i);
 			row.innerHTML = "<th class='rowlabel'>" + motor_data[motor]["plain_name"] + "</th><td>" 
 				+ motor_data[motor]["max_rpm"] + "</td><td>"
-				+ motor_data[motor]["stall_torque"] + "</td><td>"
+				+ motor_data[motor]["stall_torque"].toFixed(3) + "</td><td>"
 				+ motor_data[motor]["max_power"] + "</td><td>"
-				+ motor_data[motor]["free_current"] + "</td><td>"
-				+ motor_data[motor]["stall_current"] + "</td>";
+				+ motor_data[motor]["stall_current"] + "</td><td>"
+				+ motor_data[motor]["free_current"].toFixed(2) + "</td>";
+			row.classList.add(i%2 ? 'oddrow' : 'evenrow');
+		}
+
+		table = document.getElementById("unit_data_table");
+		i=0;
+		for(baseunit in unit_bases) {
+			firstone = true;
+			for (tounit of unit_bases[baseunit]) {
+				i++;
+				row = table.insertRow(i);
+				row.innerHTML = 
+					(firstone ? "<th class='rowlabel'>" + baseunit + "</th><td>" : "<td></td><td>") 
+					+ tounit + "</td><td>"
+					+ unit_conversions[tounit] + "</td>";
+				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+				firstone = false
+			}
+		}
+
+		table = document.getElementById("belt_data_table");
+		i=0;
+		for(mfr in belts_data) {
+			firstone = true;
+			for (series in belts_data[mfr]) {
+				i++;
+				row = table.insertRow(i);
+				row.innerHTML = 
+					(firstone ? "<th class='rowlabel'>" + belt_mfrs[mfr] + "</th><td>" : "<td></td><td>") 
+					+ series + "</td><td>"
+					+ belts_data[mfr][series].join(', ') + "</td>";
+				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+				firstone = false
+			}
 		}
 	}
 </script>
 
+
+
+<style>
+.oddrow {
+	background-color: #ddf;
+}
+
+.evenrow {
+	background-color: #ccf;
+}
+
+th {
+	padding: 5px;
+}
+td {
+	text-align: right;
+}
+</style>
+
 <html>
 <body onload="thload()">
 <div style="float: left;" class="container">
-	<h3>Thad's Mechanism Calculator</h3>
+	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
 	<div class="even">
+		<h3>Motor Specs</h3>
+		<center>
 		<table id="motor_data_table">
 			<tr>
 				<th class="collabel">Motor Name</th>
-				<th class="collabel">Free/Max RPM</th>
-				<th class="collabel">Stall/Max Torque (Nm)</th>
-				<th class="collabel">Max Power (W)</th>
-				<th class="collabel">Free/Min Current (A)</th>
-				<th class="collabel">Stall/Max Current (A)</th>
+				<th class="collabel">Free /<br/>Max RPM</th>
+				<th class="collabel">Stall/Max<br/>Torque (Nm)</th>
+				<th class="collabel">Max<br/>Power (W)</th>
+				<th class="collabel">Stall/Max<br/>Current (A)</th>
+				<th class="collabel">Free/Min<br/>Current (A)</th>
 			</tr>
 		</table>
+	</center>
+	</div>
+
+	<div class="odd">
+		<h3>Unit Conversions</h3>
+		<center>All unit conversions are handled by converting into a base SI unit<br/>to perform calculations, and back out from the base SI unit.
+		<table id="unit_data_table">
+			<tr>
+				<th class="collabel">Base Unit</th>
+				<th class="collabel">Converts to</th>
+				<th class="collabel">By Factor</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+	<div class="even">
+		<h3>Belt Data</h3>
+		<center>
+		<table id="belt_data_table">
+			<tr>
+				<th class="collabel">Manufacturer</th>
+				<th class="collabel">Size</th>
+				<th class="collabel">Teeth</th>
+			</tr>
+		</table>
+	</center>
 	</div>
 
 </div>

@@ -116,9 +116,30 @@ var belts_data = {
 	"am": {
 		"5mm": [40,45,48,93,55,85,104,107,110,117,120,131,140,151,160,170,180,200]
 	}
-}
+};
+var belt_mfrs = {"vex": "VexPro", "am": "AndyMark"};
 
 // '1 of this unit to <base unit>'
+var unit_bases = {
+	'm': ['m', 'mm', 'in', 'ft'],
+	'N-m': ['ft-lbf', 'in-lbf', 'ozf-in', 'N-m', 'N-mm'],
+	'N': ['N', 'lbf', 'kgf', 'ozf'],
+	'kg': ['kg', 'g', 'lbm', 'slug'],
+	'm/s': ['m/s', 'ft/s', 'in/s', 'mm/s'],
+	'm/s^2': ['m/s^2', 'ft/s^2'],
+	'c/m': ['c/ft', 'c/m'],
+	'kg m^2': ['kg m^2', 'lbm in^2', 'kg mm^2'],
+	'Pa': ['kPa', 'MPa', 'GPa', 'Pa', 'psi', '10^6 psi'],
+	'J': ['J'],
+	'C': ['C'],
+	'rad': ['rad', 'radian', 'revolutions', 'rev', 'degrees', 'deg'],
+	'rad/s': ['rad/s', 'RPM'],
+	'rad/s^2': ['rad/s^2', 'RPM/s'],
+	'm^4': ['mm^4', 'in^4'],
+	'm^2': ['mm^2', 'in^2'],
+	'kg/m^3': ['kg/m^3', 'g/cm^3', 'lbm/in^3'] 
+};
+
 var unit_conversions = {
 	"m":  1,
 	"mm": 1e-3,
