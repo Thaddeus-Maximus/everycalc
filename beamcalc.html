@@ -661,8 +661,12 @@
 		}
 	}
 
+	function linterp_idx(xs, xq) {
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return i;
+	}
+
 	function linterp(xs, ys, xq) {
-		i;
 		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
 		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
 	}
@@ -763,54 +767,86 @@
 		}
 	}
 
-	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
+	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0, focus_l_max;
 	function focus_handler(event){
-			var xq, lq;
-			query_l_unit = inputs_unit_map['query_l'][unit_sys];
-			if (!isNaN(event)) {
-				lq = parseFloat(event);
-				xq = x0 + (xf-x0)*lq/len;
-			}else{
-				if(event.buttons != 1) return;
-				bg = document.getElementById('chart');
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				//yq = event.clientY - bg.getBoundingClientRect().top;
+		var xq, lq;
+		query_l_unit = inputs_unit_map['query_l'][unit_sys];
+		if (!isNaN(event)) {
+			lq = parseFloat(event);
+			xq = x0 + (xf-x0)*lq/len;
+		}else{
+			if(event.buttons != 1) return;
+			bg = document.getElementById('chart');
+			xq = event.clientX - bg.getBoundingClientRect().left;
+			//yq = event.clientY - bg.getBoundingClientRect().top;
 
-				lq = (convert(l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
-				if (lq > Math.max(...focus_l)){
-					lq = Math.max(...focus_l);
-					xq = focus_x0 + (focus_xf-focus_x0)/(convert(l_max, query_l_unit)-0)*lq;
-				}
-				if (lq<0) {
-					lq=0; xq=focus_x0;
-				}
+			lq = (convert(focus_l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
+			if (lq > Math.max(...focus_l)){
+				lq = Math.max(...focus_l);
+				xq = focus_x0 + (focus_xf-focus_x0)/(convert(focus_l_max, query_l_unit)-0)*lq;
 			}
-
-
-				
-				qq   = linterp(focus_l, focus_q, lq);
-				mq   = linterp(focus_l, focus_m, lq);
-				slq  = linterp(focus_l, focus_sl, lq);
-				shq  = linterp(focus_l, focus_sh, lq);
-				qline.setAttribute('opacity', 1);
-
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
-
-				gids('query_l', lq);
-				gids('query_q', qq, 5);
-				gids('query_m', mq);
-				gids('query_sl', slq, 6);
-				gids('query_sh', shq);
-
-				smid = shq / gidv('area');
-				stop = - mq * gidv('rmax') / gidv('moi');
-				sbot = + mq * gidv('rmin') / gidv('moi');
-
-				gids("query_stress_bend_top", stop);
-				gids("query_stress_bend_bot", sbot);
-				gids("query_stress_shear",    smid);
+			if (lq<0) {
+				lq=0; xq=focus_x0;
 			}
+		}
+
+
+			
+			qq   = linterp(focus_l, focus_q, lq);
+			mq   = linterp(focus_l, focus_m, lq);
+			slq  = linterp(focus_l, focus_sl, lq);
+			shq  = linterp(focus_l, focus_sh, lq);
+			qline.setAttribute('opacity', 1);
+
+			qline.setAttribute('x1', xq);
+			qline.setAttribute('x2', xq);
+
+			gids('query_l', lq);
+			gids('query_q', qq, 5);
+			gids('query_m', mq);
+			gids('query_sl', slq, 6);
+			gids('query_sh', shq);
+
+			smid = shq / gidv('area');
+			stop = - mq * gidv('rmax') / gidv('moi');
+			sbot = + mq * gidv('rmin') / gidv('moi');
+
+			gids("query_stress_bend_top", stop);
+			gids("query_stress_bend_bot", sbot);
+			gids("query_stress_shear",    smid);
+		}
+
+	function find_extrema_handler(event) {
+		if (event.buttons != 2) return;
+		query_l_unit = inputs_unit_map['query_l'][unit_sys];
+
+		bg = document.getElementById('chart');
+		xq = event.clientX - bg.getBoundingClientRect().left;
+		//yq = event.clientY - bg.getBoundingClientRect().top;
+
+		lq = (convert(focus_l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
+		if (lq > Math.max(...focus_l) || lq < 0)
+			return;
+		
+		// init extremization algorithm
+		idx = linterp_idx(focus_l, lq);
+		direction = -sign(focus_m[idx]) * sign(focus_sl[idx]);
+		if (direction == 0) direction = 1; // can't be indecisive
+		max_or_min = -sign(focus_m[idx]);
+		if (max_or_min == 0) max_or_min = 1;
+
+		//console.log('go ', direction, 'to end up at ', max_or_min);
+		while ( idx >= 1 && idx < focus_l.length-1 ) {
+			idx += direction;
+			if (sign(focus_sl[idx+direction]) != max_or_min*direction)
+				break;
+		}
+
+		focus_handler(focus_l[idx]);
+
+		event.preventDefault();
+		return false;
+	}
 
 	function drawchart(channels) {
 		//var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
@@ -869,7 +905,9 @@
 			m_line.points.appendItem(ptm);
 		}
 		
-		bg=document.getElementById('chart_query_area');
+		bg_old=document.getElementById('chart_query_area');
+		var bg = bg_old.cloneNode(true);
+		bg_old.parentNode.replaceChild(bg, bg_old);
 
 		qline = document.getElementById('chart_query_line');
 		qline.setAttribute('opacity', 0);
@@ -884,6 +922,7 @@
 		gids("query_stress_bend_bot", '-');
 		gids("query_stress_shear",    '-');
 
+		focus_l_max = l_max;
 		focus_l = l
 		focus_q = q;
 		focus_m = m;
@@ -893,8 +932,12 @@
 		focus_x0 = x0;
 		//[focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, x0] = [l, q, m, sl, sh, xf, x0];
 
+		
+
 		bg.addEventListener('mousemove', focus_handler);
 		bg.addEventListener('mousedown', focus_handler);
+		bg.addEventListener('mousedown', find_extrema_handler);
+		bg.addEventListener('contextmenu', function(e){e.preventDefault(); return false; });
 	}
 </script>
 
