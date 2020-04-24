@@ -23,7 +23,11 @@
 		'query_sh':  ['N', 'lbf'],
 		'query_stress_bend_top': ['MPa', 'psi'],
 		'query_stress_bend_bot': ['MPa', 'psi'],
-		'query_stress_shear':    ['MPa', 'psi']
+		'query_stress_shear':    ['MPa', 'psi'],
+		'density': ['g/cm^3', 'lbm/in^3'],
+		'mass':    ['kg',  'lbm'],
+		'Sf':      ['MPa', 'psi']
+
 	}
 
 	function switch_units() {
@@ -33,7 +37,6 @@
 			unit_sys = 1;
 
 		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
 		for (unit in unit_labels) {
 			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
 				varname = unit_labels[unit].id.substring(5);
@@ -86,6 +89,11 @@
 
 	function thload() {
 		switch_units();
+
+		populate_materials();
+		document.getElementById('material').value = 'Aluminum';
+		select_material();
+
 		add_load({where: 10, amount: 0, type: 0});
 		add_load({where: 50, amount: 0, type: 0});
 		add_load({where: 90, amount: 100, type: 2});
@@ -119,13 +127,15 @@
 	}
 
 	function collapse(id) {
-		el = document.getElementById('detail_'+id);
+		tbl = document.getElementById('table_'+id);
+		console.log(tbl.rows);
+
 		btn = document.getElementById('toggle_detail_'+id);
-		if(el.style['display'] != 'none') {
-			el.style['display'] = 'none';
+		if(tbl.rows[1].style['display'] != 'none') {
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
 			btn.innerHTML = "&#9660";
 		} else {
-			el.style['display'] = 'inherit';
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
 			btn.innerHTML = "&#9650";
 		}
 	}
@@ -238,6 +248,7 @@
 				document.getElementById('section_'+i+'_row').style.display = 'none';
 		} 
 		moi_compute();
+		select_material();
 	}
 
 	var current_load_number = 0;
@@ -324,6 +335,35 @@
 		}
 		compute();
 	}
+
+	function populate_materials() {
+		select = document.getElementById('material');
+
+		i=0;
+		for(matl in materials) {
+			i++;
+			opt = document.createElement('option');
+			opt.innerHTML = matl;
+			opt.value = matl;
+			select.appendChild(opt);
+		}
+	}
+
+	function select_material() {
+		matl = document.getElementById('material').value;
+
+		document.getElementById('elastic_modulus').readOnly = matl != 'custom';
+		document.getElementById('Sf').readOnly 				= matl != 'custom';
+		document.getElementById('density').readOnly 		= matl != 'custom';
+
+		if (matl != 'custom') {
+			gids('elastic_modulus', materials[matl]['Ef']);
+			gids('density', materials[matl]['density']);
+			gids('mass', materials[matl]['density']*gidv('area')*gidv('length'));
+			gids('Sf', materials[matl]['Sf'] ? materials[matl]['Sf'] : '-');
+		}
+		
+	}
 </script>
 
 <script type="text/javascript">
@@ -392,8 +432,6 @@
 			if (dofs_to_remove.includes(i)){fq.push(0); offs++}
 			else fq.push(q._data[i-offs][0]);
 		}
-
-		//console.log(fq);
 		
 		xp = []; // x; position
 		tp = []; // theta; angle
@@ -462,10 +500,9 @@
 	}
 
 	function compute() {
-		moi_compute();
+		shape_select();
 
 		L = gidv('length');
-		//console.log('length', L);
 
 		document.getElementById('charts').classList.add('error');
 
@@ -538,7 +575,6 @@
 <script>
 	function makeTicks(mins, maxes, num_to_print, n) {
 		all_positive = !(mins);
-		//console.log(all_positive);
 		H = [];
 		bases = [];
 		for(var i=0; i<maxes.length; i++){
@@ -586,7 +622,6 @@
 			ticksstr.unshift(labelstr);
 			
 		}
-		//console.log(ticks, ticksstr);
 		return [ticks, ticksstr];
 	}
 
@@ -820,8 +855,6 @@
 		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
 		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
 
-		//console.log(lc, qc, mc);
-
 		for (i in lc) {
 			var ptq = svg.createSVGPoint();
 			var ptm = svg.createSVGPoint();
@@ -871,42 +904,77 @@
 		<h3>Thad's Beam Calculator</h3>
 		<center><a href="./">Back To Index</a></center>
 
-		<div class="even">
+		<div class="odd">
 		<center>
 			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units(); compute();">
-			  <label for="english">English</label><br>
+			  <label for="english">English</label>
 			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units(); compute();" checked>
-			  <label for="metric">Metric</label><br>
+			  <label for="metric">Metric</label>
 		</center>
 		</div>
 
-		<div class="odd">
+		<div class="even">
 			<table>
 				<tr>
-					<th class='rowlabel'>Elastic Modulus</th>
-					<td><input id='elastic_modulus' value=69 /></td>
-					<td class='unit' id='unit_elastic_modulus'></td>
-				</tr><tr>
 					<th class='rowlabel'>Length</th>
 					<td><input id='length' /></td>
 					<td class='unit' id='unit_length'></td>
 				</tr>
 			</table>
 		</div>
-		<div class="even">
-			<span class="rowlabel">Cross-Section</span>
-			<select id="section" onchange="shape_select()">
-				<option value="rndbar" selected='selected'>Round Bar</option>
-				<option value="boxbar">Rect. Bar</option>
-				<option value="boxtube">Box Tube</option>
-				<option value="rndtube">Round Tube</option>
-				<option value="angle">Angle</option>
-				<option value="hex">Hexagon</option>
-				<option value="custom">Custom</option>
-			</select>
+		<div class="odd">
+			<table id="table_material">
+				
+				<tr>
+					<th class='rowlabel'>Material</th>
+					<td colspan>
+						<select id="material" onchange="select_material(); compute();">
+							<option value="custom">Custom</option>
+						</select>
+					</td>
+					<td>
+						<button type="button" onclick="collapse('material'); shape_select()" id='toggle_detail_section'>&#9650;</button>
+					</td>
 
-			<button type="button" onclick="collapse('section')" id='toggle_detail_section'>&#9650;</button>
-			<table id="detail_section">
+				</tr>
+				<tr>
+					<th class='rowlabel'>Flexural Modulus</th>
+					<td><input id='elastic_modulus' value=69 /></td>
+					<td class='unit' id='unit_elastic_modulus'></td>
+				</tr><tr>
+					<th class='rowlabel'>Flexural Strength</th>
+					<td><input id='Sf' value=30 /></td>
+					<td class='unit' id='unit_Sf'></td>
+				</tr><tr>
+					<th class='rowlabel'>Density</th>
+					<td><input id='density' value=0 /></td>
+					<td class='unit' id='unit_density'></td>
+				</tr><tr>
+					<th class='rowlabel'>Mass</th>
+					<td><input id='mass' readonly /></td>
+					<td class='unit' id='unit_mass'></td>
+				</tr>
+			</table>
+		</div>
+		<div class="even">
+			<table id="table_section">
+				<tr>
+					<th class='rowlabel'>Cross-Section</th>
+					<td>
+						<select id="section" onchange="shape_select()">
+							<option value="rndbar" selected='selected'>Round Bar</option>
+							<option value="boxbar">Rect. Bar</option>
+							<option value="boxtube">Box Tube</option>
+							<option value="rndtube">Round Tube</option>
+							<option value="angle">Angle</option>
+							<option value="hex">Hexagon</option>
+							<option value="custom">Custom</option>
+						</select>
+					</td>
+					<td>
+						<button type="button" onclick="collapse('section'); shape_select()" id='toggle_detail_section'>&#9650;</button>
+					</td>
+				</tr>
 				<tr>
 					<th class='rowlabel'>MOI<span class="ttt">The area moment of inertia for the section</span></th>
 					<td><input id='moi' readonly /></td>
