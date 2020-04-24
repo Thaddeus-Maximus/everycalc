@@ -407,8 +407,8 @@
 				xp.push(poses[order[i]] + (zeta+1)/2*dl);
 				tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
 				qp.push(beam_shape_fcn(q_seg, zeta, dl));
-				mp.push(-E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
-				sp.push(-E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
+				mp.push(E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
+				sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
 			}
 		}
 
