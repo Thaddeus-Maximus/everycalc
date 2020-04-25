@@ -214,3 +214,7 @@ button {
 #k_table td {
   width: 100px;
 }
+
+#compute_btn {
+  background-color: #55a040;
+}
