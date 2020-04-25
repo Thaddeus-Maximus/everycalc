@@ -31,7 +31,7 @@
 \usepackage{pst-node}
 \usepackage{auto-pst-pdf}
 
-\usepackage[paper=a4paper,margin=1in]{geometry}
+\usepackage[paper=a4paper,margin=1.25in]{geometry}
 
 \makeatletter
 \g@addto@macro\@floatboxreset\centering
@@ -70,8 +70,6 @@
 	\end{align}
 
 	There are many different forms of stiffness, depending on the exact element used.
-
-	\section{Elements}
 
 	We will use a 2D beam element derived from \textit{Euler-Bernoulli beam theory}. This element has four degrees of freedom: vertical deflection $v$ and rotation $\psi$ at each end node.
 
@@ -245,9 +243,9 @@
 		\end{bmatrix}
 	\end{align}
 
-	(Zeroes have been omitted from matrix to aid in readability)
+	Zeroes have been omitted from matrix to aid in readability.
 
-	The load vector is:
+	The load vector is simply
 
 	\begin{align}
 		{F} = 
@@ -274,10 +272,10 @@
 			0 \\
 			0 \\
 			0
-		\end{Bmatrix}
+		\end{Bmatrix} .
 	\end{align}
 
-	Combining this yields:
+	Combining this yields the full, unconstrained equation
 
 	\begin{align} 
 		\begin{Bmatrix}
@@ -313,7 +311,7 @@
 			\psi_4 \\
 			v_5 \\
 			\psi_5
-		\end{Bmatrix}
+		\end{Bmatrix} .
 	\end{align}
 
 	The fixed support at node 2 removes degrees of freedom $v_2$, $\psi_2$. The pinned support at node 3 removes only $v_3$ (pin still permits rotation).
@@ -392,13 +390,18 @@
 		\end{Bmatrix}
 	\end{align}
 
-	At this point, the matrix equation could be solved to achieve the nodal displacement vector.
+	At this point, the matrix equation could be solved to achieve the nodal displacement vector. Afterwards, the resulting displacement matrix could be used with the unconstrained stiffness matrix to determine the loads at the constraints. This tells us everything we could want to know about what is happening at the nodes, but what about inbetween them?
 
-	This tells us about the nodes, but what about inbetween areas?
+	\newpage
+	\section{Post Processing and Shape Functions}
 
-	\section{Post Processing: Shape Functions}
+	One simple output from the FE model would be the reaction loads. These would be the struck-out entries of the load vector $\{F\}$. The entire load vector could be found by simply computing 
 
-	To derive the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one degree of freedom to the displacement field in an element. By combining these displacement fields, we can determine the total displacement field.
+	\begin{align}
+		\{F\} = [K]\{q\} .
+	\end{align}
+
+	Getting deflection at particular points (not nodes) will be more involved and require the use of \textit{shape functions}. In the derivation of the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one degree of freedom to the displacement field in an element. By combining these displacement fields, we can determine the total displacement field.
 
 	\begin{figure}[H]
 		\includegraphics[width=0.5\textwidth]{hermite.png}
@@ -507,6 +510,37 @@
 		\end{Bmatrix}^T 
 	\end{align}
 
+	\newpage
+	\section{Sanity Check: are the Shape Functions Appropriate?}
+
+	Usually finite element methods are used as approximations by employing the use of many, many elements to approximate the true displacement field. Beam elements, though, are somewhat unique in that \textit{under certain circumstances} they will model the underlying diplacement field exactly. Let's return to Euler-Bernoulli beam theory. This theory states that the displacement field $q$ can be represented as 
+
+	\begin{align}
+		\frac{d^2}{d x^2} E I \frac{d^2 v}{d x^2} = q ,
+	\end{align}
+
+	where $q$ is a distributed load (i.e. with dimensions of force per unit length). Euler-Bernoulli beam theory has several assumptions wrapped up in it, such as the requirement that plane sections remain plane, and no large deflections.
+
+	My calculator does not model distributed loads, so $q$ is always zero. Additionally, the cross-section and elastic modulus remain constant, so $E$ and $I$ can be moved outside of the derivative, leaving
+
+	\begin{align}
+		E I \frac{d^4 v}{d x^4} &= 0 \\
+		\frac{d^4 v}{d x^4} &= 0 
+	\end{align}
+
+	If we integrate both sides repeatedly, we can get the form of $v$.
+
+	\begin{align}
+		\int \frac{d^4 v}{d x^4} dx &= \int 0 dx \\
+		\int \frac{d^3 v}{d x^3} dx &= \int c_1 dx \\
+		\int \frac{d^2 v}{d x^2} dx &= \int c_1 x + c_2 dx \\
+		\int \frac{d v}{d x} dx     &= \int c_1 x^2 + c_2 x + c_3 dx \\
+		v &= c_1 x^3 + c_2 x^2 + c_3 x + c_4 
+	\end{align}
+
+	The shape of $v$ under the assumptions of constant $E$ and $I$ with only point loads is a cubic polynomial. This has four degrees of freedom. What else has four degrees of freedom? Our elements! Using beam elements provides a sufficient quantity of degrees of freedom to provide exact analytical solutions to problems where Euler-Bernoulli beam theory is appropriate, and require point loads and constant cross sections. This may sound restrictive, but encompasses nearly all applications of beams, which is why they are such a powerful modeling tool even in full-blown FE applications.
+
+	\newpage
 	\section{Validation Examples}
 
 	Comparison to analytical solutions is a necessary component when validating any FE model. \href{https://mechanicalc.com/reference/beam-deflection-tables}{\underline{MechaniCalc}} has some good analytical solutions I will compare to.
@@ -523,15 +557,16 @@
 		I = \frac{\pi}{64} d^4 = \frac{\pi}{64} (0.100 m)^4 = 3.06796 \times 10^{-11} m^4
 	\end{align}
 	\begin{align}
-		\delta_{a} &= - \frac{F a^2}{6 E I} (3 L - a) &= - \frac{200 N \times (0.06 m)^2}{6 \times 69 GPa \times 30.6796 mm^4} (3 \times 0.06 m - 0.06 m) &= 6.802 mm\\
-		\delta_{end} &= - \frac{F a^2}{6 E I} (3 L - a) &= - \frac{200 N \times (0.06 m)^2}{6 \times 69 GPa \times 30.6796 mm^4} (3 \times 0.1 m - 0.06 m) &= 13.6048 mm\\
-		\theta_{a/2} &= - \frac{F (a/2)^2}{2 E I} (2 L - a/2) &= \frac{200 N \times .03 m}{2 \times 69 GPa \times 30.6796 mm^4} (2 \times 0.1m - .03m) = 7.305 \ deg\\
-		& V_{0 \mbox{ to } a} &= F &= 200 \ N \\
-		& M_{x=0} &= -F \times a = - 200 N \times .06 m &= - 12\ Nm
+		\delta_{a} &= - \frac{F a^2}{6 E I} (3 L - a) = - \frac{200 N \times (0.06 m)^2}{6 \times 69 GPa \times 30.6796 mm^4} (3 \times 0.06 m - 0.06 m) = 6.802 mm\\
+		\delta_{end} &= - \frac{F a^2}{6 E I} (3 L - a) = - \frac{200 N \times (0.06 m)^2}{6 \times 69 GPa \times 30.6796 mm^4} (3 \times 0.1 m - 0.06 m) = 13.6048 mm\\
+		\theta_{a/2} &= - \frac{F (a/2)^2}{2 E I} (2 L - a/2) = \frac{200 N \times .03 m}{2 \times 69 GPa \times 30.6796 mm^4} (2 \times 0.1m - .03m) = 7.305 \ deg\\
+		V_{0 \rightarrow a} &= F = 200 \ N \\
+		M_{x=0} &= -F \times a = - 200 N \times .06 m = - 12\ Nm
 	\end{align}
 
 	You can plug in the values to the calculator and verify this load case for yourself. I found all of the above numbers to be accurate.
 
+	\newpage
 	\subsection{Simply Supported, Center Moment}
 
 	\begin{figure}[H]
@@ -541,13 +576,13 @@
 	Let $E = 27557 ksi$, $L = 6 in$, box bar with $w = 0.5 in$, $h = 2in$, $M = 1200 ft-lbf$.
 
 	\begin{align}
-		I = \frac{1}{12} b h^3 = 1/3 in^4
+		I = \frac{1}{12} b h^3 = 1/3 \ in^4
 	\end{align}
 	\begin{align}
-		\delta_{x = 1.25 in} &= \frac{ - M x}{24 L E I}(L^2 - 4*x^2) &= \frac{-12\ ft\ lbf\ 1.25 \ in}{24 \times \ 6 \ in \ 27557 \ ksi \ 1/3 \ in^4} ((6 in)^2 - 4 (1.25 in)^2) &= -.4048 thou \\
-		\theta_{1} &= \frac{- M L}{24 E I} &= \frac{-1200\ ft\ lbf\ 6 \ in}{24 \times \ 27557 \ ksi \ 1/3 \ in^4} &= -.02246 \ deg \\
-		V &= M / L &= 1200 ft-lbf / 6 in &= 2400 lbf \\
-		M_{x=L/2} &= M / 2 &= 1200 ft-lbf / 2 &= 600 ft-lbf
+		\delta_{x = 1.25 in} &= \frac{ - M x}{24 L E I}(L^2 - 4*x^2) = \frac{-12\ ft\ lbf\ 1.25 \ in}{24 \times \ 6 \ in \ 27557 \ ksi \ 1/3 \ in^4} ((6 in)^2 - 4 (1.25 in)^2) = -.4048 \ thou \\
+		\theta_{1} &= \frac{- M L}{24 E I} = \frac{-1200\ ft\ lbf\ 6 \ in}{24 \times \ 27557 \ ksi \ 1/3 \ in^4} = -.02246 \ deg \\
+		V &= M / L = 1200 ft-lbf / 6 in = 2400 lbf \\
+		M_{x=L/2} &= M / 2 = 1200 ft-lbf / 2 = 600 ft-lbf
 	\end{align}
 
 	You can plug in the values to the calculator and verify this load case for yourself. I found all of the above numbers to be accurate.

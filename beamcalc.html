@@ -360,17 +360,36 @@
 	function change_load(i) {
 		invalidate_computations();
 		type = document.getElementById('load_type_'+i).value;
-		if (type == 'pin' || type == 'fix') {
+		if (type == 'pin' ) { //
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_2_row`).style.display = '';
+			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
+			document.getElementById(`load_${i}_2`).readOnly = true;
 			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			for (j=2;j<=4;j++)
+			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
+			for (j=3;j<=4;j++)
+				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
+		} else if (type == 'fix' ) { //
+			document.getElementById(`load_${i}_1_row`).style.display = '';
+			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_2_row`).style.display = '';
+			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
+			document.getElementById(`load_${i}_2`).readOnly = true;
+			document.getElementById(`load_${i}_3_row`).style.display = '';
+			document.getElementById(`load_${i}_3_label`).innerHTML = 'M=';
+			document.getElementById(`load_${i}_3`).readOnly = true;
+			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
+			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
+			inputs_unit_map[`load_${i}_3`] = ['N-m', 'ft-lbf'];
+			for (j=4;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		} else if (type == 'force' || type == 'moment') {
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'force' ? 'F=' : 'M=';
+			document.getElementById(`load_${i}_2`).readOnly = false;
 			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
 			inputs_unit_map[`load_${i}_2`] = type == 'force' ? ['N', 'lbf'] : ['N-m', 'ft-lbf'];
 			for (j=3;j<=4;j++)
@@ -391,6 +410,11 @@
 				loads.children[i].classList.add(i%2 ? 'even' : 'odd');
 			}
 		}
+
+		delete inputs_unit_map[`load_${load_no}_1`];
+		delete inputs_unit_map[`load_${load_no}_2`];
+		delete inputs_unit_map[`load_${load_no}_3`];
+		delete inputs_unit_map[`load_${load_no}_4`];
 		compute();
 	}
 
@@ -434,18 +458,6 @@
 		return math.multiply(m, EI/L/L/L);
 	}
 
-	function drawtbl(K) {
-		tbl = document.getElementById('k_table');
-		tbl.innerHTML = '';
-		for (i=0;i<K._data.length;i++) {
-			tr = tbl.insertRow();
-			for (j=0;j<K._data[i].length;j++) {
-				td = tr.insertCell(tr.cells.length);
-				td.innerHTML = K._data[i][j];
-			}
-		}
-	}
-
 	function run_fe(E, I, order, poses, forces, moments, pinned, fixed) {
 		numel = order.length-1;
 
@@ -481,9 +493,9 @@
 			if (! dofs_to_remove.includes(i)) idx_rmv_l.push(i);
 		}
 		idx_rmv = math.index(idx_rmv_l, idx_rmv_l);
-		K = K.subset(idx_rmv);
+		Kp = K.subset(idx_rmv);
 		F = F.subset(math.index(idx_rmv_l, 0));
-		q = math.multiply(math.inv(K), F);
+		q = math.multiply(math.inv(Kp), F);
 		fq = [];
 		offs = 0;
 		for (i=0;i<numnode;i++) {
@@ -514,7 +526,9 @@
 			sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
 		}
 
-		return [xp, qp, tp, mp, sp];
+		rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
+
+		return [xp, qp, tp, mp, sp, rxns];
 	}
 
 	function beam_shape_fcn(arr, zeta, dl) {
@@ -583,9 +597,9 @@
 			order.push(i);
 			poses[i] = gidv(`load_${x}_1`);
 			if (type == 'fix') {
-				fixed[i] = 1;
+				fixed[i] = x;
 			} else if (type == 'pin') {
-				pinned[i] = 1;
+				pinned[i] = x;
 			} else if (type == 'force') {
 				forces[i] = gidv(`load_${x}_2`);
 			} else if (type == 'moment') {
@@ -624,10 +638,20 @@
 			}
 		}
 
-		displ = run_fe(gidv('moi'), gidv('elastic_modulus'),
+		[xp, qp, tp, mp, sp, rxns] = run_fe(gidv('moi'), gidv('elastic_modulus'),
 			order, poses, forces, moments, pinned, fixed);
 
-		drawchart(displ, [poses, forces, moments, pinned, fixed]);
+		for (pin in pinned) {
+			noden = order.indexOf(parseInt(pin));
+			gids(`load_${pinned[pin]}_2`, rxns[noden*2]);
+		}
+		for (fix in fixed) {
+			noden = order.indexOf(parseInt(fix));
+			gids(`load_${fixed[fix]}_2`, rxns[noden*2]);
+			gids(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
+		}
+
+		drawchart([xp, qp, tp, mp, sp], [poses, forces, moments, pinned, fixed]);
 
 
 		document.getElementById('charts').classList.remove('error');
@@ -1135,6 +1159,7 @@
 				</tr>
 				<tr>
 					<td colspan=3>
+							Moments are positive counter-clockwise.<br/><br/>
 							Click on the chart to query points. <br/><br/>
 							Click on the beam elements to query the corresponding points.<br/><br/>
 							Right click on the chart near a local extrema to latch on and find the local extrema.<br/><br/>
