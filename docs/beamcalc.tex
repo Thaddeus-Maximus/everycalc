@@ -66,7 +66,7 @@
 	There are a few methods to solve this equation. One simple one is to multiply both sides by the matrix inverse (since there is no direct equivalent of division with matrices). This method does not scale well- but it works with the few elements we will need for this calculator.
 
 	\begin{align}
-		[K^-1] \{F\} = [K^-1][K]\{q\} = \{q\}
+		[K]^{-1} \{F\} = [K]^{-1} [K]\{q\} = \{q\}
 	\end{align}
 
 	There are many different forms of stiffness, depending on the exact element used.
@@ -168,6 +168,28 @@
 	\end{align}
 
 	We're getting close to a problem we can solve! We've linked the nodes together, but we now need to constrain them. These beams are currently floating in space- we need to anchor them otherwise our displacements are meaningless (and, the matrix $[K]$ is singular and unsolvable). For example, let's apply the constraint that node 1 is fixed; that is, $u_1$ = 0. As a result, the associated column in $[K]$ (the first column) does not matter. Any loads applied to the node also do not matter since they would be absorbed by the fixed constraint. This allows us to remove columns and rows 1 of the stiffness matrix, degrees of freedom 1, and load 1, changing our equation to:
+
+	\[
+	\begin{pspicture} 
+		\begin{Bmatrix}
+			\rnode{A}{F_1} \\
+			F_2 \\
+			F_3 
+		\end{Bmatrix} = 
+		\begin{bmatrix}
+			\rnode{C}{K_A}  & -K_A    & 0    \\
+			-K_A & K_A+K_B & -K_B \\
+			\rnode{D}{0}    & -K_B    & K_B
+		\end{bmatrix}
+		\begin{Bmatrix}
+			\rnode{B}{u_1} \\
+			u_2 \\
+			u_3 
+		\end{Bmatrix}
+		\ncline{A}{B}
+		\ncline{C}{D}
+	\end{pspicture}
+	\]
 
 	\begin{align}
 		\begin{Bmatrix}
