@@ -17,7 +17,7 @@
 		'rmax':      ['mm', 'in'],
 		'rmin':      ['mm', 'in'],
 		'query_l':   ['mm', 'in'],
-		'query_q':   ['mm', 'in'],
+		'query_q':   ['mm', 'thou'],
 		'query_m':   ['N-m', 'ft-lbf'],
 		'query_sl':  ['deg', 'deg'],
 		'query_sh':  ['N', 'lbf'],
@@ -937,7 +937,7 @@
 		q_line.setAttribute("points",""); // I don't like it, but it does clear the points
 		m_line.setAttribute('points','');
 
-		[[l_ticks], xticklabels] = makeTicks(null, [Math.max(...lc)], 1, 9);
+		[[l_ticks], xticklabels] = makeTicks(null, [Math.max(...lc)], 1, 10);
 		[[q_ticks], yticklabels] = makeTicks([Math.min(...qc), Math.min(...mc)], [Math.max(...qc), Math.max(...mc)], 1, 6);
 		[[m_ticks], zticklabels] = makeTicks([Math.min(...mc), Math.min(...qc)], [Math.max(...mc), Math.max(...qc)], 1, 6);
 
@@ -1009,7 +1009,7 @@
 <body onload="thload()">
 	<div style="width: 275px; float: left;" class="container">
 		<h3>Thad's Beam Calculator</h3>
-		<center><a href="./">Back To Index</a></center>
+		<center><a href="./">Back To Index</a> - <a href="./docs/beamcalc.pdf">Model Documentation</a></center>
 
 		<div class="odd">
 		<center>

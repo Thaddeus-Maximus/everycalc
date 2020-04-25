@@ -144,6 +144,7 @@ var unit_conversions = {
 	"m":  1,
 	"mm": 1e-3,
 	"in": 0.0254,
+	"thou": 0.0254e-3,
 	"ft": 0.3048,
 
 	"ft-lbf": 1.356,
