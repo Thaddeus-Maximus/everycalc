@@ -56,6 +56,7 @@
 
     function mode_select() {
     	var mode = document.getElementById('mode').value;
+    	document.getElementById('x_target').readOnly = false;
     	if (mode=='raw') {
     		document.getElementById('v_initial').readOnly = false;
     		document.getElementById('theta').readOnly     = false;
@@ -68,6 +69,10 @@
     	} else if (mode=='find_min_v') {
     		document.getElementById('v_initial').readOnly = true;
     		document.getElementById('theta').readOnly     = true;
+    	} else if (mode.startsWith('find_distance')) {
+    		document.getElementById('v_initial').readOnly = false;
+    		document.getElementById('theta').readOnly     = false;
+    		document.getElementById('x_target').readOnly  = true;
     	}
     }
 
@@ -125,6 +130,18 @@
 		compute(true);
 	}
 
+	function collapse(id) {
+		tbl = document.getElementById('table_'+id);
+
+		btn = document.getElementById('toggle_detail_'+id);
+		if(tbl.rows[1].style['display'] != 'none') {
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
+			btn.innerHTML = "&#9660";
+		} else {
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
+			btn.innerHTML = "&#9650";
+		}
+	}
 		
 	function sign(x) {
 		if (x>0) return 1;
@@ -210,11 +227,11 @@
 		}
 
 		stats = {
-			'y_low': linterp(res_low[0],res_low[1], 0),
+			'y_low':  linterp(res_low[0],res_low[1], 0),
 			'y_high': linterp(res_high[0],res_high[1], 0),
-			'y_ctr': linterp(res_ctr[0],res_ctr[1], 0),
-			'ang': Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
-			'tof': tof
+			'y_ctr':  linterp(res_ctr[0],res_ctr[1], 0),
+			'ang':    Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
+			'tof':    tof
 		}
 
 		return [res_low, res_ctr, res_high, stats];
@@ -228,40 +245,61 @@
 
 	function compute(simulate) {
 		mode = document.getElementById('mode').value;
+		var x,y,v,theta;
 		if (mode=='raw') {
     		// nothing special
+    		x = gidv('x_target');
+    		y = gidv('y_target');
+    		theta = gidv('theta');
+    		v = gidv('v_initial');
     	} else if (mode=='find_theta') {
-    		var x = gidv('x_target');
-    		var y = gidv('y_target') - gidv('y_initial');
-    		var v = gidv('v_initial');
+    		x = gidv('x_target');
+    		y = gidv('y_target') - gidv('y_initial');
+    		v = gidv('v_initial');
 
     		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
     		
     		gids('theta', theta);
     	} else if (mode=='find_v') {
-    		var x = gidv('x_target');
-    		var y = gidv('y_target') - gidv('y_initial');
-    		var theta = gidv('theta');
+    		x = gidv('x_target');
+    		y = gidv('y_target') - gidv('y_initial');
+    		theta = gidv('theta');
 
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
 
     		gids('v_initial', v);
     	} else if (mode=='find_min_v') {
-    		var x = gidv('x_target');
-    		var y = gidv('y_target') - gidv('y_initial');
+    		x = gidv('x_target');
+    		y = gidv('y_target') - gidv('y_initial');
 
     		theta = Math.atan(y/x + Math.sqrt(y*y/x/x+1));
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
 
     		gids('theta', theta);
     		gids('v_initial', v);
+    	} else if (mode=='find_distance_far') {
+    		// There are two positions...
+    		theta = gidv('theta');
+    		v     = gidv('v_initial');
+    		y     = gidv('y_target') - gidv('y_initial');
+
+    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+    		gids('x_target', x);
+    	} else if (mode=='find_distance_near') {
+    		// There are two positions...
+    		theta = gidv('theta');
+    		v     = gidv('v_initial');
+    		y     = gidv('y_target') - gidv('y_initial');
+
+    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+    		gids('x_target', x);
     	}
 
     	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'time_of_flight', 'time_of_flight_err']
     	for (id of computable_ids) {
 	    	document.getElementById(id).classList.remove('error');    
 	    	document.getElementById(id).classList.remove('uncomputed');    
-	    	document.getElementById(id).classList.add(isNaN(v) ? 'error':'uncomputed');
+	    	document.getElementById(id).classList.add(isNaN(v)||isNaN(x)||isNaN(y)||isNaN(theta) ? 'error':'uncomputed');
     	}
 
 
@@ -297,7 +335,9 @@
 		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
 		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
 		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
-      	drawchart(max_low_run, max_high_run, targetstuff);
+		console.log(max_high_stat.y_high, targetstuff[1]+targetstuff[2]/2, max_low_stat.y_low, targetstuff[1]-targetstuff[2]/2);
+      	drawchart(max_low_run, max_high_run, targetstuff, 
+      		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
 
 		for (id of computable_ids){
 			document.getElementById(id).classList.remove('error');    
@@ -415,7 +455,7 @@
 		return pt;
 	}
 
-	function drawchart(low_run, high_run, targetstuff) {
+	function drawchart(low_run, high_run, targetstuff, missed) {
 		[target_d, target_h, target_diam] = targetstuff;
 		low_run = clean_run(low_run);
 		high_run = clean_run(high_run);
@@ -466,6 +506,9 @@
 
 		target_low  = document.getElementById('chart_target_low');
 		target_high = document.getElementById('chart_target_high');
+
+		console.log(missed ? 'missed': 'hit');
+		shot_area.setAttribute('fill', missed ? '#6a1a10': '#3a6a30')
 
 		target_low.setAttribute("points","");
 		target_high.setAttribute("points","");
@@ -551,6 +594,11 @@
 				<tr>
 					<td>
 					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
+					</td><td>
+					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()">
+					  Inches
+					</td><td>
+					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
 					</td><td class="rowlabel">
 						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
 					</td><td>
@@ -559,16 +607,9 @@
 							<option value="find_theta">Find Angle</option>
 							<option value="find_v">Find Velocity</option>
 							<option value="find_min_v">Find Minimum Velocity</option>
+							<option value="find_distance_near">Find Near Distance</option>
+							<option value="find_distance_far" >Find Far Distance</option>
 						</select>
-					</td>
-				</tr><tr>
-					<td>
-					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()">
-					  Inches
-					</td>
-				</tr><tr>
-					<td>
-					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
 					</td>
 				</tr>
 			</table>
@@ -615,7 +656,7 @@
 				</tr>
 			</table>
 		</div><div class="output" style='display:table-cell'>
-			<button type="button" onclick="compute()">Compute!</button>
+			<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
 			<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>
 			<table>
 				<tr>
@@ -638,6 +679,22 @@
 					<td><input id="time_of_flight" readOnly></td><td class="tiny">&#177;</td>
 					<td><input id="time_of_flight_err" readOnly></td>
 					<td class="unit" id='unit_time_of_flight'>[s]</td>
+				</tr>
+			</table>
+		</div>
+		<div class="even" style='display:table-cell'>
+			<table id="table_protips">
+				<tr>
+					<th class='rowlabel' colspan=2>Pro-Tips</th>
+					<td>
+						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
+					</td>
+				</tr>
+				<tr>
+					<td colspan=3>
+							When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
+							When the chart background is red, the current combination of inputs cannot be solved for.
+					</td>
 				</tr>
 			</table>
 		</div>

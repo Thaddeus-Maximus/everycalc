@@ -198,7 +198,7 @@
 		Rf = R;
 		if (document.getElementById('plot_mode').value == 'linear') Rf = 1;
 
-		channels = [[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
+		channels = [[],[],[],[],[],[]]; //[[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
       	i=0;
 		while(1) {
 			//console.log(dt);
@@ -295,12 +295,15 @@
 	function collapse(id) {
 		el = document.getElementById('detail_'+id);
 		btn = document.getElementById('toggle_detail_'+id);
+		
 		if(el.style['display'] != 'none') {
 			el.style['display'] = 'none';
 			btn.innerHTML = "&#9660";
+			if (id='gratio') document.getElementById('G').readOnly = false;
 		} else {
 			el.style['display'] = 'inherit';
 			btn.innerHTML = "&#9650";
+			if (id='gratio'){ document.getElementById('G').readOnly = true; calc_ratio(); }
 		}
 	}
 
@@ -350,7 +353,7 @@
 
 	chart_name = 'chart';
 
-	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
+	function drawTicks(axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
 		altaxis = axis == 'x' ? 'y':'x';
 		realaxis = axis == 'z' ? 'y':axis;
 		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
@@ -364,7 +367,8 @@
 		for (i in ticklabels) {
 			line = document.createElementNS('http://www.w3.org/2000/svg','line');
 			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
+			fp = f0 + (ff-f0)*(ticks==null ? i/(ticklabels.length-1) : ticks[i]/maxtick);
+			//fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
 			line.setAttribute(realaxis+'1', fp);
 			line.setAttribute(realaxis+'2', fp);
 			line.setAttribute('class', 'grid');
@@ -416,8 +420,10 @@
 		[[t_ticks], xticklabels] = makeTicks([Math.max(...t)], 1, 9);
 		[[d_ticks, v_ticks], yticklabels] = makeTicks([Math.max(...d), Math.max(...v), Math.max(...cur), Math.max(...f)], 2, 6);
 		[[cur_ticks, f_ticks], zticklabels] = makeTicks([Math.max(...cur), Math.max(...f), Math.max(...d), Math.max(...v)], 2, 6);
+
+		t_ticks.pop(); xticklabels.pop();
 		
-		t_max = t_ticks[t_ticks.length-1];
+		t_max = Math.max(...t); //t_ticks[t_ticks.length-1];
 		d_max = d_ticks[d_ticks.length-1];
 		v_max = v_ticks[v_ticks.length-1];
 		cur_max = cur_ticks[cur_ticks.length-1];
@@ -425,9 +431,9 @@
 
 
 
-		drawTicks('x', xticklabels, xf, x0, yf, y0, 15);
-		drawTicks('y', yticklabels, yf, y0, xf, x0, 5);
-		drawTicks('z', zticklabels, yf, y0, xf, x0, 5);
+		drawTicks('x', t_ticks, t_max, xticklabels, xf, x0, yf, y0, 15);
+		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
+		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
 
 		for (i in t) {
 			var ptd = svg.createSVGPoint();
@@ -470,8 +476,8 @@
 					tq = Math.max(...t);
 					xq = x0 + (xf-x0)/(t_max-0)*tq;
 				}
-				if (tq<0) {
-					tq=0; xq=x0;
+				if (tq<Math.min(...t)) {
+					tq=Math.min(...t); xq=x0;
 				}
 				dq   = linterp(t, d, tq);
 				vq   = linterp(t, v, tq);
@@ -499,8 +505,8 @@
 <html>
 <body onload="thload()">
 	<div style="display:table;">
-	<div style="width: 420px; float: left; display:table-cell;" class="container">
-	<h3>Thad's Mechanism Calculator</h3>
+	<div style="width: 300px; float: left; display:table-cell;" class="container">
+	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>
 
 	<div class="odd">
@@ -567,7 +573,7 @@
 	<div class="odd">
 		<div>
 		<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
-		<input id="G" readonly/>
+		<input id="G"/>
 		<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>
 	</div>
 	<table id='detail_gratio' style="display:none;">
@@ -653,7 +659,7 @@
 <div  class="output">
 	<table>
 		<tr>
-			<th class="rowlabel">End Condition Met in t=<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet. Auto-time-stepping may cause runs with high initial accelerations to have very short runtimes.</span></th>
+			<th class="rowlabel">End Cond. Met @<span class="ttt">When simulation terminated if the end condition was met. If not, it will tell you the end condition was unmet. Auto-time-stepping may cause runs with high initial accelerations to have very short runtimes.</span></th>
 			<td><input id="endcond_met" readonly /></td>
 			<td class="unit">[s]</td>
 		</tr><tr>
@@ -684,7 +690,25 @@
 		</tr>
 	</table>
 	</div>
-</div></div>
+</div><div class="even">
+		<span class="rowlabel">Protips</span>
+		<button type="button" onclick="collapse('protips')" id='toggle_detail_protips'>&#9660;</button>
+		<table id='detail_protips'>
+		<tr>
+			<td>
+				The calculator can be used for any mechanism. For a drivetrain, plug in wheel radius, robot mass, and nothing for load (unless you're pushing something). For an arm, plug in the radius to the center of mass, arm's mass, and the effective load at the center of gravity. For an elevator, plug in pulley radius, elevator mass, and the elevator load (weight minus any counterbalancing). Reverse the load to go 'down'.<br/><br/>
+				Click on the chart to probe points!<br/><br/>
+				When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
+				When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
+				The gear ratio has a dropdown that can be used to compute ratios from gearsets. Otherwise you can collapse it and plug in a gear ratio directly.<br/><br/>
+				The simulator uses auto-time-stepping based on the initial acceleration. It's best to specify an end condition. If your mechanism is extremely snappy, it's probably geared really, really low- so it will put the motor near free speed, which is generally undesirable.<br/><br/>
+				You can input arithmetic anywhere. But only input symbolic math (with variables) in the end condition and load equation boxes.
+			</td>
+		</tr>
+</table>
+</div>
+
+</div>
 
 <!--<div class="even">
 	<button type="button" onclick="compute()">CALCULATE!</button>
@@ -796,7 +820,7 @@
 				<td><input id="query_a" readonly /></td>
 				<td class="unit" id="unit_query_a"></td>
 			</tr><tr>
-				<th class="rowlabel">Actuator Force</th>
+				<th class="rowlabel">Actuator Force<span class="ttt">The force the actuator puts out. THIS IS NOT NET FORCE. Subtract off load equation to find net force.</span></th>
 				<td><input id="query_f" readonly /></td>
 				<td class="unit" id="unit_query_f"></td>
 			</tr>
