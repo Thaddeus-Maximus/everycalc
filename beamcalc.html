@@ -208,7 +208,7 @@
 			if (isNaN(id)) id = 0;
 			area = Math.sqrt(3)*3/2*a*a 			- Math.PI/4 * id*id;
 			moi  = 5/16*Math.sqrt(3)*Math.pow(a, 4) - Math.PI/64*Math.pow(id,4);
-			rmax = rmin = flip ? (a*Math.sqrt(3)/2) : a;
+			rmax = rmin = flip ? a : (a*2/Math.sqrt(3));
 		}
 
 		if (shape != 'custom') {
