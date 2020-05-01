@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css"> 
+<script type="text/javascript" src="include/specs.js"></script>
+<script type="text/javascript">
+
+	unit_sys = 1;
+	inputs_unit_map = {
+		'd_b': ['mm', 'in'],
+		'm_b': ['kg', 'lbm'],
+		'k_b': ['N/m', 'lbf/in'],
+		'd_w': ['mm', 'in'],
+		'm_w': ['kg', 'lbm'],
+		'w':   ['mm', 'in'],
+		'init_omega_w': ['RPM','RPM'],
+		'theta_start':  ['deg','deg'],
+		'theta_end':    ['deg','deg'],
+		'exit_v':       ['m/s','ft/s'],
+		'exit_omega_b': ['RPM','RPM'],
+		'exit_omega_w': ['RPM','RPM']
+	};
+
+	function populate_units() {
+		if(document.getElementById('unit_metric').checked)
+			unit_sys = 0;
+		else if (document.getElementById('unit_english').checked)
+			unit_sys = 1;
+		else
+			unit_sys = 2;
+
+		unit_labels = document.getElementsByClassName('unit');
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+			}
+		}
+
+		//document.getElementById(chart_name+'_y_label').innerHTML = 'Height ['+inputs_unit_map['y_target'][unit_sys]+']';
+	}
+
+	function switch_units() {
+		populate_units();
+		compute();
+	}
+
+	function gidv(id) {
+		var v =  document.getElementById(id).value;
+		if (typeof v === 'string' && v.slice(-1) == '%') {
+			v = eval(document.getElementById(id.slice(0,-4)).value)*eval(v.slice(0,-1)/100);
+		} else if (v=='') {
+			v = 0;
+		
+		} else {
+			v = eval(v);
+		}
+		
+		if (typeof inputs_unit_map[id] !== 'undefined') {
+			v = convert(v, inputs_unit_map[id][unit_sys]);
+		}
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof value === 'string') {
+			document.getElementById(id).value = value;
+		} else {
+			if (typeof inputs_unit_map[id] !== 'undefined'){
+
+				
+				value = convert_to(value, inputs_unit_map[id][unit_sys]);
+			}
+			document.getElementById(id).value = value.toFixed(places);
+		}
+	}
+
+	function thload() {
+		populate_units();
+
+		var inputs, index;
+
+		inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
+		    inputs[index].onkeyup = function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+
+		    	if (key==13) {
+		    		compute(true);
+		    	} else {
+		    		compute(false);
+		    	}
+		    }
+		}
+
+		compute(true);
+	}
+
+	function collapse(id) {
+		tbl = document.getElementById('table_'+id);
+
+		btn = document.getElementById('toggle_detail_'+id);
+		if(tbl.rows[1].style['display'] != 'none') {
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
+			btn.innerHTML = "&#9660";
+		} else {
+			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
+			btn.innerHTML = "&#9650";
+		}
+	}
+		
+	function sign(x) {
+		if (x>0) return 1;
+		if (x<0) return -1;
+		return 0;
+	}
+
+	en_vm = true;
+
+	function linterp(xs, ys, xq) {
+		i;
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
+	}
+
+	function linterpder(xs, ys, xq) {
+		i;
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
+	}
+
+	function convert_to_array(xyn, to) {
+		newxyn = [];
+		for(i=0;i<xyn.length;i++) {
+			l = [];
+			if (typeof xyn[i] === 'object') {
+				for(j=0;j<xyn[i].length;j++) {
+					l.push(convert_to(xyn[i][j], to));
+				}
+				newxyn.push(l);
+			} else {
+				newxyn.push(convert_to(xyn[i], to));
+			}
+		}
+		return newxyn;
+	}
+
+	function smooth(x, over) {
+		if (x>over) return 1;
+		if (x<-over) return -1;
+		return x/over;
+	}
+
+	function run_sim(params_pack) {
+		[d_b, m_b, I_b, k_b, w, u_f, d_w, m_w, I_w, mu_w, mu_h, omega_w_0] = params_pack;
+		
+
+		OVERAMT = 2;
+		dt = u_f/(omega_w_0*d_w/2)/1000;
+		res = [[],[],[],[],[]];
+		i=0;
+		u=0;
+		t=0;
+		v=0;
+		omega_b=0;
+		omega_w=omega_w_0;
+		while(i<3000 && u<=u_f) {
+			N_h = k_b*(d_b-w) + v*v/(w+d_w);
+			N_w = k_b*(d_b-w) - v*v/(w+d_w);
+			F_h = - N_h * mu_h * smooth(v-omega_b*d_b/2 - 0, OVERAMT);
+			F_w = - N_w * mu_w * smooth(v+omega_b*d_b/2 - omega_w*d_w/2, OVERAMT)
+
+			dv       = (F_w+F_h) / m_b;
+			domega_b = (F_w-F_h)*d_b/2 / I_b;
+			domega_w = - F_w*d_w/2 / I_w;
+
+			v       += dv*dt;
+			omega_b += domega_b*dt;
+			omega_w += domega_w*dt;
+			u       += v*dt
+			t       += dt;
+
+			res[0] .push(t);
+			res[1] .push(u);
+			res[2] .push(v);
+			res[3] .push(omega_b);
+			res[4] .push(omega_w);
+
+			i+=1;
+		}
+
+		stats = {
+		}
+
+		return [res, stats];
+	}
+
+	function bit_test(num, bit){
+	    return ((num>>bit) % 2 != 0)
+	}
+
+	g = 9.81;
+
+	function compute(simulate) {
+		simulate = typeof simulate !== 'undefined' ? simulate : true;
+		if(!simulate) return; // lol you gotta simulate this
+
+
+		d_b = gidv('d_b');
+		m_b = gidv('m_b');
+		I_b = gidv('moi_rat_b') * m_b * d_b*d_b/4;
+		k_b = gidv('k_b');
+		w = gidv('w');
+		d_w = gidv('d_w');
+		m_w = gidv('m_w');
+		I_w = gidv('moi_rat_w') * m_w * d_w*d_w/4;
+		mu_w = gidv('mu_w');
+		mu_h = gidv('mu_h');
+		omega_w_0 = gidv('init_omega_w');
+		u_f = (w+d_w) * (gidv('theta_start') - gidv('theta_end'));
+		params_pack = [d_b, m_b, I_b, k_b, w, u_f, d_w, m_w, I_w, mu_w, mu_h, omega_w_0];
+		[run, stats] = run_sim(params_pack);
+
+		console.log(params_pack, run, stats);
+
+		/*max_low       = +Infinity;
+		max_low_stat  = {};
+		max_low_run   = [];
+		max_high      = -Infinity;
+		max_high_stat = {};
+		max_high_run  = [];
+		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball'];
+
+		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+			params = [];
+			for (j=0; j<params_list.length; j++) {
+				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+			}
+			run = run_sim(params);
+			if (run[3]['y_low'] < max_low)   {
+				max_low      = run[3]['y_low'];
+				max_low_run  = run[0];
+				max_low_stat = run[3];
+			}
+			if (run[3]['y_high'] > max_high) {
+				max_high      = run[3]['y_high'];
+				max_high_run  = run[2];
+				max_high_stat = run[3];
+			}
+		}
+		
+		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
+		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
+		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
+		console.log(max_high_stat.y_high, targetstuff[1]+targetstuff[2]/2, max_low_stat.y_low, targetstuff[1]-targetstuff[2]/2);
+      	drawchart(max_low_run, max_high_run, targetstuff, 
+      		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
+
+		for (id of computable_ids){
+			document.getElementById(id).classList.remove('error');    
+	    	document.getElementById(id).classList.remove('uncomputed');    	
+		}
+      	gids('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
+      	gids('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
+      	gids('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
+      	gids('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
+      	gids('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
+      	gids('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
+      	gids('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
+      	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);*/
+
+      	drawchart(run);
+	}
+
+	function NaNtoerr(x) {
+		if (isNaN(x)) return '-'; return x;
+	}
+
+
+	function NaNto1(x) {
+		if (isNaN(x))
+			return 1;
+		return x;
+	}
+</script>
+
+<script type="text/javascript">
+	function makeTicks(maxes, num_to_print, n) {
+		if (Math.min(maxes) < 0) return [0];
+		H = [];
+		bases = [];
+		for(var i=0; i<maxes.length; i++){
+			h = maxes[i]/n;
+			base = Math.floor(Math.log10(h)-Math.log10(5));
+			bases.push(base);
+			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
+		}
+
+		ticks = [];
+		ticksstr = [];
+		alive = true;
+		for(var i=0; alive; i++) {
+			alive = false;
+			labelstr = '';
+			for(var j=0; j<maxes.length; j++) {
+				if (j<num_to_print) {
+					if (ticks.length <= j+1)
+						ticks.push([]);
+					ticks[j].push(H[j]*i);
+					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
+					if (j != num_to_print-1)
+						labelstr += ' / ';
+				}
+				if (H[j]*(i) < maxes[j])
+					alive = true;
+			}
+			ticksstr.push(labelstr);
+			
+		}
+		return [ticks, ticksstr];
+	}
+
+	function sign(x) {
+		if(x>0) return 1;
+		if(x<0) return -1;
+		return 0;
+	}
+
+	chart_name = 'chart';
+
+	function drawTicks(axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
+		altaxis = axis == 'x' ? 'y':'x';
+		realaxis = axis == 'z' ? 'y':axis;
+		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
+		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
+
+		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
+		while(labels.firstChild) labels.removeChild(labels.firstChild);
+
+		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
+
+		console.log(ticklabels);
+		for (i in ticklabels) {
+			line = document.createElementNS('http://www.w3.org/2000/svg','line');
+			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
+			fp = f0 + (ff-f0)*(ticks==null ? i/(ticklabels.length-1) : ticks[i]/maxtick);
+			//fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
+			line.setAttribute(realaxis+'1', fp);
+			line.setAttribute(realaxis+'2', fp);
+			line.setAttribute('class', 'grid');
+			xgrid.append(line);
+
+			label = document.createElementNS('http://www.w3.org/2000/svg','text');
+			label.setAttribute(altaxis, gfl);
+			label.setAttribute(realaxis, fp);
+			label.innerHTML = i==0 ? '0' : ticklabels[i];
+			labels.append(label);
+		}
+	}
+
+	function clean_run(run) {
+		for (var i=run[0].length-1; i>0; i--) {
+			if (run[0][i] < 0) {
+				yint = linterp(run[0], run[1], 0);
+				arr = [run[0].slice(0,i-1).concat(0), run[1].slice(0,i-1).concat(yint)];
+
+				return arr;
+			}
+		} 
+		
+	}
+
+
+	function makept(scaling, xq, yq) {
+		[x0, y0, xf, yf, xl, xm, ym] = scaling;
+		var pt = svg.createSVGPoint();
+		pt.x = x0 + (xf-x0)/(xm-xl)*(xq-xl);
+		pt.y = y0 + (yf-y0)/(ym-0)*yq;
+		return pt;
+	}
+
+	function drawchart(run) {
+
+		res[0] .push(t);
+		res[1] .push(u);
+		res[2] .push(v);
+		res[3] .push(omega_b);
+		res[4] .push(omega_w);
+
+		t = res[0];
+		u = convert_to(res[1], inputs_unit_map['w'][unit_sys]);
+		v_b = convert_to(res[2], inputs_unit_map['exit_v'][unit_sys]);
+		omega_b = convert_to(res[3], inputs_unit_map['exit_omega_b'][unit_sys]);
+		omega_w = convert_to(res[4], inputs_unit_map['exit_omega_w'][unit_sys]);
+
+		svg = document.getElementById('chart');
+		x_axis = document.getElementById('chart_x_axis');
+		y_axis = document.getElementById('chart_y_axis');
+
+		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+
+		omega_b_line = document.getElementById('chart_omega_b_line');
+		omega_w_line = document.getElementById('chart_omega_w_line');
+		v_b_line     = document.getElementById('chart_v_b_line');
+		omega_b_line.setAttribute("points","");
+		omega_w_line.setAttribute("points","");
+		v_b_line    .setAttribute("points","");
+
+		[[t_ticks], x_ticklabels] 					= makeTicks([Math.max(...t)], 1, 10);
+		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_w)], 2, 8);
+		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_w), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
+
+		t_ticks.pop(); x_ticklabels.pop();
+		
+		t_max = Math.max(...t);
+		v_b_max     = v_b_ticks[v_b_ticks.length-1];
+		omega_b_max = omega_b_ticks[omega_b_ticks.length-1];
+		omega_w_max = omega_w_ticks[omega_w_ticks.length-1];
+
+		console.log(x_ticklabels, y_ticklabels, z_ticklabels);
+		drawTicks('x', t_ticks, t_max, x_ticklabels, xf, x0, yf, y0, 15);
+		drawTicks('y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
+		drawTicks('z', null, null, z_ticklabels, yf, y0, xf, x0, 5);
+		
+		for (i in t) {
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.y = y0 + (yf-y0)/(v_b_max-0)*(v_b[i]-0);
+			v_b_line.points.appendItem(pt);
+
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.y = y0 + (yf-y0)/(omega_b_max-0)*(omega_b[i]-0);
+			omega_b_line.points.appendItem(pt);
+
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.y = y0 + (yf-y0)/(omega_w_max-0)*(omega_w[i]-0);
+			omega_w_line.points.appendItem(pt);
+		}
+
+		console.log('plotted :)')
+
+		/*
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = 0; target_low.points.appendItem(pt);
+
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
+		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
+		*/
+
+		/*bg=document.getElementById('chart');
+
+		qline = document.getElementById('chart_query_line');
+		qline.setAttribute('opacity', 0);
+
+		gids('query_time', '-');
+		gids('query_d', '-');
+		gids('query_v', '-');
+		gids('query_cur', '-');
+		gids('query_f', '-');
+
+		handler = function(event){
+			if(event.buttons != 1) return;
+				xq = event.clientX - bg.getBoundingClientRect().left;
+				yq = event.clientY - bg.getBoundingClientRect().top;
+
+				tq = (t_max-0)/(xf-x0)*(xq-x0);
+				if (tq>Math.max(...t)){
+					tq = Math.max(...t);
+					xq = x0 + (xf-x0)/(t_max-0)*tq;
+				}
+				if (tq<0) {
+					tq=0; xq=x0;
+				}
+				dq   = linterp(t, d, tq);
+				vq   = linterp(t, v, tq);
+				curq = linterp(t, cur, tq);
+				fq   = linterp(t, f, tq);
+				qline.setAttribute('opacity', 1);
+
+				qline.setAttribute('x1', xq);
+				qline.setAttribute('x2', xq);
+
+				gids('query_time', tq);
+				gids('query_d', dq);
+				gids('query_v', vq);
+				gids('query_cur', curq);
+				gids('query_f', fq);
+			}
+		bg.addEventListener('mousemove', handler);
+		bg.addEventListener('mousedown', handler);*/
+	}
+
+</script>
+</script>
+
+
+<html>
+<body onload="thload()">
+	<div style="width: 100%; float: left;" class="container">
+		<h3>Thad's Ballistic Trajectory Calculator</h3>
+		<center><a href="./">Back To Index</a><br/></center>
+
+		<div class="even" style=''>
+			<table>
+				<tr>
+					<td>
+					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
+					</td><td>
+					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<div style='display:table-row'>
+		<div class="odd" style='display:table-cell'>
+			<table>
+				<tr>
+					<th class="rowlabel">Ball Diameter</th>
+					<td><input id="d_b" value=7></td><td class="tiny">&#177;</td>
+					<td><input id="d_b_err" value=''></td>
+					<td class="unit" id='unit_d_b'></td>
+				</tr><tr>
+					<th class='rowlabel'>Ball Mass</th>
+					<td><input id='m_b' value=0.3><td class="tiny">&#177;</td>
+					<td><input id='m_b_err' value=''></td>
+					<td class='unit' id='unit_m_b'></td>
+				</tr><tr>
+					<th class='rowlabel'>Ball MOI Ratio</th>
+					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">&#177;</td>
+					<td></td>
+					<td class="unit">[-]</td>
+				</tr><tr>
+					<th class="rowlabel">Ball Stiffness</th>
+					<td><input id="k_b" value=20></td><td class="tiny">&#177;</td>
+					<td><input id="k_b_err" value=''></td>
+					<td class="unit" id='unit_k_b'></td>
+				</tr><tr>
+					<th class='rowlabel'>Wheel Diameter</th>
+					<td><input id='d_w' value=6></td><td class="tiny">&#177;</td>
+					<td><input id='d_w_err' value=''></td>
+					<td class='unit' id='unit_d_w'></td>
+				</tr><tr>
+					<th class='rowlabel'>Wheel Mass</th>
+					<td><input id='m_w' value=2><td class="tiny">&#177;</td>
+					<td><input id='m_w_err' value=''></td>
+					<td class='unit' id='unit_m_w'></td>
+				</tr><tr>
+					<th class='rowlabel'>Wheel MOI Ratio</th>
+					<td><input id='moi_rat_w' value=2><td class="tiny">&#177;</td>
+					<td></td>
+					<td class='unit'>[-]</td>
+				</tr><tr>
+					<th class="rowlabel">Hood Gap</th>
+					<td><input id="w" value=8></td><td></td>
+					<td><input id="w_err" value=''></td>
+					<td class="unit" id='unit_w'></td>
+				</tr><tr>
+					<th class="rowlabel">Angle Start</th>
+					<td><input id="theta_start" value=120></td><td></td>
+					<td><input id="theta_start_err" value=1></td>
+					<td class="unit" id='unit_theta_start'></td>
+				</tr><tr>
+					<th class='rowlabel'>Angle End</th>
+					<td><input id='theta_end' value=15></td><td class="tiny">&#177;</td>
+					<td><input id='theta_end_err' value=''></td>
+					<td class='unit' id='unit_theta_end'></td>
+				</tr><tr>
+					<th class="rowlabel">COF Wheel</th>
+					<td><input id="mu_w" value=0.5></td><td></td>
+					<td><input id="mu_w_err" value=''></td>
+					<td class="unit">[-]</td>
+				</tr><tr>
+					<th class='rowlabel'>COF Hood</th>
+					<td><input id='mu_h' value=0.5></td><td class="tiny">&#177;</td>
+					<td><input id='mu_h_err' value=''></td>
+					<td class='unit'>[-]</td>
+				</tr><tr>
+					<th class='rowlabel'>Flywheel Initial RPM</th>
+					<td><input id='init_omega_w' value=0.5></td><td class="tiny">&#177;</td>
+					<td><input id='init_omega_w_err' value=''></td>
+					<td class='unit' id='unit_init_omega_w'>[-]</td>
+				</tr>
+			</table>
+		</div><div class="output" style='display:table-cell'>
+			<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
+			<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>
+			<table>
+				<tr>
+					<th class='rowlabel'>Exit Velocity</th>
+					<td><input id='exit_v' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_v_err' readOnly></td>
+					<td class='unit' id='unit_exit_v'></td>
+				</tr><tr>
+					<th class='rowlabel'>Exit Ball RPM</th>
+					<td><input id='exit_omega_b' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_omega_b_err' readOnly></td>
+					<td class='unit' id='unit_exit_omega_b'></td>
+				</tr><tr>
+					<th class="rowlabel">Exit Flywheel RPM</th>
+					<td><input id="exit_omega_w" readOnly></td><td class="tiny">&#177;</td>
+					<td><input id="exit_omega_w_err" readOnly></td>
+					<td class="unit" id='unit_exit_omega_w'></td>
+				</tr>
+			</table>
+		</div>
+		<div class="even" style='display:table-cell'>
+			<table id="table_protips">
+				<tr>
+					<th class='rowlabel' colspan=2>Pro-Tips</th>
+					<td>
+						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+
+	<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+
+<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
+  <title id="title">Position/Velocity Data</title>
+
+
+<rect class="background" id="chart_background" x=90 y=20 width=615 height=430 />
+<g class="x-grid">
+  <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
+</g>
+<g class="y-grid">
+  <line id="chart_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
+  <line id="chart_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+</g>
+
+<g class="x-grid" id="chart_x_grid"></g>
+<g class="y-grid" id="chart_y_grid"></g>
+<g class="z-grid" id="chart_z_grid"></g>
+
+<g class="labels x-labels" id='chart_x_labels'>
+  <text x="375" y=485 class="label-title">Time [s]</text>
+</g>
+
+<g class="labels y-labels" id='chart_y_labels'>
+  <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_v_b_label" fill="#0074d9">Ball Velocity</text>
+  <text x=-180 y=15 class="label-title" transform="rotate(270)" id="chart_omega_b_label" fill="#d91200">Ball Spin [RPM]</text>
+  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
+</g>
+
+<g class="labels z-labels" id='chart_z_labels'>
+  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#c48900">Flywheel RPM</text>
+</g>
+
+<g class="labels x-labels" id='chart_x_axis_labels'></g>
+<g class="labels z-labels" id='chart_z_axis_labels'></g>
+<g class="labels y-labels" id='chart_y_axis_labels'></g>
+
+<g class="query-line">
+	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
+</g>
+<polyline
+	id='chart_v_b_line'
+	fill='none'
+	stroke='#0074d9'
+	stroke-width=2
+	points="
+	"/>
+<polyline
+	id='chart_omega_b_line'
+	fill='none'
+	stroke='#d91200'
+	stroke-width=2
+	points="
+	"/>
+<polyline
+	id='chart_omega_w_line'
+	fill='none'
+	stroke='#c48900'
+	stroke-width=2
+	points="
+	"/>
+</svg>
+	
+	<div class="output-graph">
+	</div>
+
+</div>
+</div>
+</body>
+</html>
