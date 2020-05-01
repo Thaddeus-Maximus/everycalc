@@ -143,6 +143,15 @@
 	\begin{align}
 		L = \frac{2 C}{\sqrt{1 - (\frac{d_2 + d_1}{2 C})^2}} + \frac{d_1 + d_2}{2} (\pi + 2 \theta)
 	\end{align}
+
+	\section*{Belt Strength Calculation}
+
+	Belt strength is calculated from the tables in the \href{https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf}{\underline{Gates Light Power and Precision Manual}}.
+
+	These tables list allowable pulley torque $T(\omega, N)$ as a function of RPM $\omega$ and pulley teeth $N$. Note that 6 teeth should be in engagement.
+	2-D interpolation is used to determine values on the in-betweens.
+	Tabulated values outside the bounds are extrapolated. Omitted values are presumed to be zero.
+	The multiplier factors are used to determine strength of different width belts.
 	
 	
 \end{document}

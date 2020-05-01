@@ -6,6 +6,9 @@
 		vendor_select();
 		driver_select();
 		switch_type();
+		chg_units();
+		chg_series();
+		strength_compute();
 	}
 
 	function gidv(id) {
@@ -180,6 +183,8 @@
 				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,1).toFixed(4);
 			}
 		}
+
+		strength_compute();
 	}
 
 	function vendor_select() {
@@ -232,6 +237,7 @@
 			document.getElementById("p1_mesh").innerHTML = "P1 Teeth in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Teeth in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "# Teeth";
+			document.getElementById("strength_div").style.display = "";
 			//document.getElementById("center_add").readOnly = false;
 		} else {
 			document.getElementById("driver").value = "cc";
@@ -241,10 +247,150 @@
 			document.getElementById("p1_mesh").innerHTML = "P1 Distance in Mesh";
 			document.getElementById("p2_mesh").innerHTML = "P2 Distance in Mesh";
 			document.getElementById("no_teeth_1").innerHTML = "Pulley Diam.";
+			document.getElementById("strength_div").style.display = "none";
 			//document.getElementById("center_add").readOnly = true;
 		}
 		driver_select();
 	}
+</script>
+
+<script type="text/javascript">
+	//https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf
+	unit_sys = 0;
+	unit_map = {
+		'torque': ['N-m', 'in-lbf'],
+		'torque_cap': ['N-m', 'in-lbf']
+	}
+
+	function chg_units() {
+		if(document.getElementById('unit_mm').checked)
+			unit_sys = 0;
+		else 
+			unit_sys = 1;
+
+		unit_labels = document.getElementsByClassName('unit');
+		for (unit in unit_labels) {
+			if (unit_labels[unit].id && unit_map[unit_labels[unit].id.substring(5)] ){
+				varname = unit_labels[unit].id.substring(5);
+				document.getElementById('unit_'+varname).innerHTML = '['+unit_map[varname][unit_sys]+']';
+			}
+		}
+	}
+
+	function chg_series() {
+		select = document.getElementById('belt_width');
+		select.innerHTML = '';
+
+		series   = document.getElementById('series').value;
+		pitch    = document.getElementById('pitch').value;
+
+		bdata = belt_ratings[`${series}_${pitch}mm`];
+
+		if (!bdata) {
+			gids('torque_cap_1', 'invalid pitch');
+			gids('fos_1', 'invalid pitch');
+		} else if(bdata['width_multipliers']) {
+			for(size in bdata['width_multipliers']) {
+				opt = document.createElement('option');
+				opt.innerHTML = size;
+				opt.value = size;
+				select.appendChild(opt);
+			}
+		} else {
+			console.log(chg_series);
+			gids('torque_cap_1', 'invalid width');
+			gids('fos_1', 'invalid width');
+		}
+	}
+
+	function gidv(id) {
+		v =  eval(document.getElementById(id).value);
+		unit_id = id.substring(0, id.length-2);
+		if (typeof unit_map[unit_id] !== 'undefined')
+			v = convert(v, unit_map[unit_id][unit_sys]);
+		return v;
+	}
+
+	function gids(id, value, places) {
+		if (typeof places === 'undefined')
+			places = 3;
+		if (typeof value === 'string') {
+			document.getElementById(id).value = value;
+		} else {
+			unit_id = id.substring(0, id.length-2);
+			if (typeof unit_map[unit_id] !== 'undefined')
+				value = convert_to(value, unit_map[unit_id][unit_sys]);
+			document.getElementById(id).value = value.toFixed(places);
+		}
+	}
+
+	function torque_compute(el) {
+		from  = el.id == 'torque_1' ? 1 : 2;
+		to    = el.id == 'torque_1' ? 2 : 1;
+		ratio = gidv('ratio');
+
+		torque = gidv('p'+to+'_n')/gidv('p'+from+'_n')*gidv('torque_'+from);
+		gids('torque_'+to, torque);
+	}
+
+	function rpm_compute(el) {
+		from  = el.id == 'rpm_1' ? 1 : 2;
+		to    = el.id == 'rpm_1' ? 2 : 1;
+		ratio = gidv('ratio');
+
+		rpm = gidv('p'+from+'_n')/gidv('p'+to+'_n')*gidv('rpm_'+from);
+		gids('rpm_'+to, rpm);
+	}
+
+	function interp1d(xs, ys, xq) {
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
+	}
+
+	function interp2d(xs, ys, zs, xq, yq) { // x indexes rows, y indexes columns
+		for (j=1; j<xs.length-1 && !isNaN(xs[j]) && xq>xs[j]; j++) {}
+		x1 = xs[j];
+		x2 = xs[j-1];
+		y1 = zs[j];
+		y2 = zs[j-1];
+		z1 = interp1d(ys, y1, yq);
+		z2 = interp1d(ys, y2, yq);
+		return interp1d([x1,x2], [z1,z2], xq);
+	}
+
+	function strength_compute() {
+		teeth_1  = gidv('p1_n');
+		teeth_2  = gidv('p2_n');
+		rpm_1    = gidv('rpm_1');
+		rpm_2    = gidv('rpm_2');
+		torque_1 = gidv('torque_1');
+		torque_2 = gidv('torque_2');
+
+		series   = document.getElementById('series').value;
+		pitch    = document.getElementById('pitch').value;
+		width    = document.getElementById('belt_width').value;
+
+		bdata = belt_ratings[`${series}_${pitch}mm`];
+
+		if (!bdata) {
+			gids('torque_cap_1', 'invalid pitch');
+			gids('fos_1', 'invalid pitch');
+			return;
+		} else if(! bdata['width_multipliers'][width]) {
+			gids('torque_cap_1', 'invalid width');
+			gids('fos_1', 'invalid width');
+			return;
+		}
+
+		torque_cap_1 = interp2d(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * bdata['width_multipliers'][width];
+		torque_cap_2 = interp2d(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * bdata['width_multipliers'][width];
+		gids('torque_cap_1', torque_cap_1);
+		gids('torque_cap_2', torque_cap_2);
+		gids('fos_1', Math.min(torque_cap_1/torque_1, torque_cap_2/torque_2));
+		//gids('fos_2', torque_cap_2/torque_2);
+		// TODO: Length correction factor
+	}
+
 </script>
 
 <html>
@@ -257,10 +403,10 @@
 
 	<div class="even">
 		<center>
-			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="compute()"  checked>
-			  <label for="inch">Inches</label>
-			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="compute()" >
-			  <label for="mm">Millimeters</label><br>
+			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="chg_units(); compute()"  checked>
+			  <label for="inch">English</label>
+			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="chg_units(); compute()" >
+			  <label for="mm">Metric</label><br>
 			  <input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switch_type()" checked>
 			  <label for="timing">Timing Belt</label>
 			  <input type="radio" id="type_poly" name="belt_type" value="timing" onclick="switch_type()" >
@@ -270,57 +416,57 @@
 
 	<div class="odd">
 	
-	<table>
-		<tr id="th_pitch">
-			<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
-			<td><input id="pitch" value=5 onchange="compute()" /></td><td class="unit">mm</td>
-		</tr><tr id="th_stretch">
-			<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
-			<td><input id="stretch" value=5 onchange="compute()" /></td><td class="unit">%</td>
-			<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
-			<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
-		</tr>
-		<tr>
-			<td></td>
-			<th class="collabel">Pulley 1</th>
-			<th class="collabel">Pulley 2</th>
-			<th class="collabel" colspan=2>Center</th>
-		</tr><tr>
-			<th class="rowlabel" id="no_teeth_1"># Teeth</th>
-			<th><input id="p1_n" value=24 onchange="compute()" /></th>
-			<th><input id="p2_n" value=18 onchange="compute()" /></th>
-			<th id="des_cc" class="rowlabel">
-				<select id="driver" onchange="driver_select()">
-					<option value="teeth">Belt Teeth</option>
-					<option value="cc" selected="selected">Desired C-C</option>
-				</select>
-			</th>
-			<th><input id="driver_val" value=5 onchange="compute()" /></th>
-			<!--<th id="des_teeth_label" class="rowlabel" style="display:none">Belt Teeth</th>
-			<th><input id="des_teeth" value=500 style="display:none" /></th>-->
-		</tr><tr>
-			<th class="rowlabel">OD</th>
-			<th><input id="p1_od" readonly /></th>
-			<th><input id="p2_od" readonly /></th>
-			<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
-			<th><input id="center_add" value=0.000  onchange="compute()" /></th>
-		</tr><tr>
-			<th class="rowlabel">PD</th>
-			<th><input id="p1_pd" readonly /></th>
-			<th><input id="p2_pd" readonly /></th>
-			<th class="rowlabel">Ratio</th>
-			<th><input id="ratio" readonly /></th>
-		</tr><tr id="src_label">
-				<th class="collabel" colspan=5>
-					Belting Option Source: <select id="vendor" onchange="vendor_select()">
-						<option value="vex">VexPro</option>
-						<option value="am">AndyMark</option>
-						<option value="raw" selected="selected">Increments of</option>
-					</select>
-					<input id="raw_inc" value=5 onchange="compute()" /><span id="raw_inc_label">Teeth</span>
-				</th>
+		<table>
+			<tr id="th_pitch">
+				<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
+				<td><input id="pitch" value=5 onkeyup="chg_series(); compute()" /></td><td class="unit">mm</td>
+			</tr><tr id="th_stretch">
+				<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
+				<td><input id="stretch" value=5 onkeyup="compute()" /></td><td class="unit">%</td>
+				<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
+				<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
 			</tr>
-	</table>
+			<tr>
+				<td></td>
+				<th class="collabel">Pulley 1</th>
+				<th class="collabel">Pulley 2</th>
+				<th class="collabel" colspan=2>Center</th>
+			</tr><tr>
+				<th class="rowlabel" id="no_teeth_1"># Teeth</th>
+				<th><input id="p1_n" value=24 onkeyup="compute()" /></th>
+				<th><input id="p2_n" value=18 onkeyup="compute()" /></th>
+				<th id="des_cc" class="rowlabel">
+					<select id="driver" onchange="driver_select()">
+						<option value="teeth">Belt Teeth</option>
+						<option value="cc" selected="selected">Desired C-C</option>
+					</select>
+				</th>
+				<th><input id="driver_val" value=5 onkeyup="compute()" /></th>
+				<!--<th id="des_teeth_label" class="rowlabel" style="display:none">Belt Teeth</th>
+				<th><input id="des_teeth" value=500 style="display:none" /></th>-->
+			</tr><tr>
+				<th class="rowlabel">OD</th>
+				<th><input id="p1_od" readonly /></th>
+				<th><input id="p2_od" readonly /></th>
+				<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
+				<th><input id="center_add" value=0.000  onkeyup="compute()" /></th>
+			</tr><tr>
+				<th class="rowlabel">PD</th>
+				<th><input id="p1_pd" readonly /></th>
+				<th><input id="p2_pd" readonly /></th>
+				<th class="rowlabel">Ratio</th>
+				<th><input id="ratio" readonly /></th>
+			</tr><tr id="src_label">
+					<th class="collabel" colspan=5>
+						Belting Option Source: <select id="vendor" onchange="vendor_select()">
+							<option value="vex">VexPro</option>
+							<option value="am">AndyMark</option>
+							<option value="raw" selected="selected">Increments of</option>
+						</select>
+						<input id="raw_inc" value=5 onkeyup="compute()" /><span id="raw_inc_label">Teeth</span>
+					</th>
+				</tr>
+		</table>
 	</div><div class="output" id="results_table">
 		<center>
 		<table>
@@ -350,8 +496,45 @@
 				<td><input id="p2_l" readonly /></td>
 			</tr>
 		</table>
-	</center>
-	</div>
+		</center>
+	</div><div class="odd" id="strength_div" >
+		<center>Strengh calculated as per the<br/><a href="https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf">Gates Light Power & Precision Drive Design Manual</a></center>
+		<table>
+			<tr id="th_pitch">
+				<th class="rowlabel">
+					Belting Series
+				</th><td><select id="series" onchange="chg_series(); strength_compute()">
+						<option value="htd" selected=selected >HTD</option>
+						<option value="gt2" >GT2</option>
+						<option value="gt3" >GT3</option>
+					</select>
+				</td><td>
+					<select id="belt_width" onchange="strength_compute()">
+					</select>
+				</td><td>
+					width
+				</td>
+			</tr><tr>
+				<th class='rowlabel'>RPM</th>
+				<td><input id='rpm_1' onkeyup="rpm_compute(this); strength_compute();"></td>
+				<td><input id='rpm_2' onkeyup="rpm_compute(this); strength_compute();"></td>
+				<td>[RPM]</td>
+			</tr><tr>
+				<th class='rowlabel'>Torque</th>
+				<td><input id='torque_1' onkeyup="torque_compute(this); strength_compute();"></td>
+				<td><input id='torque_2' onkeyup="torque_compute(this); strength_compute();"></td>
+				<td class="unit" id="unit_torque"></td>
+			</tr><tr>
+				<th class='rowlabel'>Torque Capacity</th>
+				<td ><input id='torque_cap_1' readonly></td>
+				<td><input id='torque_cap_2' readonly></td>
+				<td class="unit" id="unit_torque_cap" ></td>
+			</tr><tr>
+				<th class='rowlabel'>Factor of Safety</th>
+				<td ><input id='fos_1' readonly ></td>
+				<!--<td><input id='fos_2' readonly ></td>-->
+			</tr>
+		</table>
 	</div>
 </div>
 </body>
