@@ -142,6 +142,8 @@ var unit_bases = {
 };
 
 var unit_conversions = {
+	's': 1,
+	
 	"m":  1,
 	"mm": 1e-3,
 	"in": 0.0254,

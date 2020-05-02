@@ -200,6 +200,11 @@ button {
   stroke-width: 2;
 }
 
+.marker-line line {
+  stroke: #333;
+  stroke-width: 2;
+}
+
 .qline-hidden {
   opacity: 0;
 }
