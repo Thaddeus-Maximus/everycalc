@@ -16,8 +16,20 @@
 		'theta_end':    ['deg','deg'],
 		'exit_v':       ['m/s','ft/s'],
 		'exit_omega_b': ['RPM','RPM'],
-		'exit_omega_w': ['RPM','RPM']
+		'exit_omega_w': ['RPM','RPM'],
+
+		'query_omega_b': ['RPM','RPM'],
+		'query_omega_w': ['RPM','RPM'],
+		'query_v_b':     ['m/s','ft/s'],
+		'query_u':       ['mm', 'in'],
+
+		'query_F_h':     ['N', 'lbf'],
+		'query_F_w':     ['N', 'lbf']
 	};
+
+	function invalidate_computations() {
+		document.getElementById('charts').classList.add('error');
+	}
 
 	function populate_units() {
 		if(document.getElementById('unit_metric').checked)
@@ -35,7 +47,8 @@
 			}
 		}
 
-		//document.getElementById(chart_name+'_y_label').innerHTML = 'Height ['+inputs_unit_map['y_target'][unit_sys]+']';
+		document.getElementById(chart_name+'_v_b_label').innerHTML = 'Ball Velocity ['+inputs_unit_map['query_v_b'][unit_sys]+']';
+		document.getElementById(chart_name+'_u_label').innerHTML = 'Position in Hood ['+inputs_unit_map['query_u'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -123,6 +136,12 @@
 		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
 	}
 
+	function lindx(xs, xq) {
+		i;
+		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+		return i;
+	}
+
 	function linterpder(xs, ys, xq) {
 		i;
 		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
@@ -155,20 +174,20 @@
 		[d_b, m_b, I_b, k_b, w, u_f, d_w, m_w, I_w, mu_w, mu_h, omega_w_0] = params_pack;
 		
 
-		OVERAMT = 2;
-		dt = u_f/(omega_w_0*d_w/2)/1000;
-		res = [[],[],[],[],[]];
+		OVERAMT = gidv('blur_amt');
+		dt = u_f/(omega_w_0*d_w/2)/100;
+		res = [[],[],[],[],[],[],[]];
 		i=0;
 		u=0;
 		t=0;
 		v=0;
 		omega_b=0;
 		omega_w=omega_w_0;
-		while(i<3000 && u<=u_f) {
-			N_h = k_b*(d_b-w) + v*v/(w+d_w);
-			N_w = k_b*(d_b-w) - v*v/(w+d_w);
-			F_h = - N_h * mu_h * smooth(v-omega_b*d_b/2 - 0, OVERAMT);
-			F_w = - N_w * mu_w * smooth(v+omega_b*d_b/2 - omega_w*d_w/2, OVERAMT)
+		while(i<1000 && u<=u_f) {
+			N_h = k_b*(d_b-w) + m_b*v*v/(w+d_w);
+			N_w = k_b*(d_b-w) - m_b*v*v/(w+d_w);
+			F_h = - N_h * mu_h * smooth(v-omega_b*w/2 - 0, OVERAMT);
+			F_w = - N_w * mu_w * smooth(v+omega_b*w/2 - omega_w*d_w/2, OVERAMT)
 
 			dv       = (F_w+F_h) / m_b;
 			domega_b = (F_w-F_h)*d_b/2 / I_b;
@@ -185,11 +204,16 @@
 			res[2] .push(v);
 			res[3] .push(omega_b);
 			res[4] .push(omega_w);
+			res[5] .push(F_h);
+			res[6] .push(F_w);
 
 			i+=1;
 		}
 
 		stats = {
+			v_b_exit: v,
+			omega_b_exit: omega_b,
+			omega_w_exit: omega_w
 		}
 
 		return [res, stats];
@@ -202,6 +226,7 @@
 	g = 9.81;
 
 	function compute(simulate) {
+		invalidate_computations();
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
 
@@ -220,8 +245,6 @@
 		u_f = (w+d_w) * (gidv('theta_start') - gidv('theta_end'));
 		params_pack = [d_b, m_b, I_b, k_b, w, u_f, d_w, m_w, I_w, mu_w, mu_h, omega_w_0];
 		[run, stats] = run_sim(params_pack);
-
-		console.log(params_pack, run, stats);
 
 		/*max_low       = +Infinity;
 		max_low_stat  = {};
@@ -270,6 +293,7 @@
       	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);*/
 
       	drawchart(run);
+		document.getElementById('charts').classList.remove('error');
 	}
 
 	function NaNtoerr(x) {
@@ -339,7 +363,6 @@
 
 		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
 
-		console.log(ticklabels);
 		for (i in ticklabels) {
 			line = document.createElementNS('http://www.w3.org/2000/svg','line');
 			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
@@ -379,13 +402,57 @@
 		return pt;
 	}
 
-	function drawchart(run) {
+	var focus_xf, focus_x0, focus_u, focus_v_b, focus_omega_w, focus_omega_b, focus_t, focus_F_h, focus_F_w;
+	var last_uq = undefined;
+	function focus_handler(event, disable_position_write){
+		var xq, uq;
+		query_u_unit = inputs_unit_map['query_u'][unit_sys];
+		u_max = Math.max(...focus_u);
+		if (!isNaN(event)) {
+			uq = parseFloat(event);
+			xq = focus_x0 + (focus_xf-focus_x0)*uq/u_max;
+		}else{
+			if(event.buttons != 1) return;
+			bg = document.getElementById('chart');
+			xq = event.clientX - bg.getBoundingClientRect().left;
+			//yq = event.clientY - bg.getBoundingClientRect().top;
 
-		res[0] .push(t);
-		res[1] .push(u);
-		res[2] .push(v);
-		res[3] .push(omega_b);
-		res[4] .push(omega_w);
+			
+			uq = (u_max-0)/(focus_xf-focus_x0)*(xq-focus_x0);
+			if (uq > u_max){
+				uq = u_max;
+				xq = focus_x0 + (focus_xf-focus_x0)/(u_max-0)*uq;
+			}
+			if (uq<0) {
+				uq=0; xq=focus_x0;
+			}
+		}
+		
+		iq       = lindx(focus_u, uq);
+		v_bq     = linterp(focus_u, focus_v_b, uq);
+		F_hq     = linterp(focus_u, focus_F_h, uq);
+		F_wq     = linterp(focus_u, focus_F_w, uq);
+		omega_bq = linterp(focus_u, focus_omega_b, uq);
+		omega_wq = linterp(focus_u, focus_omega_w, uq);
+		tq       = linterp(focus_u, focus_t, uq);
+		qline.setAttribute('opacity', 1);
+		qline.setAttribute('x1', xq);
+		qline.setAttribute('x2', xq);
+
+		gids('query_u', uq);
+		gids('query_t', tq);
+		gids('query_i', iq);
+		gids('query_v_b', v_bq);
+		gids('query_omega_b', omega_bq);
+		gids('query_omega_w', omega_wq);
+		gids('query_F_h', F_hq);
+		gids('query_F_w', F_wq);
+
+		last_uq = uq;
+	}
+
+	function drawchart(run) {
+		[t_raw, u_raw, v_b_raw, omega_b_raw, omega_w_raw, focus_F_h, focus_F_w] = run;
 
 		t = res[0];
 		u = convert_to(res[1], inputs_unit_map['w'][unit_sys]);
@@ -409,94 +476,56 @@
 		omega_w_line.setAttribute("points","");
 		v_b_line    .setAttribute("points","");
 
-		[[t_ticks], x_ticklabels] 					= makeTicks([Math.max(...t)], 1, 10);
+		[[u_ticks], x_ticklabels] 					= makeTicks([Math.max(...u)], 1, 10);
 		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_w)], 2, 8);
 		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_w), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
 
-		t_ticks.pop(); x_ticklabels.pop();
+		u_ticks.pop(); x_ticklabels.pop();
 		
-		t_max = Math.max(...t);
+		u_max = Math.max(...u);
 		v_b_max     = v_b_ticks[v_b_ticks.length-1];
 		omega_b_max = omega_b_ticks[omega_b_ticks.length-1];
 		omega_w_max = omega_w_ticks[omega_w_ticks.length-1];
 
-		console.log(x_ticklabels, y_ticklabels, z_ticklabels);
-		drawTicks('x', t_ticks, t_max, x_ticklabels, xf, x0, yf, y0, 15);
+		drawTicks('x', u_ticks, u_max, x_ticklabels, xf, x0, yf, y0, 15);
 		drawTicks('y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
 		drawTicks('z', null, null, z_ticklabels, yf, y0, xf, x0, 5);
 		
 		for (i in t) {
 			var pt = svg.createSVGPoint();
-			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
 			pt.y = y0 + (yf-y0)/(v_b_max-0)*(v_b[i]-0);
 			v_b_line.points.appendItem(pt);
 
 			var pt = svg.createSVGPoint();
-			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
 			pt.y = y0 + (yf-y0)/(omega_b_max-0)*(omega_b[i]-0);
 			omega_b_line.points.appendItem(pt);
 
 			var pt = svg.createSVGPoint();
-			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
 			pt.y = y0 + (yf-y0)/(omega_w_max-0)*(omega_w[i]-0);
 			omega_w_line.points.appendItem(pt);
 		}
 
-		console.log('plotted :)')
-
-		/*
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = 0; target_low.points.appendItem(pt);
-
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
-		*/
-
-		/*bg=document.getElementById('chart');
+		bg=document.getElementById('chart');
 
 		qline = document.getElementById('chart_query_line');
-		qline.setAttribute('opacity', 0);
 
-		gids('query_time', '-');
-		gids('query_d', '-');
-		gids('query_v', '-');
-		gids('query_cur', '-');
-		gids('query_f', '-');
+		focus_xf = xf;
+		focus_x0 = x0;
+		focus_u  = u_raw;
+		focus_v_b = v_b_raw;
+		focus_omega_w = omega_w_raw;
+		focus_omega_b = omega_b_raw;
+		focus_t       = t_raw;
 
-		handler = function(event){
-			if(event.buttons != 1) return;
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				yq = event.clientY - bg.getBoundingClientRect().top;
+		bg.addEventListener('mousemove', focus_handler);
+		bg.addEventListener('mousedown', focus_handler);
+		//bg.addEventListener('mousedown', find_extrema_handler);
+		//bg.addEventListener('contextmenu', function(e){e.preventDefault(); return false; });
 
-				tq = (t_max-0)/(xf-x0)*(xq-x0);
-				if (tq>Math.max(...t)){
-					tq = Math.max(...t);
-					xq = x0 + (xf-x0)/(t_max-0)*tq;
-				}
-				if (tq<0) {
-					tq=0; xq=x0;
-				}
-				dq   = linterp(t, d, tq);
-				vq   = linterp(t, v, tq);
-				curq = linterp(t, cur, tq);
-				fq   = linterp(t, f, tq);
-				qline.setAttribute('opacity', 1);
-
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
-
-				gids('query_time', tq);
-				gids('query_d', dq);
-				gids('query_v', vq);
-				gids('query_cur', curq);
-				gids('query_f', fq);
-			}
-		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);*/
+		if (typeof last_uq != 'undefined') focus_handler(last_uq);
 	}
 
 </script>
@@ -536,7 +565,7 @@
 					<td class='unit' id='unit_m_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball MOI Ratio</th>
-					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">&#177;</td>
+					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny"></td>
 					<td></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
@@ -556,7 +585,7 @@
 					<td class='unit' id='unit_m_w'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI Ratio</th>
-					<td><input id='moi_rat_w' value=2><td class="tiny">&#177;</td>
+					<td><input id='moi_rat_w' value=2><td class="tiny"></td>
 					<td></td>
 					<td class='unit'>[-]</td>
 				</tr><tr>
@@ -589,6 +618,11 @@
 					<td><input id='init_omega_w' value=0.5></td><td class="tiny">&#177;</td>
 					<td><input id='init_omega_w_err' value=''></td>
 					<td class='unit' id='unit_init_omega_w'>[-]</td>
+				</tr><tr>
+					<th class='rowlabel'>Frictional Blurring<span class='ttt'>Magic number that helps stability with frictional model.<br/>Friction is weird; 2N seems to be a reasonable amount.<br/>Make sure this is the same between any two runs you're comparing.</span></th>
+					<td><input id='blur_amt' value=2></td><td class="tiny"></td>
+					<td></td>
+					<td class='unit' id='unit_blur_amt'>[N]</td>
 				</tr>
 			</table>
 		</div><div class="output" style='display:table-cell'>
@@ -645,17 +679,17 @@
 <g class="z-grid" id="chart_z_grid"></g>
 
 <g class="labels x-labels" id='chart_x_labels'>
-  <text x="375" y=485 class="label-title">Time [s]</text>
+  <text x="375" y=485 class="label-title" id="chart_u_label">Position</text>
 </g>
 
 <g class="labels y-labels" id='chart_y_labels'>
-  <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_v_b_label" fill="#0074d9">Ball Velocity</text>
-  <text x=-180 y=15 class="label-title" transform="rotate(270)" id="chart_omega_b_label" fill="#d91200">Ball Spin [RPM]</text>
+  <text x=-320 y=15 class="label-title" transform="rotate(270)" id="chart_v_b_label" fill="#0074d9">Ball Velocity</text>
+  <text x=-160 y=15 class="label-title" transform="rotate(270)" id="chart_omega_b_label" fill="#d91200">Ball Spin [RPM]</text>
   <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 
 <g class="labels z-labels" id='chart_z_labels'>
-  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#c48900">Flywheel RPM</text>
+  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#c48900">Flywheel Speed [RPM]</text>
 </g>
 
 <g class="labels x-labels" id='chart_x_axis_labels'></g>
@@ -689,6 +723,41 @@
 </svg>
 	
 	<div class="output-graph">
+		<table>
+			<tr>
+				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point. Position represented by a vertical bar.</span></th>
+				<td><input id="query_u" onkeyup="focus_handler(gidv('query_u'), true);" /></td>
+				<td class="unit" id="unit_query_u">[s]</td>
+			</tr><tr>
+				<th class="rowlabel">Time</th>
+				<td><input id="query_t" readonly /></td>
+				<td class="unit">[s]</td>
+			</tr><tr>
+				<th class="rowlabel">Timestep</th>
+				<td><input id="query_i" readonly /></td>
+				<td class="unit"></td>
+			</tr><tr>
+				<th class="rowlabel">Ball Velocity</th>
+				<td><input id="query_v_b" readonly /></td>
+				<td class="unit" id="unit_query_v_b"></td>
+			</tr><tr>
+				<th class="rowlabel">Ball Spin</th>
+				<td><input id="query_omega_b" readonly /></td>
+				<td class="unit" id='unit_query_omega_b'>[A]</td>
+			</tr><tr>
+				<th class="rowlabel">Flywheel Speed</th>
+				<td><input id="query_omega_w" readonly /></td>
+				<td class="unit" id='unit_query_omega_w'></td>
+			</tr><tr>
+				<th class="rowlabel">Hood Force</th>
+				<td><input id="query_F_h" readonly /></td>
+				<td class="unit" id='unit_query_F_h'></td>
+			</tr><tr>
+				<th class="rowlabel">Flywheel Force</th>
+				<td><input id="query_F_w" readonly /></td>
+				<td class="unit" id='unit_query_F_w'></td>
+			</tr>
+		</table>
 	</div>
 
 </div>
