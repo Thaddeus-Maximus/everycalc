@@ -9,7 +9,6 @@
 		'm_b': ['kg', 'lbm'],
 		'k_b': ['N/m', 'lbf/in'],
 		'd_w': ['mm', 'in'],
-		'm_w': ['kg', 'lbm'],
 		'w':   ['mm', 'in'],
 		'I_w': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0': ['RPM','RPM'],
@@ -20,7 +19,6 @@
 		'm_b_err': ['kg', 'lbm'],
 		'k_b_err': ['N/m', 'lbf/in'],
 		'd_w_err': ['mm', 'in'],
-		'm_w_err': ['kg', 'lbm'],
 		'w_err':   ['mm', 'in'],
 		'I_w_err': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0_err': ['RPM','RPM'],
@@ -43,15 +41,45 @@
 		'query_v_b_1':     ['m/s','ft/s'],
 		'query_F_h_1':     ['N', 'lbf'],
 		'query_F_w_1':     ['N', 'lbf'],
+		'query_N_h_1':     ['N', 'lbf'],
+		'query_N_w_1':     ['N', 'lbf'],
 		'query_omega_b_2': ['RPM','RPM'],
 		'query_omega_w_2': ['RPM','RPM'],
 		'query_v_b_2':     ['m/s','ft/s'],
 		'query_F_h_2':     ['N', 'lbf'],
-		'query_F_w_2':     ['N', 'lbf']
+		'query_F_w_2':     ['N', 'lbf'],
+
+		'query_omega':   ['RPM', 'RPM']
 	};
 
-	function invalidate_computations() {
-		document.getElementById('charts').classList.add('error');
+	function validate_computations(state, components) {
+		if (!components) components = [];
+		for (el of document.getElementsByClassName('error')) {
+			el.classList.remove('error');
+		}
+		for (el of document.getElementsByClassName('uncomputed')) {
+			el.classList.remove('uncomputed');
+		}
+
+		if (state=='invalid')	{
+			document.getElementById('charts').classList.remove('error');
+			document.getElementById('charts').classList.add('uncomputed');
+
+			for (id of components) {
+				document.getElementById(id).classList.add('uncomputed')
+			}
+		} else if (state=='valid') {
+			document.getElementById('charts').classList.remove('error');
+			document.getElementById('charts').classList.remove('uncomputed');
+		} else if (state=='error') {
+			document.getElementById('charts').classList.add('error');
+			document.getElementById('charts').classList.remove('uncomputed');
+
+			for (id of components) {
+				document.getElementById(id).classList.add('error')
+			}
+		}
+		
 	}
 
 	function populate_units() {
@@ -70,8 +98,8 @@
 			}
 		}
 
-		document.getElementById(chart_name+'_v_b_label').innerHTML = 'Ball Velocity ['+inputs_unit_map['query_v_b_1'][unit_sys]+']';
-		document.getElementById(chart_name+'_u_label').innerHTML = 'Ball Travel Position From Hood Start ['+inputs_unit_map['query_u'][unit_sys]+']';
+		document.getElementById(chart_launch_name+'_v_b_label').innerHTML = 'Ball Velocity ['+inputs_unit_map['query_v_b_1'][unit_sys]+']';
+		document.getElementById(chart_launch_name+'_u_label').innerHTML = 'Ball Travel Position From Hood Start ['+inputs_unit_map['query_u'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -128,6 +156,19 @@
 		    	}
 		    }
 		}
+
+		select = document.getElementById("motortype");
+		i=0;
+		for(motor in motor_data) {
+			i++;
+			opt = document.createElement('option');
+			opt.innerHTML = motor_data[motor]["plain_name"];
+			opt.value = motor;
+			select.appendChild(opt);
+		}
+
+		calc_ratio();
+		motortype_select(document.getElementById("motortype"));
 
 		compute(true);
 	}
@@ -206,7 +247,7 @@
 		}
 	}
 
-	function run_sim(params_pack) {
+	function run_sim_launch(params_pack) {
 		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, u_f] = params_pack;
 		I_b = moi_rat_b*m_b*d_b*d_b/4;
 
@@ -218,7 +259,7 @@
 		v=0;
 		omega_b=0;
 		omega_w=omega_w_0;
-		res = [[t],[u],[v],[omega_b],[omega_w],[0],[0]];
+		res = [[t],[u],[v],[omega_b],[omega_w],[0],[0],[0],[0]];
 		while(i<1000 && u<=u_f) {
 			N_h = k_b*(d_b-w) + m_b*v*v/(w+d_w);
 			N_w = k_b*(d_b-w) - m_b*v*v/(w+d_w);
@@ -226,7 +267,7 @@
 			F_w = - N_w * mu_w * smooth(v+omega_b*w/2 - omega_w*d_w/2, OVERAMT)
 
 			dv       = (F_w+F_h) / m_b;
-			domega_b = (F_w-F_h)*d_b/2 / I_b;
+			domega_b = (F_w-F_h)*w/2 / I_b;
 			domega_w = - F_w*d_w/2 / I_w;
 
 			v       += dv*dt;
@@ -240,8 +281,10 @@
 			res[2] .push(v);
 			res[3] .push(omega_b);
 			res[4] .push(omega_w);
-			res[5] .push(F_h);
-			res[6] .push(F_w);
+			res[5] .push(N_h);
+			res[6] .push(N_w);
+			res[7] .push(F_h);
+			res[8] .push(F_w);
 
 			i+=1;
 		}
@@ -256,6 +299,60 @@
 		return [res, stats];
 	}
 
+	function run_sim_rev(params_pack) {
+		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, omega_drop, load_eqn] = params_pack;
+
+		dt = 0.01;
+
+		i = 0;
+		t = 0;
+		omega = 0;
+		cur_cons = 0;
+		cur_cons_drop = 0;
+		res = [[t],[omega],[cur_stall]];
+
+		t_drop = 0;
+		validity = 0;
+
+		while(i<1000) {
+			T = T_stall*(omega_max-omega)/omega_max;
+			cur = cur_free + (cur_stall-cur_free)*(omega_max-omega)/omega_max;
+			M = eval(load_eqn);
+			domega = (T-M)/I_w;
+			omega += domega*dt;
+			cur_cons += cur*dt;
+			t += dt;
+			i ++;
+
+			res[0].push(t);
+			res[1].push(omega);
+			res[2].push(cur);
+
+			if (t_drop == 0 && omega > omega_drop) {
+				t_drop = t;
+				cur_cons_drop = cur_cons;
+				validity ++;
+			}
+			if (omega > omega_target) {
+				validity ++;
+				break;
+			}
+		}
+
+		cur_idle = 0; // if no resistance, no current consumption // TODO
+
+		stats = {
+			idle_current: cur_idle,
+			cur_cons_live: cur_cons-cur_cons_drop,
+			cur_cons_dead: cur_cons,
+			t_dead: t,
+			t_live: t-t_drop,
+			valid: validity
+		};
+
+		return [res, stats];
+	}
+
 	function bit_test(num, bit){
 	    return ((num>>bit) % 2 != 0)
 	}
@@ -263,7 +360,7 @@
 	g = 9.81;
 
 	function compute(simulate) {
-		invalidate_computations();
+		validate_computations('error');
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
 
@@ -272,12 +369,13 @@
 		max_low       = +Infinity;
 		max_low_stat  = {};
 		max_low_run   = [];
+		max_low_param = []
 		max_high      = -Infinity;
 		max_high_stat = {};
 		max_high_run  = [];
+		max_high_param = [];
 		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w', 'd_w', 'I_w', 'mu_w', 'mu_h', 'omega_w_0'];
-
-// d_b, m_b, moi_rat_b, k_b, w, d_w, m_w, I_w, mu_w, mu_h, omega_w_0, u_f
+		low_omega_w   = +Infinity;
 
 		for (var i=0; i<Math.pow(2, params_list.length); i++) {
 			params = [];
@@ -286,28 +384,40 @@
 			}
 			u_f = gidv('theta_start') - gidv('theta_end');
 			params.push(u_f);
-			[run, stats] = run_sim(params);
+			[run, stats] = run_sim_launch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
 				max_low_run  = run;
 				max_low_stat = stats;
+				max_low_param = params;
 			}
 			if (stats.v_b_exit > max_high) {
 				max_high      = stats.v_b_exit;
 				max_high_run  = run;
 				max_high_stat = stats;
+				max_high_param = params;
+			}
+			if (stats.omega_w_exit < low_omega_w) {
+				low_omega_w = stats.omega_w_exit;
 			}
 		}
 
-		/*for (id of computable_ids){
-			document.getElementById(id).classList.remove('error');    
-	    	document.getElementById(id).classList.remove('uncomputed');    	
-		}*/
+		
 
-		console.log(max_low_run, max_high_run);
+		G = gidv('G');
 
-      	drawchart(max_low_run, max_high_run, max_low_stat, max_high_stat);
-		document.getElementById('charts').classList.remove('error');
+		[rev_run, rev_stats] = run_sim_rev([
+			gidv('motor_stall_torque_adj')*G,
+			convert(gidv('motor_max_rpm_adj'), 'RPM')/G,
+			gidv('motor_free_current_adj'),
+			gidv('motor_stall_current_adj'),
+			gidv('I_w') + gidv('I_w_err'),
+			gidv('omega_w_0'),
+			low_omega_w, '0']);
+
+      	drawchart_launch(max_low_run, max_high_run, max_low_stat, max_high_stat);
+
+		drawchart_rev(rev_run, rev_stats);
 
 		gids('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
 		gids('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
@@ -317,6 +427,16 @@
 		gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
 		gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 		gids('settling_dist_max', Math.max(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
+
+		gids('t_rev_live', rev_stats.t_live);
+		gids('t_rev_dead', rev_stats.t_dead);
+		gids('cur_cons_dead', rev_stats.cur_cons_dead);
+		gids('cur_cons_live', rev_stats.cur_cons_live);
+		gids('cur_idle', rev_stats.idle_current);
+
+		validate_computations('valid');
+		if (rev_stats.valid != 2)
+			validate_computations('error', ['t_rev_live', 't_rev_dead', 'cur_cons_dead', 'cur_cons_live', 'cur_idle']);
 	}
 
 	function NaNtoerr(x) {
@@ -373,9 +493,9 @@
 		return 0;
 	}
 
-	chart_name = 'chart';
+	chart_launch_name = 'chart_launch';
 
-	function drawTicks(axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
+	function drawTicks(chart_name, axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
 		altaxis = axis == 'x' ? 'y':'x';
 		realaxis = axis == 'z' ? 'y':axis;
 		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
@@ -435,9 +555,9 @@
 	var last_uq = undefined;
 	function focus_handler(event, disable_position_write){
 
-		bg=document.getElementById('chart');
+		bg=document.getElementById('chart_launch');
 
-		qline = document.getElementById('chart_query_line');
+		qline = document.getElementById('chart_launch_query_line');
 
 		var xq, uq;
 		query_u_unit = inputs_unit_map['query_u'][unit_sys];
@@ -446,7 +566,7 @@
 			xq = focus_x0 + (focus_xf-focus_x0)*uq/focus_u_max;
 		}else{
 			if(event.buttons != 1) return;
-			bg = document.getElementById('chart');
+			bg = document.getElementById('chart_launch');
 			xq = event.clientX - bg.getBoundingClientRect().left;
 			//yq = event.clientY - bg.getBoundingClientRect().top;
 			
@@ -465,15 +585,19 @@
 		gids('query_u', uq);
 		gids('query_i_1', lindx(focus_run_low[1], uq), 0);
 		gids('query_v_b_1', linterp(focus_run_low[1], focus_run_low[2], uq));
-		gids('query_F_h_1', linterp(focus_run_low[1], focus_run_low[5], uq));
-		gids('query_F_w_1', linterp(focus_run_low[1], focus_run_low[6], uq));
+		gids('query_N_h_1', linterp(focus_run_low[1], focus_run_low[5], uq));
+		gids('query_N_w_1', linterp(focus_run_low[1], focus_run_low[6], uq));
+		gids('query_F_h_1', linterp(focus_run_low[1], focus_run_low[7], uq));
+		gids('query_F_w_1', linterp(focus_run_low[1], focus_run_low[8], uq));
 		gids('query_omega_b_1', linterp(focus_run_low[1], focus_run_low[3], uq));
 		gids('query_omega_w_1', linterp(focus_run_low[1], focus_run_low[4], uq));
 		gids('query_t_1', linterp(focus_run_low[1], focus_run_low[0], uq));
 		gids('query_i_2', lindx(focus_run_high[1], uq), 0);
 		gids('query_v_b_2', linterp(focus_run_high[1], focus_run_high[2], uq));
-		gids('query_F_h_2', linterp(focus_run_high[1], focus_run_high[5], uq));
-		gids('query_F_w_2', linterp(focus_run_high[1], focus_run_high[6], uq));
+		gids('query_N_h_2', linterp(focus_run_high[1], focus_run_high[5], uq));
+		gids('query_N_w_2', linterp(focus_run_high[1], focus_run_high[6], uq));
+		gids('query_F_h_2', linterp(focus_run_high[1], focus_run_high[7], uq));
+		gids('query_F_w_2', linterp(focus_run_high[1], focus_run_high[8], uq));
 		gids('query_omega_b_2', linterp(focus_run_high[1], focus_run_high[3], uq));
 		gids('query_omega_w_2', linterp(focus_run_high[1], focus_run_high[4], uq));
 		gids('query_t_2', linterp(focus_run_high[1], focus_run_high[0], uq));
@@ -484,7 +608,7 @@
 		last_uq = uq;
 	}
 
-	function drawchart(run_low, run_high, stats_low, stats_high) {
+	function drawchart_launch(run_low, run_high, stats_low, stats_high) {
 		//[t_raw, u_raw, v_b_raw, omega_b_raw, omega_w_raw, focus_F_h, focus_F_w] = run_low;
 
 		//clean_runs(run_low, run_high, 1);
@@ -510,18 +634,18 @@
 		omega_b = omega_b_l.reverse().concat(omega_b_h);
 		omega_w = omega_w_l.reverse().concat(omega_w_h);
 
-		svg = document.getElementById('chart');
-		x_axis = document.getElementById('chart_x_axis');
-		y_axis = document.getElementById('chart_y_axis');
+		svg = document.getElementById('chart_launch');
+		x_axis = document.getElementById('chart_launch_x_axis');
+		y_axis = document.getElementById('chart_launch_y_axis');
 
 		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 
-		omega_b_line = document.getElementById('chart_omega_b_area');
-		omega_w_line = document.getElementById('chart_omega_w_area');
-		v_b_line     = document.getElementById('chart_v_b_area');
+		omega_b_line = document.getElementById('chart_launch_omega_b_area');
+		omega_w_line = document.getElementById('chart_launch_omega_w_area');
+		v_b_line     = document.getElementById('chart_launch_v_b_area');
 		omega_b_line.setAttribute("points","");
 		omega_w_line.setAttribute("points","");
 		v_b_line    .setAttribute("points","");
@@ -537,9 +661,9 @@
 		omega_b_max = omega_b_ticks[omega_b_ticks.length-1];
 		omega_w_max = omega_w_ticks[omega_w_ticks.length-1];
 
-		drawTicks('x', u_ticks, u_max, x_ticklabels, xf, x0, yf, y0, 15);
-		drawTicks('y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
-		drawTicks('z', null, null, z_ticklabels, yf, y0, xf, x0, 5);
+		drawTicks('chart_launch', 'x', u_ticks, u_max, x_ticklabels, xf, x0, yf, y0, 15);
+		drawTicks('chart_launch', 'y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
+		drawTicks('chart_launch', 'z', null, null, z_ticklabels, yf, y0, xf, x0, 5);
 		
 		for (i in u) {
 			var pt = svg.createSVGPoint();
@@ -558,14 +682,9 @@
 			omega_w_line.points.appendItem(pt);
 		}
 
-		
+		bg=document.getElementById('chart_launch');
 
-
-
-
-		bg=document.getElementById('chart');
-
-		qline = document.getElementById('chart_query_line');
+		qline = document.getElementById('chart_launch_query_line');
 
 		focus_xf = xf;
 		focus_x0 = x0;
@@ -578,8 +697,8 @@
 
 		if (typeof last_uq != 'undefined') focus_handler(last_uq);
 
-		sline_1 = document.getElementById('chart_stable_line_1');
-		sline_2 = document.getElementById('chart_stable_line_2');
+		sline_1 = document.getElementById('chart_launch_stable_line_1');
+		sline_2 = document.getElementById('chart_launch_stable_line_2');
 
 		sline_1.setAttribute('opacity', 1);
 		sline_1.setAttribute('x1', x0 + (xf-x0)/(focus_u_max-0)*(run_low[1][stats_low.i_settle]-0));
@@ -590,28 +709,184 @@
 	}
 
 </script>
+
+<script type="text/javascript">
+	function get_motor_data(motor,key){
+		return motor_data[motor][key];
+	}
+
+	function falseto1(x) {
+		if (x)
+			return x
+		return 1;
+	}
+
+	function calc_ratio() {
+		validate_computations('invalid');
+		var G = 1;
+		G *= falseto1(document.getElementById("G1B").value);
+		G *= falseto1(document.getElementById("G2B").value);
+		G *= falseto1(document.getElementById("G3B").value);
+		G *= falseto1(document.getElementById("G4B").value);
+		G /= falseto1(document.getElementById("G1A").value);
+		G /= falseto1(document.getElementById("G2A").value);
+		G /= falseto1(document.getElementById("G3A").value);
+		G /= falseto1(document.getElementById("G4A").value);
+
+		gids("G", G);
+	}
+
+	function motortype_select() {
+		e=document.getElementById("motortype");
+		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		props.forEach(function(a) {
+			
+			document.getElementById("motor_"+a).value=get_motor_data(e.value, a);
+			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
+			if (a=="stall_torque")
+				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+			if (a=="free_current" || a=="stall_current" )
+				adjVal *= gidv("motornum");
+			gids("motor_"+a+"_adj",adjVal);
+		});
+	}
+
+	var focus_rev_xf, focus_rev_x0, focus_rev_run, focus_rev_t_max;
+	var rev_last_tq = undefined;
+	function focus_handler_rev(event, disable_position_write){
+
+		bg=document.getElementById('chart_rev');
+
+		qline = document.getElementById('chart_rev_query_line');
+
+		var xq, tq;
+		if (!isNaN(event)) {
+			tq = parseFloat(event);
+			xq = focus_rev_x0 + (focus_rev_xf-focus_rev_x0)*tq/focus_rev_t_max;
+		}else{
+			if(event.buttons != 1) return;
+			bg = document.getElementById('chart_rev');
+			xq = event.clientX - bg.getBoundingClientRect().left;
+			
+			tq = (focus_rev_t_max-0)/(focus_rev_xf-focus_rev_x0)*(xq-focus_rev_x0);
+			if (tq > focus_rev_t_max){
+				tq = focus_rev_t_max;
+				xq = focus_rev_x0 + (focus_rev_xf-focus_rev_x0)/(focus_rev_t_max-0)*tq;
+			}
+			if (tq<0) {
+				tq=0; xq=focus_rev_x0;
+			}
+		}
+
+		//[t_raw, u_raw, v_b_raw, omega_b_raw, omega_w_raw, focus_F_h, focus_F_w] = run_low;
+		
+		gids('query_t', tq);
+		gids('query_rev_i', lindx  (focus_rev_run[0], tq), 0);
+		gids('query_omega', linterp(focus_rev_run[0], focus_rev_run[1], tq));
+		gids('query_cur',   linterp(focus_rev_run[0], focus_rev_run[2], tq));
+		qline.setAttribute('opacity', 1);
+		qline.setAttribute('x1', xq);
+		qline.setAttribute('x2', xq);
+
+		last_tq = tq;
+	}
+
+	function drawchart_rev(run_low, stats) {
+		focus_rev_run = run_low;
+
+		t 		= convert_to(run_low[0], 's');
+		cur 	= convert_to(run_low[2], 's');
+		omega 	= convert_to(run_low[1], inputs_unit_map['query_omega'][unit_sys]);
+
+		/*t_h = convert_to(run_high[0], 's');
+		I_h = convert_to(run_high[1], inputs_unit_map['query_cur_1'][unit_sys]);
+		omega_h = convert_to(run_high[2], inputs_unit_map['exit_omega_1'][unit_sys]);
+
+		t = t_l.reverse().concat(t_h);
+		I = I_l.reverse().concat(I_h);
+		omega = omega_l.reverse().concat(omega_h);*/
+
+		svg = document.getElementById('chart_rev');
+		x_axis = document.getElementById('chart_rev_x_axis');
+		y_axis = document.getElementById('chart_rev_y_axis');
+
+		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
+
+		cur_line   = document.getElementById('chart_rev_cur_area');
+		omega_line = document.getElementById('chart_rev_omega_area');
+		cur_line  .setAttribute("points","");
+		omega_line.setAttribute("points","");
+
+		[[t_ticks], x_ticklabels] 		= makeTicks([Math.max(...t)], 1, 10);
+		[[cur_ticks], y_ticklabels] 	= makeTicks([Math.max(...cur), Math.max(...omega)], 1, 8);
+		[[omega_ticks], z_ticklabels] 	= makeTicks([Math.max(...omega), Math.max(...cur)], 1, 8);
+
+		t_ticks.pop(); x_ticklabels.pop();
+		
+		t_max = Math.max(...t);
+		cur_max   = cur_ticks  [cur_ticks  .length-1];
+		omega_max = omega_ticks[omega_ticks.length-1];
+
+		drawTicks('chart_rev', 'x', t_ticks, t_max, x_ticklabels, xf, x0, yf, y0, 15);
+		drawTicks('chart_rev', 'y', null, null,     y_ticklabels, yf, y0, xf, x0, 5);
+		drawTicks('chart_rev', 'z', null, null,     z_ticklabels, yf, y0, xf, x0, 5);
+		
+		for (i in t) {
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.y = y0 + (yf-y0)/(cur_max-0)*(cur[i]-0);
+			cur_line.points.appendItem(pt);
+
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(t_max-0)*(t[i]-0);
+			pt.y = y0 + (yf-y0)/(omega_max-0)*(omega[i]-0);
+			omega_line.points.appendItem(pt);
+		}
+
+		bg = document.getElementById('chart_rev');
+
+		qline = document.getElementById('chart_rev_query_line');
+
+		focus_rev_xf = xf;
+		focus_rev_x0 = x0;
+		focus_rev_t_max = t_max;
+
+		bg.addEventListener('mousemove', focus_handler_rev);
+		bg.addEventListener('mousedown', focus_handler_rev);
+
+		if (typeof rev_last_tq != 'undefined') focus_handler(rev_last_tq);
+
+		sline_1 = document.getElementById('chart_rev_stable_line_1');
+
+		sline_1.setAttribute('opacity', 1);
+		sline_1.setAttribute('x1', x0 + (xf-x0)/(t_max-0)*(stats.t_dead-stats.t_live));
+		sline_1.setAttribute('x2', x0 + (xf-x0)/(t_max-0)*(stats.t_dead-stats.t_live));
+	}
 </script>
 
 
 <html>
 <body onload="thload()">
-	<div style="width: 100%; float: left;" class="container">
-		<h3>Thad's Ballistic Trajectory Calculator</h3>
-		<center><a href="./">Back To Index</a><br/></center>
+<div style="width: 100%; float: left;" class="container">
+	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Hooded Flywheel Shooter Calculator</h3>
+	<center><a href="./">Back To Index</a><br/></center>
 
-		<div class="even" style=''>
-			<table>
-				<tr>
-					<td>
-					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
-					</td><td>
-					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
-					</td>
-				</tr>
-			</table>
-		</div>
+	<div class="even" style=''>
+		<table>
+			<tr>
+				<td>
+				  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
+				</td><td>
+				  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
+				</td>
+			</tr>
+		</table>
+	</div>
 
-		<div style='display:table-row'>
+	<div style='display:table-row'>
 		<div class="odd" style='display:table-cell'>
 			<table>
 				<tr>
@@ -627,10 +902,10 @@
 				</tr><tr>
 					<th class='rowlabel'>Ball MOI Ratio<span class="ttt">Ratio of MOI to mass times radius squared.<br/>2/5 for a solid sphere, 2/3 for a hollow sphere, 1/2 for a solid cylinder, 1 for a hollow cylinder.</span></th>
 					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">&#177;</td>
-					<td><input id='moi_rat_b_err' value=0></td>
+					<td><input id='moi_rat_b_err'></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
-					<th class="rowlabel">Ball Stiffness</th>
+					<th class="rowlabel">Ball Stiffness<span class="ttt">Stiffness of the ball. This should be evaluated as a shock condition and near the amount of compression in the case of nonlinear balls (which, practically any ball will be)</span></th>
 					<td><input id="k_b" value=20></td><td class="tiny">&#177;</td>
 					<td><input id="k_b_err" value=''></td>
 					<td class="unit" id='unit_k_b'></td>
@@ -640,24 +915,19 @@
 					<td><input id='d_w_err' value=''></td>
 					<td class='unit' id='unit_d_w'></td>
 				</tr><tr>
-					<th class='rowlabel'>Wheel Mass</th>
-					<td><input id='m_w' value=2><td class="tiny">&#177;</td>
-					<td><input id='m_w_err' value=''></td>
-					<td class='unit' id='unit_m_w'></td>
-				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input id='I_w' value=2><td class="tiny">&#177;</td>
+					<td><input id='I_w' value=4><td class="tiny">&#177;</td>
 					<td><input id="I_w_err" value=''></td>
 					<td class='unit' id="unit_I_w"></td>
 				</tr><tr>
 					<th class="rowlabel">Hood Gap</th>
-					<td><input id="w" value=8></td><td class="tiny">&#177;</td>
+					<td><input id="w" value=5></td><td class="tiny">&#177;</td>
 					<td><input id="w_err" value=''></td>
 					<td class="unit" id='unit_w'></td>
 				</tr><tr>
 					<th class="rowlabel">Hood Start<span class="ttt">Angle that the hood starts at, with respect to vertical.<br/>A larger value would mean the hood wraps around more.</span></th>
 					<td><input id="theta_start" value=120></td><td class="tiny">&#177;</td>
-					<td><input id="theta_start_err" value=1></td>
+					<td><input id="theta_start_err"></td>
 					<td class="unit" id='unit_theta_start'></td>
 				</tr><tr>
 					<th class='rowlabel'>Hood End<span class="ttt">Angle that the hood ends at, with respect to vertical.<br/>This would be the same as the release/departure angle with respect to the horizontal.<br/>A larger value would mean that the hood wraps around less, and creates a more vertical shot.</span></th>
@@ -666,7 +936,7 @@
 					<td class='unit' id='unit_theta_end'></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
-					<td><input id="mu_w" value=0.5></td><td class="tiny">&#177;</td>
+					<td><input id="mu_w" value=1.0></td><td class="tiny">&#177;</td>
 					<td><input id="mu_w_err" value=''></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
@@ -675,8 +945,8 @@
 					<td><input id='mu_h_err' value=''></td>
 					<td class='unit'>[-]</td>
 				</tr><tr>
-					<th class='rowlabel'>Flywheel Initial RPM</th>
-					<td><input id='omega_w_0' value=0.5></td><td class="tiny">&#177;</td>
+					<th class='rowlabel'>Flywheel Target Velocity</th>
+					<td><input id='omega_w_0' value=3000></td><td class="tiny">&#177;</td>
 					<td><input id='omega_w_0_err' value=''></td>
 					<td class='unit' id='unit_omega_w_0'>[-]</td>
 				</tr><tr>
@@ -691,7 +961,80 @@
 					<td class='unit' id='unit_blur_amt'>[%]</td>
 				</tr>
 			</table>
-		</div><div class="output" style='display:table-cell'>
+		</div>
+		<div class="even" style='display:table-cell'>
+			<div>
+				<span class="rowlabel">Motor</span>
+				<select class="doublewide" id="motortype" oninput="motortype_select(); compute();"></select>
+				<!--<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>-->
+			</div>
+			<table id='detail_motor'>
+				<tr>
+					<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span> </th>
+					<td><input class='' id="motornum" oninput="motortype_select(); compute();" value=1 /></td>
+				</tr><tr>
+					<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
+					<td><input class='' id="op_voltage" oninput="motortype_select(); compute();" value=12 /></td>
+					<td class="unit">[V]</td>
+				</tr><tr>
+					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
+					<td><input class=''  id="efficiency" oninput="motortype_select(); compute();" value=85 /></td>
+					<td class="unit">[%]</td>
+				</tr>
+				<tr>
+					<th></th>
+					<th class="collabel">Raw Motor</th>
+					<th class="collabel">Adjusted</th>
+					<th></th>
+				</tr>
+				<tr>
+					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+					<td><input id="motor_max_rpm" readonly /></td>
+					<td><input id="motor_max_rpm_adj" readonly /></td>
+					<td class="unit">[RPM]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+					<td><input id="motor_stall_torque" readonly /></td>
+					<td><input id="motor_stall_torque_adj" readonly /></td>
+					<td class="unit" id="unit_motor_stall_torque"></td>
+				</tr><tr>
+					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+					<td><input id="motor_free_current" readonly /></td>
+					<td><input id="motor_free_current_adj" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+					<td><input id="motor_stall_current" readonly /></td>
+					<td><input id="motor_stall_current_adj" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr>
+			</table>
+			<div class="odd">
+				<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
+				<input id="G" readonly/>
+				<!--<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>-->
+			</div>
+			<table id='detail_gratio'>
+				<tr>
+					<td><input id="G1A" oninput="calc_ratio()" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G1B" oninput="calc_ratio()" value=1 /></td>
+				</tr><tr>
+					<td><input id="G2A" oninput="calc_ratio()" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G2B" oninput="calc_ratio()" /></td>
+				</tr><tr>
+					<td><input id="G3A" oninput="calc_ratio()" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G3B" oninput="calc_ratio()" /></td>
+				</tr><tr>
+					<td><input id="G4A" oninput="calc_ratio()" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G4B" oninput="calc_ratio()" /></td>
+				</tr>
+			</table>
+		</div>
+		<div class="output" style='display:table-cell'>
 			<center><button type="button" onclick="compute()" id="compute_btn">Compute!</button></center>
 			<table>
 				<tr>
@@ -715,6 +1058,26 @@
 					<td class="tiny">to</td>
 					<td><input id="settling_dist_max" readOnly></td>
 					<td class="unit" id='unit_settling_dist_min'></td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Time to Revved</th>
+					<td><input id="t_rev_live" readOnly></td>
+					<td class="unit">[s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Current to Rev</th>
+					<td><input id="cur_cons_live" readOnly></td>
+					<td class="unit">[A-s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Time to Recover</th>
+					<td><input id="t_rev_dead" readOnly></td>
+					<td class="unit">[s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Current to Recover</th>
+					<td><input id="cur_cons_dead" readOnly></td>
+					<td class="unit">[A-s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Idle Current</th>
+					<td><input id="cur_idle" readOnly></td>
+					<td class="unit">[A]</td>
 				</tr>
 			</table>
 		</div>
@@ -727,6 +1090,12 @@
 					</td>
 				</tr><tr>
 					<td colspan=3>
+						Yellow: Not computed. Press enter on a field or press the compute button.<br/>
+						Green: Computed, no issues.<br/>
+						Red: An error has occurred with the results.
+					</td>
+				</tr><tr>
+					<td colspan=3>
 						The plot displays the run with the highest exit velocity, and lowest exit velocity.
 					</td>
 				</tr><tr>
@@ -735,7 +1104,7 @@
 					</td>
 				</tr><tr>
 					<td colspan=3>
-						The settling distance (where the values of everything evens out and stops changing) is marked on the plot at the black vertical lines.
+						The settling distance (where the values of everything evens out and stops changing)<br/>is marked on the plot at the black vertical lines.
 					</td>
 				</tr><tr>
 					<td colspan=3>
@@ -745,78 +1114,91 @@
 			</table>
 		</div>
 	</div>
+</div>
 
-	<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+<style type="text/css">
+	.graph {
+	  height: 500px;
+	  width: 800px;
+	  margin: 10px;
+	}
+</style>
 
-<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
-  <title id="title">Position/Velocity Data</title>
+<div class="output-graph" style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+	<div>
+		<div style="margin-left: 0px; display:table-cell;">
+		<center>Launch Simulation</center>
+
+	<svg version="1.2" class="graph" id='chart_launch' aria-labelledby="title" role="img">
+	  <title id="title">Position/Velocity Data</title>
 
 
-<rect class="background" id="chart_background" x=90 y=20 width=615 height=430 />
-<g class="x-grid">
-  <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
-</g>
-<g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
-  <line id="chart_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
-</g>
+		<rect class="background" id="chart_launch_background" x=110 y=20 width=615 height=430 />
+		<g class="x-grid">
+		  <line id="chart_launch_x_axis" class="axes" x1="110" x2="110" y1="20" y2="450"></line>
+		</g>
+		<g class="y-grid">
+		  <line id="chart_launch_y_axis" class="axes" x1="110" x2="725" y1=450 y2=450></line>
+		  <line id="chart_launch_z_axis" class="axes" x1="725" x2="725" y1=20  y2=450></line>
+		</g>
 
-<g class="x-grid" id="chart_x_grid"></g>
-<g class="y-grid" id="chart_y_grid"></g>
-<g class="z-grid" id="chart_z_grid"></g>
+		<g class="x-grid" id="chart_launch_x_grid"></g>
+		<g class="y-grid" id="chart_launch_y_grid"></g>
+		<g class="z-grid" id="chart_launch_z_grid"></g>
 
-<g class="labels x-labels" id='chart_x_labels'>
-  <text x="375" y=485 class="label-title" id="chart_u_label">Position</text>
-</g>
+		<g class="labels x-labels" id='chart_launch_x_labels'>
+		  <text x="425" y=485 class="label-title" id="chart_launch_u_label">Position</text>
+		</g>
 
-<g class="labels y-labels" id='chart_y_labels'>
-  <text x=-320 y=15 class="label-title" transform="rotate(270)" id="chart_v_b_label" fill="#0074d9">Ball Velocity</text>
-  <text x=-160 y=15 class="label-title" transform="rotate(270)" id="chart_omega_b_label" fill="#d91200">Ball Spin [RPM]</text>
-  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
-</g>
+		<g class="labels y-labels" id='chart_launch_y_labels'>
+		  <text x=-320 y=15 class="label-title" transform="rotate(270)" id="chart_launch_v_b_label" fill="#0074d9">Ball Velocity</text>
+		  <text x=-160 y=15 class="label-title" transform="rotate(270)" id="chart_launch_omega_b_label" fill="#d91200">Ball Spin [RPM]</text>
+		  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_launch_y1_divider" fill="#111">/</text>
+		</g>
 
-<g class="labels z-labels" id='chart_z_labels'>
-  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#c48900">Flywheel Speed [RPM]</text>
-</g>
+		<g class="labels z-labels" id='chart_launch_z_labels'>
+		  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_launch_cur_label" fill="#c48900">Flywheel Speed [RPM]</text>
+		</g>
 
-<g class="labels x-labels" id='chart_x_axis_labels'></g>
-<g class="labels z-labels" id='chart_z_axis_labels'></g>
-<g class="labels y-labels" id='chart_y_axis_labels'></g>
+		<g class="labels x-labels" id='chart_launch_x_axis_labels'></g>
+		<g class="labels z-labels" id='chart_launch_z_axis_labels'></g>
+		<g class="labels y-labels" id='chart_launch_y_axis_labels'></g>
 
-<g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
-</g>
-<g class="marker-line">
-	<line id="chart_stable_line_1" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
-	<line id="chart_stable_line_2" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
-</g>
-<polyline
-	id='chart_v_b_area'
-	stroke='#0074d9'
-	fill='#0074d9'
-	fill-opacity=0.3
-	stroke-width=2
-	points="
-	"/>
-<polyline
-	id='chart_omega_b_area'
-	stroke='#d91200'
-	fill='#d91200'
-	fill-opacity=0.3
-	stroke-width=2
-	points="
-	"/>
-<polyline
-	id='chart_omega_w_area'
-	stroke='#c48900'
-	fill='#c48900'
-	stroke-width=2
-	fill-opacity=0.3
-	points="
-	"/>
-</svg>
+		<g class="query-line">
+			<line id="chart_launch_query_line" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+		</g>
+		<g class="marker-line">
+			<line id="chart_launch_stable_line_1" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+			<line id="chart_launch_stable_line_2" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+		</g>
+		<polyline
+			id='chart_launch_v_b_area'
+			stroke='#0074d9'
+			fill='#0074d9'
+			fill-opacity=0.3
+			stroke-width=2
+			points="
+			"/>
+		<polyline
+			id='chart_launch_omega_b_area'
+			stroke='#d91200'
+			fill='#d91200'
+			fill-opacity=0.3
+			stroke-width=2
+			points="
+			"/>
+		<polyline
+			id='chart_launch_omega_w_area'
+			stroke='#c48900'
+			fill='#c48900'
+			stroke-width=2
+			fill-opacity=0.3
+			points="
+			"/>
+	</svg>
+
 	
-	<div class="output-graph">
+	
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point. Position represented by a vertical bar.</span></th>
@@ -848,10 +1230,20 @@
 				<td><input id="query_omega_w_2" readonly /></td>
 				<td class="unit" id='unit_query_omega_w_1'></td>
 			</tr><tr>
+				<th class="rowlabel">Hood Normal</th>
+				<td><input id="query_N_h_1" readonly /></td>
+				<td><input id="query_N_h_2" readonly /></td>
+				<td class="unit" id='unit_query_N_h_1'></td>
+			</tr><tr>
 				<th class="rowlabel">Hood Force</th>
 				<td><input id="query_F_h_1" readonly /></td>
 				<td><input id="query_F_h_2" readonly /></td>
 				<td class="unit" id='unit_query_F_h_1'></td>
+			</tr><tr>
+				<th class="rowlabel">Flywheel Normal</th>
+				<td><input id="query_N_w_1" readonly /></td>
+				<td><input id="query_N_w_2" readonly /></td>
+				<td class="unit" id='unit_query_N_w_1'></td>
 			</tr><tr>
 				<th class="rowlabel">Flywheel Force</th>
 				<td><input id="query_F_w_1" readonly /></td>
@@ -859,9 +1251,84 @@
 				<td class="unit" id='unit_query_F_w_1'></td>
 			</tr>
 		</table>
-	</div>
+	</div><div style="margin-left: 0px; display:table-cell;">
+		<center>Spin-Up Simulation</center>
+		<svg version="1.2" class="graph" id='chart_rev' aria-labelledby="title" role="img">
+			<title id="title">Revving Simulation</title>
 
-</div>
+
+			<rect class="background" id="chart_rev_background" x=90 y=20 width=615 height=430 />
+			<g class="x-grid">
+			  <line id="chart_rev_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
+			</g>
+			<g class="y-grid">
+			  <line id="chart_rev_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
+			  <line id="chart_rev_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+			</g>
+
+			<g class="x-grid" id="chart_rev_x_grid"></g>
+			<g class="y-grid" id="chart_rev_y_grid"></g>
+			<g class="z-grid" id="chart_rev_z_grid"></g>
+
+			<g class="labels x-labels" id='chart_rev_x_labels'>
+			  <text x="405" y=485 class="label-title" id="chart_rev_t_label">Time [s]</text>
+			</g>
+
+			<g class="labels y-labels" id='chart_rev_y_labels'>
+			  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_rev_cur_label" fill="#d91200">Current Draw [A]</text>
+			</g>
+
+			<g class="labels z-labels" id='chart_rev_z_labels'>
+			  <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_rev_omega_label" fill="#0074d9">Flywheel Speed [RPM]</text>
+			</g>
+
+			<g class="labels x-labels" id='chart_rev_x_axis_labels'></g>
+			<g class="labels z-labels" id='chart_rev_z_axis_labels'></g>
+			<g class="labels y-labels" id='chart_rev_y_axis_labels'></g>
+
+			<g class="query-line">
+				<line id="chart_rev_query_line" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+			</g>
+			<g class="marker-line">
+				<line id="chart_rev_stable_line_1" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+				<line id="chart_rev_stable_line_2" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+			</g>
+			<polyline
+				id='chart_rev_omega_area'
+				stroke='#0074d9'
+				fill=none
+				stroke-width=2
+				points="
+				"/>
+			<polyline
+				id='chart_rev_cur_area'
+				stroke='#d91200'
+				fill=none
+				stroke-width=2
+				points="
+				"/>
+		</svg>
+		<table>
+			<tr>
+				<th class="rowlabel">Queried Time<span class="ttt">Query a time on the graph by clicking (and optionally dragging) a point. Position represented by a vertical bar.</span></th>
+				<td><input id="query_t" /></td>
+				<td class="unit" id="unit_query_t">[s]</td>
+			</tr><tr>
+				<th class="rowlabel">Timestep</th>
+				<td><input id="query_rev_i" readonly /></td>
+				<td class="unit"></td>
+			</tr><tr>
+				<th class="rowlabel">Flywheel Speed</th>
+				<td><input id="query_omega" readonly /></td>
+				<td class="unit" id='unit_query_omega'>[RPM]</td>
+			</tr><tr>
+				<th class="rowlabel">Current</th>
+				<td><input id="query_cur" readonly /></td>
+				<td class="unit">[A]</td>
+			</tr>
+		</table>
+	</div>
+	</div>
 </div>
 </body>
 </html>
