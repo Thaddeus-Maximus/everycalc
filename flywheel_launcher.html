@@ -36,7 +36,7 @@
 		'settling_dist_min': ['mm', 'in'],
 		'settling_dist_max': ['mm', 'in'],
 
-		'query_u':       ['mm', 'in'],
+		'query_u':       ['deg', 'deg'],
 
 		'query_omega_b_1': ['RPM','RPM'],
 		'query_omega_w_1': ['RPM','RPM'],
@@ -71,7 +71,7 @@
 		}
 
 		document.getElementById(chart_name+'_v_b_label').innerHTML = 'Ball Velocity ['+inputs_unit_map['query_v_b_1'][unit_sys]+']';
-		document.getElementById(chart_name+'_u_label').innerHTML = 'Ball Travel Distance ['+inputs_unit_map['query_u'][unit_sys]+']';
+		document.getElementById(chart_name+'_u_label').innerHTML = 'Ball Travel Position From Hood Start ['+inputs_unit_map['query_u'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -200,7 +200,6 @@
 				fin  = chnls[j][chnls[j].length-1]
 				diff = chnls[j][i] - fin;
 				if ( Math.abs(diff/fin) > settle_amt) {
-					console.log(j);
 					return i;
 				}
 			}
@@ -212,14 +211,14 @@
 		I_b = moi_rat_b*m_b*d_b*d_b/4;
 
 		OVERAMT = gidv('blur_amt');
-		dt = u_f/(omega_w_0*d_w/2)/100;
-		res = [[],[],[],[],[],[],[]];
+		dt = u_f/(omega_w_0)/30;
 		i=0;
 		u=0;
 		t=0;
 		v=0;
 		omega_b=0;
 		omega_w=omega_w_0;
+		res = [[t],[u],[v],[omega_b],[omega_w],[0],[0]];
 		while(i<1000 && u<=u_f) {
 			N_h = k_b*(d_b-w) + m_b*v*v/(w+d_w);
 			N_w = k_b*(d_b-w) - m_b*v*v/(w+d_w);
@@ -233,7 +232,7 @@
 			v       += dv*dt;
 			omega_b += domega_b*dt;
 			omega_w += domega_w*dt;
-			u       += v*dt
+			u       += v*dt /((d_w+w)/2) ;
 			t       += dt;
 
 			res[0] .push(t);
@@ -285,7 +284,7 @@
 			for (j=0; j<params_list.length; j++) {
 				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
 			}
-			u_f = (params[4]+params[5]) * (gidv('theta_start') - gidv('theta_end'));
+			u_f = gidv('theta_start') - gidv('theta_end');
 			params.push(u_f);
 			[run, stats] = run_sim(params);
 			if (stats.v_b_exit < max_low)   {
@@ -305,7 +304,7 @@
 	    	document.getElementById(id).classList.remove('uncomputed');    	
 		}*/
 
-		console.log(max_low_stat, max_high_stat);
+		console.log(max_low_run, max_high_run);
 
       	drawchart(max_low_run, max_high_run, max_low_stat, max_high_stat);
 		document.getElementById('charts').classList.remove('error');
@@ -464,14 +463,14 @@
 		//[t_raw, u_raw, v_b_raw, omega_b_raw, omega_w_raw, focus_F_h, focus_F_w] = run_low;
 		
 		gids('query_u', uq);
-		gids('query_i_1', lindx(focus_run_low[1], uq));
+		gids('query_i_1', lindx(focus_run_low[1], uq), 0);
 		gids('query_v_b_1', linterp(focus_run_low[1], focus_run_low[2], uq));
 		gids('query_F_h_1', linterp(focus_run_low[1], focus_run_low[5], uq));
 		gids('query_F_w_1', linterp(focus_run_low[1], focus_run_low[6], uq));
 		gids('query_omega_b_1', linterp(focus_run_low[1], focus_run_low[3], uq));
 		gids('query_omega_w_1', linterp(focus_run_low[1], focus_run_low[4], uq));
 		gids('query_t_1', linterp(focus_run_low[1], focus_run_low[0], uq));
-		gids('query_i_2', lindx(focus_run_high[1], uq));
+		gids('query_i_2', lindx(focus_run_high[1], uq), 0);
 		gids('query_v_b_2', linterp(focus_run_high[1], focus_run_high[2], uq));
 		gids('query_F_h_2', linterp(focus_run_high[1], focus_run_high[5], uq));
 		gids('query_F_w_2', linterp(focus_run_high[1], focus_run_high[6], uq));
@@ -494,13 +493,13 @@
 		focus_run_high = run_high;
 
 		t_l = convert_to(run_low[0], 's');
-		u_l = convert_to(run_low[1], inputs_unit_map['w'][unit_sys]);
+		u_l = convert_to(run_low[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_l = convert_to(run_low[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_l = convert_to(run_low[3], inputs_unit_map['exit_omega_b'][unit_sys]);
 		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w'][unit_sys]);
 
 		t_h = convert_to(run_high[0], 's');
-		u_h = convert_to(run_high[1], inputs_unit_map['w'][unit_sys]);
+		u_h = convert_to(run_high[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_h = convert_to(run_high[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_h = convert_to(run_high[3], inputs_unit_map['exit_omega_b'][unit_sys]);
 		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w'][unit_sys]);
@@ -542,7 +541,7 @@
 		drawTicks('y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
 		drawTicks('z', null, null, z_ticklabels, yf, y0, xf, x0, 5);
 		
-		for (i in t) {
+		for (i in u) {
 			var pt = svg.createSVGPoint();
 			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
 			pt.y = y0 + (yf-y0)/(v_b_max-0)*(v_b[i]-0);
@@ -656,12 +655,12 @@
 					<td><input id="w_err" value=''></td>
 					<td class="unit" id='unit_w'></td>
 				</tr><tr>
-					<th class="rowlabel">Angle Start</th>
+					<th class="rowlabel">Hood Start<span class="ttt">Angle that the hood starts at, with respect to vertical.<br/>A larger value would mean the hood wraps around more.</span></th>
 					<td><input id="theta_start" value=120></td><td class="tiny">&#177;</td>
 					<td><input id="theta_start_err" value=1></td>
 					<td class="unit" id='unit_theta_start'></td>
 				</tr><tr>
-					<th class='rowlabel'>Angle End</th>
+					<th class='rowlabel'>Hood End<span class="ttt">Angle that the hood ends at, with respect to vertical.<br/>This would be the same as the release/departure angle with respect to the horizontal.<br/>A larger value would mean that the hood wraps around less, and creates a more vertical shot.</span></th>
 					<td><input id='theta_end' value=15></td><td class="tiny">&#177;</td>
 					<td><input id='theta_end_err' value=''></td>
 					<td class='unit' id='unit_theta_end'></td>
@@ -785,11 +784,11 @@
 <g class="labels y-labels" id='chart_y_axis_labels'></g>
 
 <g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
+	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
 </g>
 <g class="marker-line">
-	<line id="chart_stable_line_1" x1=100 x2=100 y1=15 y2=455></line>
-	<line id="chart_stable_line_2" x1=100 x2=100 y1=15 y2=455></line>
+	<line id="chart_stable_line_1" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+	<line id="chart_stable_line_2" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
 </g>
 <polyline
 	id='chart_v_b_area'
