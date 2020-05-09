@@ -33,6 +33,7 @@ hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
 .collabel{
 	text-align: top;
+  text-align: center;
 }
 
 .rowlabel{
@@ -216,5 +217,9 @@ button {
 }
 
 #compute_btn {
+  background-color: #55a040;
+}
+
+.hovered {
   background-color: #55a040;
 }
