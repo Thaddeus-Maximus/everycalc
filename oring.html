@@ -103,6 +103,7 @@
 		}
 
 		select_type();
+		document.getElementById('topbar_version').innerHTML = VERSION;
 	}
 
 	function select_dash_size() {
@@ -354,7 +355,11 @@
 
 	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 	function download_page() {
-		console.log('downloading...');
+		today = new Date();
+		var fileName = 'oring_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		fileName += '.html';
 
 		head = document.head || document.getElementsByTagName('head')[0]
 
@@ -383,14 +388,20 @@
 			}
 		}
 
-		today = new Date();
-		var fileName = 'oring_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName) + '.html';
+
 		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
 		var myFile = new Blob([fileContent], {type: 'text/html'});
 		window.URL = window.URL || window.webkitURL;
-		document.getElementById('download').setAttribute('href', window.URL.createObjectURL(myFile));
-		document.getElementById('download').setAttribute('download', fileName);
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+		//document.getElementById('download').setAttribute('download', fileName);
+		console.log('done!');
+	}
+
+	function print_page() {
+		window.print();
 	}
 </script>
 
@@ -456,11 +467,15 @@ input {
 
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_ctr">O-Ring Gland</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 <div style="float: left;" class="container">
-	<h3>Thad's O-Ring Calculator</h3> <a onclick="download_page()" id="download">Download</a>
-	<center>
-		<a href="./">Back To Index</a>
-	</center>
 
 <div style='display:table-row'>
 	<div class="odd" style='display:table-cell'>
