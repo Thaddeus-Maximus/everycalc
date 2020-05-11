@@ -74,6 +74,8 @@
 	function thload() {
 		var inputs, index;
 
+		if (packed_inputs) unpack_inputs();
+
 		switch_units();
 
 		inputs = document.getElementsByTagName('input');
@@ -323,7 +325,37 @@
 	}
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
 <script>
+	function pack_inputs() {
+		packed_inputs = {};
+		packed_inputs.unit_sys = unit_sys;
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		unit_sys = packed_inputs.unit_sys;
+		delete packed_inputs.unit_sys;
+		document.getElementById('unit_english').checked = unit_sys;
+		document.getElementById('unit_metric') .checked = !unit_sys;
+		for (key in packed_inputs) {
+			document.getElementById(key).value = packed_inputs[key];
+		}
+	}
+
 	function readTextFile(file)
 	{
 		var allText = null;
@@ -361,7 +393,9 @@
 		if (!fileName) return;
 		fileName += '.html';
 
-		head = document.head || document.getElementsByTagName('head')[0]
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
 
 		scripts   = document.getElementsByTagName('script');
 		for (script of scripts) {
