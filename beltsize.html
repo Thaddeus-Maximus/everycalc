@@ -3,12 +3,16 @@
 <script type="text/javascript" src="include/specs.js"></script>
 <script type="text/javascript">
 	function thload() {
+		if(packed_inputs) unpack_inputs();
+		switch_type();
+		chg_series();
+		if(packed_inputs) unpack_inputs();
 		vendor_select();
 		driver_select();
 		switch_type();
 		chg_units();
-		chg_series();
 		strength_compute();
+		document.getElementById('topbar_version').innerHTML = VERSION;
 	}
 
 	function gidv(id) {
@@ -393,14 +397,135 @@
 
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
+<script>
+	function pack_inputs() {
+		packed_inputs = {};
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+			if (input.type == "radio") {
+				packed_inputs[input.id] = input.checked;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		for (key in packed_inputs) {
+			if (typeof packed_inputs[key] == "boolean")
+				document.getElementById(key).checked = packed_inputs[key];
+			else
+				document.getElementById(key).value   = packed_inputs[key];
+		}
+	}
+
+	function readTextFile(file)
+	{
+		var allText = null;
+	    var rawFile = new XMLHttpRequest();
+	    rawFile.open("GET", file, false);
+	    rawFile.onreadystatechange = function ()
+	    {
+	        if(rawFile.readyState === 4)
+	        {
+	            if(rawFile.status === 200 || rawFile.status == 0)
+	            {
+	                allText = rawFile.responseText;
+	            }
+	        }
+	    }
+	    rawFile.send(null);
+	    return allText;
+	}
+
+	if (!String.prototype.decodeHTML) {
+	  String.prototype.decodeHTML = function () {
+	    return this.replace(/&apos;/g, "'")
+	               .replace(/&quot;/g, '"')
+	               .replace(/&gt;/g, '>')
+	               .replace(/&lt;/g, '<')
+	               .replace(/&amp;/g, '&');
+	  };
+	}
+
+	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+	function download_page() {
+		today = new Date();
+		var fileName = 'beltsize_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
+		fileName += '.html';
+
+
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
+
+		scripts   = document.getElementsByTagName('script');
+		for (script of scripts) {
+			if (script.src) {
+				scr = readTextFile(script.src);
+				script.innerHTML = scr;
+				script.removeAttribute('src');
+			}
+		}
+
+		links = document.getElementsByTagName('link');
+		for (link of links) {
+			if (link.href) {
+				scr = readTextFile(link.href);
+				style = document.createElement('style');
+				style.type='text/css';
+				if(style.styleSheet) {
+					style.styleSheet.cssText = scr;
+				} else {
+					style.appendChild(document.createTextNode(scr));
+				}
+				head.prepend(style);
+				link.parentElement.removeChild(link);
+			}
+		}
+
+
+		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
+		var myFile = new Blob([fileContent], {type: 'text/html'});
+		window.URL = window.URL || window.webkitURL;
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+		//document.getElementById('download').setAttribute('download', fileName);
+		console.log('done!');
+	}
+
+	function print_page() {
+		window.print();
+	}
+</script>
+
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_la" id='topbar_fname'></div>
+	<div class="topbar_ctr">Belt/Pulley Sizing</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 <div style="float: left;" class="container">
-	<h3>Thad's Belt Calculator</h3>
-	<center>
-		<a href="./">Back To Index</a> - <a href="./docs/beltcalc.pdf">Model Documentation</a><br/>
-	</center>
-
 	<div class="even">
 		<center>
 			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="chg_units(); compute()"  checked>

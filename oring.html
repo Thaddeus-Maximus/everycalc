@@ -391,6 +391,7 @@
 		var fileName = 'oring_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
 		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
 		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
 		fileName += '.html';
 
 		head = document.head || document.getElementsByTagName('head')[0];
@@ -513,7 +514,6 @@ input {
 
 <div style='display:table-row'>
 	<div class="odd" style='display:table-cell'>
-		
 		<table>
 			<tr>
 				<td colspan=5 style="text-align:center;">

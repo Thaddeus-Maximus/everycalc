@@ -94,6 +94,17 @@
 	}
 
 	function thload() {
+		document.getElementById('topbar_version').innerHTML = VERSION;
+		select = document.getElementById("motortype");
+		i=0;
+		for(motor in motor_data) {
+			i++;
+			opt = document.createElement('option');
+			opt.innerHTML = motor_data[motor]["plain_name"];
+			opt.value = motor;
+			select.appendChild(opt);
+		}
+		if(packed_inputs) unpack_inputs();
 		var inputs, index;
 
 		select_plot_mode(true);
@@ -111,15 +122,6 @@
 		    }
 		}
 
-		select = document.getElementById("motortype");
-		i=0;
-		for(motor in motor_data) {
-			i++;
-			opt = document.createElement('option');
-			opt.innerHTML = motor_data[motor]["plain_name"];
-			opt.value = motor;
-			select.appendChild(opt);
-		}
 
 		calc_ratio();
 		motortype_select(document.getElementById("motortype"));
@@ -501,13 +503,145 @@
 	}
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
+<script>
+	function pack_inputs() {
+		packed_inputs = {};
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+			if (input.type == "radio") {
+				packed_inputs[input.id] = input.checked;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		for (key in packed_inputs) {
+			if (typeof packed_inputs[key] == "boolean")
+				document.getElementById(key).checked = packed_inputs[key];
+			else
+				document.getElementById(key).value   = packed_inputs[key];
+		}
+
+		loads = document.getElementsByClassName('load');
+		for (load of loads) {
+			console.log('unpacked ', load)
+			load.identifier = load.firstChild.getAttribute('identifier');
+		}
+		for (btn of document.getElementsByClassName('toggle_button'))
+			btn.innerHTML = "&#9650;";
+	}
+
+	function readTextFile(file)
+	{
+		var allText = null;
+	    var rawFile = new XMLHttpRequest();
+	    rawFile.open("GET", file, false);
+	    rawFile.onreadystatechange = function ()
+	    {
+	        if(rawFile.readyState === 4)
+	        {
+	            if(rawFile.status === 200 || rawFile.status == 0)
+	            {
+	                allText = rawFile.responseText;
+	            }
+	        }
+	    }
+	    rawFile.send(null);
+	    return allText;
+	}
+
+	if (!String.prototype.decodeHTML) {
+	  String.prototype.decodeHTML = function () {
+	    return this.replace(/&apos;/g, "'")
+	               .replace(/&quot;/g, '"')
+	               .replace(/&gt;/g, '>')
+	               .replace(/&lt;/g, '<')
+	               .replace(/&amp;/g, '&')
+	               .replace(/â–¼/g, '&#9650;');
+	  };
+	}
+
+	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+	function download_page() {
+		today = new Date();
+		var fileName = 'simplemech_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
+		fileName += '.html';
+
+
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
+
+		scripts   = document.getElementsByTagName('script');
+		for (script of scripts) {
+			if (script.src) {
+				scr = readTextFile(script.src);
+				script.innerHTML = scr;
+				script.removeAttribute('src');
+			}
+		}
+
+		links = document.getElementsByTagName('link');
+		for (link of links) {
+			if (link.href) {
+				scr = readTextFile(link.href);
+				style = document.createElement('style');
+				style.type='text/css';
+				if(style.styleSheet) {
+					style.styleSheet.cssText = scr;
+				} else {
+					style.appendChild(document.createTextNode(scr));
+				}
+				head.prepend(style);
+				link.parentElement.removeChild(link);
+			}
+		}
+
+
+		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
+		var myFile = new Blob([fileContent], {type: 'text/html'});
+		window.URL = window.URL || window.webkitURL;
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+		//document.getElementById('download').setAttribute('download', fileName);
+		console.log('done!');
+	}
+
+	function print_page() {
+		window.print();
+	}
+</script>
 
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_la" id='topbar_fname'></div>
+	<div class="topbar_ctr">General Mechanism</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 	<div style="display:table;">
 	<div style="width: 300px; float: left; display:table-cell;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
-	<center><a href="./">Back To Index</a></center>
 
 	<div class="odd">
 		<center>
@@ -538,7 +672,7 @@
 			
 			<span class="rowlabel">Motor</span>
 			<select class="doublewide" id="motortype" oninput="motortype_select()"></select>
-			<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>
+			<button type="button" onclick="collapse('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
 		</div>
 	<table id='detail_motor' style='display:none;'>
 		<tr>
@@ -574,7 +708,7 @@
 		<div>
 		<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
 		<input id="G"/>
-		<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>
+		<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
 	</div>
 	<table id='detail_gratio' style="display:none;">
 		<tr>
@@ -603,7 +737,7 @@
 				<option value="motor">To Motor</option>
 				<option value="output">To Output</option>
 			</select>
-		<button type="button" onclick="collapse('encoder')" id='toggle_detail_encoder'>&#9660;</button>
+		<button type="button" onclick="collapse('encoder')" id='toggle_detail_encoder' class="toggle_button">&#9660;</button>
 		</div>
 		<table id='detail_encoder' style='display:none;'>
 		<tr class='encoder_detail'>
@@ -640,7 +774,7 @@
 	</table>
 <div class="even">
 	Variable reference for use in expressions
-	<button type="button" onclick="collapse('varref')" id='toggle_detail_varref'>&#9660;</button>
+	<button type="button" onclick="collapse('varref')" id='toggle_detail_varref' class="toggle_button">&#9660;</button>
 	<table id='detail_varref' style='display:none;'>
 			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
 			<tr><th class='rowlabel'>m</th><td class="unit" id="unit_mass_ref">[kg]</td><td>Mass</td></tr>
@@ -692,7 +826,7 @@
 	</div>
 </div><div class="even">
 		<span class="rowlabel">Protips</span>
-		<button type="button" onclick="collapse('protips')" id='toggle_detail_protips'>&#9660;</button>
+		<button type="button" onclick="collapse('protips')" id='toggle_detail_protips' class="toggle_button">&#9660;</button>
 		<table id='detail_protips'>
 		<tr>
 			<td>
