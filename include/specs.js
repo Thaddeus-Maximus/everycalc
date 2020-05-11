@@ -1,3 +1,5 @@
+var VERSION = "V0.3";
+
 var motor_data = {
 		"neo": {
 			"plain_name": "REV NEO",

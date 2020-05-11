@@ -74,6 +74,8 @@
 	function thload() {
 		var inputs, index;
 
+		if (packed_inputs) unpack_inputs();
+
 		switch_units();
 
 		inputs = document.getElementsByTagName('input');
@@ -103,6 +105,7 @@
 		}
 
 		select_type();
+		document.getElementById('topbar_version').innerHTML = VERSION;
 	}
 
 	function select_dash_size() {
@@ -146,7 +149,6 @@
 
 
 		document.getElementById('graphic_'+type).style.display = '';
-		console.log(document.getElementById('graphic_'+type));
 
 		document.getElementById('application').innerHTML = `
 			<option value="s">Static</option>
@@ -210,7 +212,6 @@
 		}
 		if (!x) return;
 		for (el of document.getElementsByClassName(`d${x}_label`)) {
-			console.log(el);
 			el.classList.add('hovered_ill');
 		}
 	}
@@ -254,11 +255,9 @@
 		rod = rid+rw*2;
 		if(rid < id) {
 			// stretched around inside
-			console.log('inside', rid, id);
 			return (id/rid - 1) * 100;
 		} else if (rod > od) {
 			// compressed against outside
-			console.log('outside');
 			return (od/rod - 1) * 100;
 		} else {
 			return 0;
@@ -326,6 +325,121 @@
 	}
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
+<script>
+	function pack_inputs() {
+		packed_inputs = {};
+		packed_inputs.unit_sys = unit_sys;
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		unit_sys = packed_inputs.unit_sys;
+		delete packed_inputs.unit_sys;
+		document.getElementById('unit_english').checked = unit_sys;
+		document.getElementById('unit_metric') .checked = !unit_sys;
+		for (key in packed_inputs) {
+			document.getElementById(key).value = packed_inputs[key];
+		}
+	}
+
+	function readTextFile(file)
+	{
+		var allText = null;
+	    var rawFile = new XMLHttpRequest();
+	    rawFile.open("GET", file, false);
+	    rawFile.onreadystatechange = function ()
+	    {
+	        if(rawFile.readyState === 4)
+	        {
+	            if(rawFile.status === 200 || rawFile.status == 0)
+	            {
+	                allText = rawFile.responseText;
+	            }
+	        }
+	    }
+	    rawFile.send(null);
+	    return allText;
+	}
+
+	if (!String.prototype.decodeHTML) {
+	  String.prototype.decodeHTML = function () {
+	    return this.replace(/&apos;/g, "'")
+	               .replace(/&quot;/g, '"')
+	               .replace(/&gt;/g, '>')
+	               .replace(/&lt;/g, '<')
+	               .replace(/&amp;/g, '&');
+	  };
+	}
+
+	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+	function download_page() {
+		today = new Date();
+		var fileName = 'oring_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
+		fileName += '.html';
+
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
+
+		scripts   = document.getElementsByTagName('script');
+		for (script of scripts) {
+			if (script.src) {
+				scr = readTextFile(script.src);
+				script.innerHTML = scr;
+				script.removeAttribute('src');
+			}
+		}
+
+		links = document.getElementsByTagName('link');
+		for (link of links) {
+			if (link.href) {
+				scr = readTextFile(link.href);
+				style = document.createElement('style');
+				style.type='text/css';
+				if(style.styleSheet) {
+					style.styleSheet.cssText = scr;
+				} else {
+					style.appendChild(document.createTextNode(scr));
+				}
+				head.prepend(style);
+				link.parentElement.removeChild(link);
+			}
+		}
+
+
+		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
+		var myFile = new Blob([fileContent], {type: 'text/html'});
+		window.URL = window.URL || window.webkitURL;
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+		//document.getElementById('download').setAttribute('download', fileName);
+		console.log('done!');
+	}
+
+	function print_page() {
+		window.print();
+	}
+</script>
+
 <style>
 	.illustration {
 		width: 300px;
@@ -388,15 +502,18 @@ input {
 
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_ctr">O-Ring Gland</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 <div style="float: left;" class="container">
-	<h3>Thad's O-Ring Calculator</h3>
-	<center>
-		<a href="./">Back To Index</a>
-	</center>
 
 <div style='display:table-row'>
 	<div class="odd" style='display:table-cell'>
-		
 		<table>
 			<tr>
 				<td colspan=5 style="text-align:center;">

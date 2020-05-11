@@ -223,3 +223,33 @@ button {
 .hovered {
   background-color: #55a040;
 }
+
+#topbar {
+  width: 100%;
+  background-color: #ddd;
+  display: flex;
+  flex-direction: row;
+  font-weight: bold;
+}
+.topbar_la {
+  text-align: left;
+  flex-grow: 0;
+  padding: 5px;
+  border-right: 1px solid #333;
+}
+.topbar_ra {
+  text-align: right;
+  flex-grow: 0;
+  padding: 5px;
+  border-left:  1px solid #333;
+}
+.topbar_ctr {
+  text-align: center;
+  flex-grow: 10;
+  padding: 5px;
+}
+
+.selectable:hover {
+  background-color: #55a040;
+  cursor: pointer;
+}
