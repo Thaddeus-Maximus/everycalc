@@ -28,9 +28,11 @@
 		'exit_v':       ['m/s','ft/s'],
 		'exit_omega_b': ['RPM','RPM'],
 		'exit_omega_w': ['RPM','RPM'],
+		'exit_theta':       ['deg','deg'],
 		'exit_v_err':        ['m/s','ft/s'],
 		'exit_omega_b_err':  ['RPM','RPM'],
 		'exit_omega_w_err':  ['RPM','RPM'],
+		'exit_theta_err':       ['deg','deg'],
 		'settling_dist_min': ['deg', 'deg'],
 		'settling_dist_max': ['deg', 'deg'],
 
@@ -228,10 +230,10 @@
 		return newxyn;
 	}
 
-	function smooth(x, over) {
-		if (x>over) return 1;
-		if (x<-over) return -1;
-		return x/over;
+	function smooth(X, over) {
+		if (X>over) return 1;
+		if (X<-over) return -1;
+		return X/over;
 	}
 
 	function proc_settle(chnls) {
@@ -247,50 +249,91 @@
 		}
 	}
 
+	function posatan2(X,Y) {
+		atn = Math.atan2(X,Y);
+		if (atn < 0) atn += Math.PI*2;
+		return atn;
+	}
+
+	function avg(arr) {
+		sum = 0;
+		for (X of arr) { sum+=X; }
+		return sum/arr.length;
+	}
+
 	function run_sim_launch(params_pack) {
-		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, u_f] = params_pack;
+		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, theta_0, theta_end] = params_pack;
 		I_b = moi_rat_b*m_b*d_b*d_b/4;
 
 		OVERAMT = gidv('blur_amt');
-		dt = u_f/(omega_w_0)/30;
+		c = 100; // N/(m/s)
 		i=0;
-		u=0;
+		u=theta_0; // angular position
 		t=0;
-		v=0;
+		x=-(w+d_w)/2 * Math.sin(theta_0);
+		y=+(w+d_w)/2 * Math.cos(theta_0);
+		vx=0;
+		vy=0;
+		ax=0;
+		ay=0;
 		omega_b=0;
 		omega_w=omega_w_0;
-		res = [[t],[u],[v],[omega_b],[omega_w],[0],[0],[0],[0]];
-		while(i<1000 && u<=u_f) {
-			N_h = k_b*(d_b-w) + m_b*v*v/(w+d_w);
-			N_w = k_b*(d_b-w) - m_b*v*v/(w+d_w);
-			F_h = - N_h * mu_h * smooth(v-omega_b*w/2 - 0, OVERAMT);
-			F_w = - N_w * mu_w * smooth(v+omega_b*w/2 - omega_w*d_w/2, OVERAMT)
+		res = [[t],[0],[0],[omega_b],[omega_w],[0],[0],[0],[0],[0],[0]];
+		dtv = [];
+		for (i=0;i<20;i++) dtv.push(5e-6);
+		while(i<5000 && u>theta_end) {
 
-			dv       = (F_w+F_h) / m_b;
+			R = Math.sqrt(x*x+y*y);
+			u = posatan2(-x, y);
+			uv = posatan2(vy, vx);
+			vbar = Math.sqrt(vx*vx+vy*vy);
+			vt = Math.sqrt(vx*vx+vy*vy)*Math.cos(u-uv);
+			vn = Math.sqrt(vx*vx+vy*vy)*Math.sin(u-uv);
+			//console.log(i, x,y, vx,vy);
+			N_h = 2*k_b*(R - d_w+d_b/2) - 2*vn*c;
+			N_w = 2*k_b*(d_w+d_b/2 - R) + 2*vn*c; if (N_w < 0) N_w = 0;
+			dvt = vt-omega_b*w/2 - 0;
+			dvb = vt+omega_b*w/2 - omega_w*d_w/2;
+			F_h = - N_h * mu_h * smooth(dvt, OVERAMT);
+			F_w = - N_w * mu_w * smooth(dvb, OVERAMT)
+
+			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 5e-6)); dtv.pop();
+			dt = avg(dtv);
+			//dt = 1e-4;
+			//console.log(dt);
+
+			ax       = ((F_w+F_h)*Math.cos(u) - (N_w-N_h)*Math.sin(u)) / m_b;
+			ay       = ((F_w+F_h)*Math.sin(u) + (N_w-N_h)*Math.cos(u)) / m_b;
 			domega_b = (F_w-F_h)*w/2 / I_b;
 			domega_w = - F_w*d_w/2 / I_w;
 
-			v       += dv*dt;
+			vx      += ax*dt;
+			vy      += ay*dt;
 			omega_b += domega_b*dt;
 			omega_w += domega_w*dt;
-			u       += v*dt /((d_w+w)/2) ;
+			x       += vx*dt;
+			y       += vy*dt;
+			//u       += v*dt /((d_w+w)/2) ;
 			t       += dt;
 
 			res[0] .push(t);
-			res[1] .push(u);
-			res[2] .push(v);
+			res[1] .push(theta_0-u);
+			res[2] .push(Math.sqrt(vx*vx+vy*vy));
 			res[3] .push(omega_b);
 			res[4] .push(omega_w);
 			res[5] .push(N_h);
 			res[6] .push(N_w);
 			res[7] .push(F_h);
 			res[8] .push(F_w);
+			res[9] .push(vt);
+			res[10].push(vn);
 
 			i+=1;
 		}
 
 		stats = {
-			v_b_exit: v,
+			v_b_exit: Math.sqrt(vx*vx+vy*vy),
+			theta_b_exit: posatan2(vy, vx),
 			omega_b_exit: omega_b,
 			omega_w_exit: omega_w,
 			i_settle: proc_settle(res)
@@ -374,16 +417,32 @@
 		max_high_stat = {};
 		max_high_run  = [];
 		max_high_param = [];
-		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w', 'd_w', 'I_w', 'mu_w', 'mu_h', 'omega_w_0'];
+		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w', 'd_w', 'I_w', 'mu_w', 'mu_h', 'omega_w_0', 'theta_start', 'theta_end'];
+		params_var_list  = [];
+		params_var_count = 0;
+		for (param of params_list) {
+			if (gidv(param+'_err')) {
+				params_var_list.push(true);
+				params_var_count++;
+			} else {
+				params_var_list.push(false);
+			}
+		}
 		low_omega_w   = +Infinity;
 
-		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+		for (var i=0; i<Math.pow(2, params_var_count); i++) {
 			params = [];
+			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
-				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+				if (params_var_list[j]) {
+					params.push(gidv(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					pvc ++;
+				} else {
+					params.push(gidv(params_list[j]));
+				}
+
 			}
-			u_f = gidv('theta_start') - gidv('theta_end');
-			params.push(u_f);
+			console.log(params);
 			[run, stats] = run_sim_launch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
@@ -400,6 +459,7 @@
 			if (stats.omega_w_exit < low_omega_w) {
 				low_omega_w = stats.omega_w_exit;
 			}
+			//break;
 		}
 
 		
@@ -420,9 +480,11 @@
 		drawchart_rev(rev_run, rev_stats);
 
 		gids('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
+		gids('exit_theta', (max_low_stat.theta_b_exit + max_high_stat.theta_b_exit)/2);
 		gids('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
 		gids('exit_omega_w', (max_low_stat.omega_w_exit + max_high_stat.omega_w_exit)/2);
 		gids('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
+		gids('exit_theta_err', Math.abs(max_low_stat.theta_b_exit - max_high_stat.theta_b_exit)/2);
 		gids('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
 		gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
 		gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
@@ -1042,6 +1104,11 @@
 					<td><input id='exit_v' readOnly></td><td class="tiny">&#177;</td>
 					<td><input id='exit_v_err' readOnly></td>
 					<td class='unit' id='unit_exit_v'></td>
+				</tr><tr>
+					<th class='rowlabel'>Exit Angle</th>
+					<td><input id='exit_theta' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_theta_err' readOnly></td>
+					<td class='unit' id='unit_exit_theta'></td>
 				</tr><tr>
 					<th class='rowlabel'>Exit Ball RPM</th>
 					<td><input id='exit_omega_b' readOnly></td><td class="tiny">&#177;</td>
