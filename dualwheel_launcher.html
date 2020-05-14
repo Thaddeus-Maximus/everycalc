@@ -11,22 +11,20 @@ j<!DOCTYPE html>
 		'd_b_err': ['mm', 'in'],
 		'm_b_err': ['kg', 'lbm'],
 		'k_b_err': ['N/m', 'lbf/in'],
+		'w':       ['mm', 'in'],
+		'w_err':   ['mm', 'in'],
 
 		'd_w_bot': ['mm', 'in'],
-		'w_bot':   ['mm', 'in'],
 		'I_w_bot': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0_bot': ['RPM','RPM'],
 		'd_w_bot_err': ['mm', 'in'],
-		'w_bot_err':   ['mm', 'in'],
 		'I_w_bot_err': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0_bot_err': ['RPM','RPM'],
 
 		'd_w_top': ['mm', 'in'],
-		'w_top':   ['mm', 'in'],
 		'I_w_top': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0_top': ['RPM','RPM'],
 		'd_w_top_err': ['mm', 'in'],
-		'w_top_err':   ['mm', 'in'],
 		'I_w_top_err': ['kg mm^2', 'lbm in^2'],
 		'omega_w_0_top_err': ['RPM','RPM'],
 
@@ -267,53 +265,72 @@ j<!DOCTYPE html>
 	}
 
 	function run_sim_launch(params_pack) {
-		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, u_f] = params_pack;
+		[d_b, m_b, moi_rat_b, k_b, w,
+		d_w_top, I_w_top, mu_w_top, omega_w_0_top,
+		d_w_bot, I_w_bot, mu_w_bot, omega_w_0_bot,
+		G_top] = params_pack;
+
 		I_b = moi_rat_b*m_b*d_b*d_b/4;
 
 		OVERAMT = gidv('blur_amt');
-		dt = u_f/(omega_w_0)/30;
+		dt = 1e-4; //u_f/(omega_w_0)/30;
 		i=0;
-		u=0;
+		u0 = -Math.sqrt((d_w_top+w)*(d_w_bot+w)*(d_b*(d_b+d_w_top+d_w_bot)-w*(d_w_top+d_w_bot+w)))/(d_w_top+d_w_bot+2*w);
+		y  = (d_w_bot*(d_b+d_w_top+d_w_bot) + 2*w*(w + d_w_bot + d_w_top) - d_b*d_w_top)/2/(d_w_top+d_w_bot+2*w);
+		u=u0+1e-3;
 		t=0;
 		v=0;
 		omega_b=0;
-		omega_w=omega_w_0;
-		res = [[t],[u],[v],[omega_b],[omega_w],[0],[0],[0],[0]];
-		while(i<1000 && u<=u_f) {
-			N_h = k_b*(d_b-w) + m_b*v*v/(w+d_w);
-			N_w = k_b*(d_b-w) - m_b*v*v/(w+d_w);
-			F_h = - N_h * mu_h * smooth(v-omega_b*w/2 - 0, OVERAMT);
-			F_w = - N_w * mu_w * smooth(v+omega_b*w/2 - omega_w*d_w/2, OVERAMT)
+		omega_w_top=omega_w_0_top;
+		omega_w_bot=omega_w_0_bot;
+		res = [[t],[u-u0],[v],[omega_b],[omega_w_top],[omega_w_bot],[0],[0],[0],[0]];
+		while(i<10000) {
+			psi = Math.atan2(u, (d_w_bot+d_w_top)/2 + w - y);
+			theta = Math.atan2(u, y);
+			del_top = (d_b+d_w_top)/2 - Math.sqrt(u*u + Math.pow((d_w_bot+d_w_top)/2 + w - y, 2));
+			del_bot = (d_b+d_w_bot)/2 - Math.sqrt(u*u + y*y);
 
-			dv       = (F_w+F_h) / m_b;
-			domega_b = (F_w-F_h)*w/2 / I_b;
-			domega_w = - F_w*d_w/2 / I_w;
+			N_w_top = 2*k_b*del_top; if (N_w_top < 0) N_w_top = 0;
+			N_w_bot = 2*k_b*del_bot; if (N_w_bot < 0) N_w_bot = 0;
+			F_w_top = - N_w_top * mu_w_top * smooth(v-omega_b*w/2 - omega_w_bot*d_w_top/2, OVERAMT);
+			F_w_bot = - N_w_bot * mu_w_bot * smooth(v+omega_b*w/2 - omega_w_top*d_w_bot/2, OVERAMT);
+
+			dv       = N_w_bot*Math.sin(theta) + F_w_bot*Math.cos(theta) + N_w_top*Math.sin(psi) + F_w_bot*Math.cos(psi);
+			domega_b = (F_w_bot-F_w_top)*d_b/2 / I_b;
+			domega_w_top = 0; // - F_w*d_w/2 / I_w;
+			domega_w_bot = 0; // - F_w*d_w/2 / I_w;
 
 			v       += dv*dt;
 			omega_b += domega_b*dt;
-			omega_w += domega_w*dt;
-			u       += v*dt /((d_w+w)/2) ;
+			omega_w_top += domega_w_top*dt;
+			omega_w_bot += domega_w_bot*dt;
+			u       += v*dt;
 			t       += dt;
 
 			res[0] .push(t);
-			res[1] .push(u);
+			res[1] .push(u-u0);
 			res[2] .push(v);
-			res[3] .push(omega_b);
-			res[4] .push(omega_w);
-			res[5] .push(N_h);
-			res[6] .push(N_w);
-			res[7] .push(F_h);
-			res[8] .push(F_w);
+			res[3] .push(Math.abs(omega_b));
+			res[4] .push(omega_w_top);
+			res[5] .push(omega_w_bot);
+			res[6] .push(N_w_top);
+			res[7] .push(N_w_bot);
+			res[8] .push(F_w_top);
+			res[9] .push(F_w_bot);
 
 			i+=1;
+			if (N_w_top <= 0 && N_w_bot <= 0) break;
 		}
 
 		stats = {
 			v_b_exit: v,
 			omega_b_exit: omega_b,
-			omega_w_exit: omega_w,
+			omega_w_top_exit: omega_w_top,
+			omega_w_bot_exit: omega_w_bot,
 			i_settle: proc_settle(res)
 		}
+
+		console.log(res);
 
 		return [res, stats];
 	}
@@ -383,8 +400,6 @@ j<!DOCTYPE html>
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
 
-		
-
 		max_low       = +Infinity;
 		max_low_stat  = {};
 		max_low_run   = [];
@@ -393,16 +408,25 @@ j<!DOCTYPE html>
 		max_high_stat = {};
 		max_high_run  = [];
 		max_high_param = [];
-		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w', 'd_w', 'I_w', 'mu_w', 'mu_h', 'omega_w_0'];
+		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w',
+		'd_w_top', 'I_w_top', 'mu_w_top', 'omega_w_0_top',
+		'd_w_bot', 'I_w_bot', 'mu_w_bot', 'omega_w_0_bot'];
+		params_var_list  = [];
+		params_var_count = 0;
 		low_omega_w   = +Infinity;
 
 		for (var i=0; i<Math.pow(2, params_list.length); i++) {
 			params = [];
+			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
-				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+				if (params_var_list[j]) {
+					params.push(gidv(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					pvc ++;
+				} else {
+					params.push(gidv(params_list[j]));
+				}
 			}
-			u_f = gidv('theta_start') - gidv('theta_end');
-			params.push(u_f);
+			params.push(document.getElementById('motortype_top')=="slave" ? gidv("G_top"):NaN);
 			[run, stats] = run_sim_launch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
@@ -419,11 +443,12 @@ j<!DOCTYPE html>
 			if (stats.omega_w_exit < low_omega_w) {
 				low_omega_w = stats.omega_w_exit;
 			}
+			break;
 		}
 
 		
 
-		G = gidv('G');
+		/*G = gidv('G');
 
 		[rev_run, rev_stats] = run_sim_rev([
 			gidv('motor_stall_torque_adj')*G,
@@ -433,29 +458,29 @@ j<!DOCTYPE html>
 			gidv('I_w') + gidv('I_w_err'),
 			gidv('omega_w_0'),
 			low_omega_w, '0']);
+		drawchart_rev(rev_run, rev_stats);*/
 
       	drawchart_launch(max_low_run, max_high_run, max_low_stat, max_high_stat);
 
-		drawchart_rev(rev_run, rev_stats);
 
 		gids('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
 		gids('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
-		gids('exit_omega_w', (max_low_stat.omega_w_exit + max_high_stat.omega_w_exit)/2);
+		//gids('exit_omega_w', (max_low_stat.omega_w_exit + max_high_stat.omega_w_exit)/2);
 		gids('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
 		gids('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
-		gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
+		//gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
 		gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 		gids('settling_dist_max', Math.max(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 
-		gids('t_rev_live', rev_stats.t_live);
+		/*gids('t_rev_live', rev_stats.t_live);
 		gids('t_rev_dead', rev_stats.t_dead);
 		gids('cur_cons_dead', rev_stats.cur_cons_dead);
 		gids('cur_cons_live', rev_stats.cur_cons_live);
-		gids('cur_idle', rev_stats.idle_current);
+		gids('cur_idle', rev_stats.idle_current);*/
 
 		validate_computations('valid');
-		if (rev_stats.valid != 2)
-			validate_computations('error', ['t_rev_live', 't_rev_dead', 'cur_cons_dead', 'cur_cons_live', 'cur_idle']);
+		//if (rev_stats.valid != 2)
+		//	validate_computations('error', ['t_rev_live', 't_rev_dead', 'cur_cons_dead', 'cur_cons_live', 'cur_idle']);
 	}
 
 	function NaNtoerr(x) {
@@ -472,11 +497,12 @@ j<!DOCTYPE html>
 
 <script type="text/javascript">
 	function makeTicks(maxes, num_to_print, n) {
-		if (Math.min(maxes) < 0) return [0];
+		//if (Math.min(maxes) < 0) return [0];
 		H = [];
 		bases = [];
 		for(var i=0; i<maxes.length; i++){
-			h = maxes[i]/n;
+			if (maxes[i] > 0) h = maxes[i]/n;
+			else              h = 1;
 			base = Math.floor(Math.log10(h)-Math.log10(5));
 			bases.push(base);
 			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
@@ -639,13 +665,13 @@ j<!DOCTYPE html>
 		u_l = convert_to(run_low[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_l = convert_to(run_low[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_l = convert_to(run_low[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w'][unit_sys]);
+		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w_top'][unit_sys]);
 
 		t_h = convert_to(run_high[0], 's');
 		u_h = convert_to(run_high[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_h = convert_to(run_high[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_h = convert_to(run_high[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w'][unit_sys]);
+		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w_top'][unit_sys]);
 
 		t = t_l.reverse().concat(t_h);
 		u = u_l.reverse().concat(u_h);
@@ -673,12 +699,15 @@ j<!DOCTYPE html>
 		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_w)], 2, 8);
 		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_w), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
 
+
 		u_ticks.pop(); x_ticklabels.pop();
 		
 		u_max = Math.max(...u);
 		v_b_max     = v_b_ticks[v_b_ticks.length-1];
 		omega_b_max = omega_b_ticks[omega_b_ticks.length-1];
 		omega_w_max = omega_w_ticks[omega_w_ticks.length-1];
+
+		console.log(omega_b_max, omega_b);
 
 		drawTicks('chart_launch', 'x', u_ticks, u_max, x_ticklabels, xf, x0, yf, y0, 15);
 		drawTicks('chart_launch', 'y', null, null, y_ticklabels, yf, y0, xf, x0, 5);
@@ -903,7 +932,7 @@ j<!DOCTYPE html>
 <html>
 <body onload="thload()">
 <div style="width: 100%; float: left;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Hooded Flywheel Shooter Calculator</h3>
+	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Dual Flywheel Shooter Calculator</h3>
 	<center><a href="./">Back To Index</a><br/></center>
 
 	

@@ -263,77 +263,58 @@
 
 	function run_sim_launch(params_pack) {
 		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, theta_0, theta_end] = params_pack;
-		I_b = moi_rat_b*m_b*d_b*d_b/4;
+		I_b = moi_rat_b*m_b*w*w/4;
 
 		OVERAMT = gidv('blur_amt');
-		c = 100; // N/(m/s)
 		i=0;
-		u=theta_0; // angular position
+		u=theta_0; // angular positionx
 		t=0;
-		x=-(w+d_w)/2 * Math.sin(theta_0);
-		y=+(w+d_w)/2 * Math.cos(theta_0);
-		vx=0;
-		vy=0;
-		ax=0;
-		ay=0;
+		R=(w+d_w)/2;
+		v_b=0;
 		omega_b=0;
 		omega_w=omega_w_0;
-		res = [[t],[0],[0],[omega_b],[omega_w],[0],[0],[0],[0],[0],[0]];
+		res = [[t],[0],[v_b],[omega_b],[omega_w],[0],[0],[0],[0]];
 		dtv = [];
-		for (i=0;i<20;i++) dtv.push(5e-6);
-		while(i<5000 && u>theta_end) {
-
-			R = Math.sqrt(x*x+y*y);
-			u = posatan2(-x, y);
-			uv = posatan2(vy, vx);
-			vbar = Math.sqrt(vx*vx+vy*vy);
-			vt = Math.sqrt(vx*vx+vy*vy)*Math.cos(u-uv);
-			vn = Math.sqrt(vx*vx+vy*vy)*Math.sin(u-uv);
-			//console.log(i, x,y, vx,vy);
-			N_h = 2*k_b*(R - d_w+d_b/2) - 2*vn*c;
-			N_w = 2*k_b*(d_w+d_b/2 - R) + 2*vn*c; if (N_w < 0) N_w = 0;
-			dvt = vt-omega_b*w/2 - 0;
-			dvb = vt+omega_b*w/2 - omega_w*d_w/2;
+		impls = 0;
+		for (i=0;i<20;i++) dtv.push(8e-6);
+		while(i<10000 && u>theta_end) {
+			N_h = 2*k_b*(d_b-w)/2 + v_b*v_b/R*m_b/2;
+			N_w = 2*k_b*(d_b-w)/2 - v_b*v_b/R*m_b/2; if (N_w < 0) N_w = 0;
+			dvt = v_b-omega_b*w/2 - 0;
+			dvb = v_b+omega_b*w/2 - omega_w*d_w/2;
 			F_h = - N_h * mu_h * smooth(dvt, OVERAMT);
 			F_w = - N_w * mu_w * smooth(dvb, OVERAMT)
 
-			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 5e-6)); dtv.pop();
+			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
 			dt = avg(dtv);
-			//dt = 1e-4;
-			//console.log(dt);
 
-			ax       = ((F_w+F_h)*Math.cos(u) - (N_w-N_h)*Math.sin(u)) / m_b;
-			ay       = ((F_w+F_h)*Math.sin(u) + (N_w-N_h)*Math.cos(u)) / m_b;
+			dv       = (F_w+F_h) / m_b;
 			domega_b = (F_w-F_h)*w/2 / I_b;
-			domega_w = - F_w*d_w/2 / I_w;
+			domega_w = (-F_w*d_w/2) / I_w;
+			impls += F_w*d_w/2*dt;
 
-			vx      += ax*dt;
-			vy      += ay*dt;
+			v_b      += dv*dt;
 			omega_b += domega_b*dt;
 			omega_w += domega_w*dt;
-			x       += vx*dt;
-			y       += vy*dt;
-			//u       += v*dt /((d_w+w)/2) ;
+			u       -= v_b*dt/R;
 			t       += dt;
 
 			res[0] .push(t);
 			res[1] .push(theta_0-u);
-			res[2] .push(Math.sqrt(vx*vx+vy*vy));
+			res[2] .push(v_b);
 			res[3] .push(omega_b);
 			res[4] .push(omega_w);
 			res[5] .push(N_h);
 			res[6] .push(N_w);
 			res[7] .push(F_h);
 			res[8] .push(F_w);
-			res[9] .push(vt);
-			res[10].push(vn);
 
 			i+=1;
 		}
 
 		stats = {
-			v_b_exit: Math.sqrt(vx*vx+vy*vy),
-			theta_b_exit: posatan2(vy, vx),
+			v_b_exit: v_b,
+			theta_b_exit: theta_end,
 			omega_b_exit: omega_b,
 			omega_w_exit: omega_w,
 			i_settle: proc_settle(res)
@@ -442,7 +423,6 @@
 				}
 
 			}
-			console.log(params);
 			[run, stats] = run_sim_launch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
