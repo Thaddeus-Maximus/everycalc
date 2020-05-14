@@ -280,10 +280,10 @@
 		while(i<10000 && u>theta_end) {
 			N_h = 2*k_b*(d_b-w)/2 + v_b*v_b/R*m_b/2;
 			N_w = 2*k_b*(d_b-w)/2 - v_b*v_b/R*m_b/2; if (N_w < 0) N_w = 0;
-			dvt = v_b-omega_b*w/2 - 0;
-			dvb = v_b+omega_b*w/2 - omega_w*d_w/2;
-			F_h = - N_h * mu_h * smooth(dvt, OVERAMT);
-			F_w = - N_w * mu_w * smooth(dvb, OVERAMT);
+			dvt = v_b-omega_b*w/2;
+			dvb = omega_w*d_w/2 - v_b+omega_b*w/2;
+			F_h = N_h * mu_h * smooth(dvt, OVERAMT);
+			F_w = N_w * mu_w * smooth(dvb, OVERAMT);
 
 			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
 			dt = avg(dtv);
