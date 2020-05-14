@@ -144,6 +144,8 @@
 	}
 
 	function thload() {
+		document.getElementById('topbar_version').innerHTML = VERSION;
+		if(packed_inputs) unpack_inputs();
 		populate_units();
 
 		var inputs, index;
@@ -962,13 +964,144 @@
 	}
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
+<script>
+	function pack_inputs() {
+		packed_inputs = {};
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+			if (input.type == "checkbox" || input.type == "radio") {
+				packed_inputs[input.id] = input.checked;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		for (key in packed_inputs) {
+			if (typeof packed_inputs[key] == "boolean")
+				document.getElementById(key).checked = packed_inputs[key];
+			else
+				document.getElementById(key).value   = packed_inputs[key];
+		}
+
+		loads = document.getElementsByClassName('load');
+		for (load of loads) {
+			console.log('unpacked ', load)
+			load.identifier = load.firstChild.getAttribute('identifier');
+		}
+		for (btn of document.getElementsByClassName('toggle_button'))
+			btn.innerHTML = "&#9650;";
+	}
+
+	function readTextFile(file)
+	{
+		var allText = null;
+	    var rawFile = new XMLHttpRequest();
+	    rawFile.open("GET", file, false);
+	    rawFile.onreadystatechange = function ()
+	    {
+	        if(rawFile.readyState === 4)
+	        {
+	            if(rawFile.status === 200 || rawFile.status == 0)
+	            {
+	                allText = rawFile.responseText;
+	            }
+	        }
+	    }
+	    rawFile.send(null);
+	    return allText;
+	}
+
+	if (!String.prototype.decodeHTML) {
+	  String.prototype.decodeHTML = function () {
+	    return this.replace(/&apos;/g, "'")
+	               .replace(/&quot;/g, '"')
+	               .replace(/&gt;/g, '>')
+	               .replace(/&lt;/g, '<')
+	               .replace(/&amp;/g, '&')
+	               .replace(/â–¼/g, '&#9650;');
+	  };
+	}
+
+	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+	function download_page() {
+		today = new Date();
+		var fileName = 'hoodwhl_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
+		fileName += '.html';
+
+
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
+
+		scripts   = document.getElementsByTagName('script');
+		for (script of scripts) {
+			if (script.src) {
+				scr = readTextFile(script.src);
+				script.innerHTML = scr;
+				script.removeAttribute('src');
+			}
+		}
+
+		links = document.getElementsByTagName('link');
+		for (link of links) {
+			if (link.href) {
+				scr = readTextFile(link.href);
+				style = document.createElement('style');
+				style.type='text/css';
+				if(style.styleSheet) {
+					style.styleSheet.cssText = scr;
+				} else {
+					style.appendChild(document.createTextNode(scr));
+				}
+				head.prepend(style);
+				link.parentElement.removeChild(link);
+			}
+		}
+
+
+		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
+		var myFile = new Blob([fileContent], {type: 'text/html'});
+		window.URL = window.URL || window.webkitURL;
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+		//document.getElementById('download').setAttribute('download', fileName);
+		console.log('done!');
+	}
+
+	function print_page() {
+		window.print();
+	}
+</script>
 
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_la" id='topbar_fname'></div>
+	<div class="topbar_ctr">Hood and Wheel Launcher</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 <div style="width: 100%; float: left;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Hooded Flywheel Shooter Calculator</h3>
-	<center><a href="./">Back To Index</a><br/></center>
-
 	<div class="even" style=''>
 		<table>
 			<tr>
@@ -986,62 +1119,62 @@
 			<table>
 				<tr>
 					<th class="rowlabel">Ball Diameter</th>
-					<td><input id="d_b" value=7></td><td class="tiny">&#177;</td>
+					<td><input id="d_b" value=7></td><td class="tiny">+/-</td>
 					<td><input id="d_b_err" value=''></td>
 					<td class="unit" id='unit_d_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball Mass</th>
-					<td><input id='m_b' value=0.3><td class="tiny">&#177;</td>
+					<td><input id='m_b' value=0.3><td class="tiny">+/-</td>
 					<td><input id='m_b_err' value=''></td>
 					<td class='unit' id='unit_m_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball MOI Ratio<span class="ttt">Ratio of MOI to mass times radius squared.<br/>2/5 for a solid sphere, 2/3 for a hollow sphere, 1/2 for a solid cylinder, 1 for a hollow cylinder.</span></th>
-					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">&#177;</td>
+					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">+/-</td>
 					<td><input id='moi_rat_b_err'></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class="rowlabel">Ball Stiffness<span class="ttt">Stiffness of the ball. This should be evaluated as a shock condition and near the amount of compression in the case of nonlinear balls (which, practically any ball will be)</span></th>
-					<td><input id="k_b" value=20></td><td class="tiny">&#177;</td>
+					<td><input id="k_b" value=20></td><td class="tiny">+/-</td>
 					<td><input id="k_b_err" value=''></td>
 					<td class="unit" id='unit_k_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel Diameter</th>
-					<td><input id='d_w' value=6></td><td class="tiny">&#177;</td>
+					<td><input id='d_w' value=6></td><td class="tiny">+/-</td>
 					<td><input id='d_w_err' value=''></td>
 					<td class='unit' id='unit_d_w'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input id='I_w' value=4><td class="tiny">&#177;</td>
+					<td><input id='I_w' value=4><td class="tiny">+/-</td>
 					<td><input id="I_w_err" value=''></td>
 					<td class='unit' id="unit_I_w"></td>
 				</tr><tr>
 					<th class="rowlabel">Hood Gap</th>
-					<td><input id="w" value=5></td><td class="tiny">&#177;</td>
+					<td><input id="w" value=5></td><td class="tiny">+/-</td>
 					<td><input id="w_err" value=''></td>
 					<td class="unit" id='unit_w'></td>
 				</tr><tr>
 					<th class="rowlabel">Hood Start<span class="ttt">Angle that the hood starts at, with respect to vertical.<br/>A larger value would mean the hood wraps around more.</span></th>
-					<td><input id="theta_start" value=120></td><td class="tiny">&#177;</td>
+					<td><input id="theta_start" value=120></td><td class="tiny">+/-</td>
 					<td><input id="theta_start_err"></td>
 					<td class="unit" id='unit_theta_start'></td>
 				</tr><tr>
 					<th class='rowlabel'>Hood End<span class="ttt">Angle that the hood ends at, with respect to vertical.<br/>This would be the same as the release/departure angle with respect to the horizontal.<br/>A larger value would mean that the hood wraps around less, and creates a more vertical shot.</span></th>
-					<td><input id='theta_end' value=15></td><td class="tiny">&#177;</td>
+					<td><input id='theta_end' value=15></td><td class="tiny">+/-</td>
 					<td><input id='theta_end_err' value=''></td>
 					<td class='unit' id='unit_theta_end'></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
-					<td><input id="mu_w" value=1.0></td><td class="tiny">&#177;</td>
+					<td><input id="mu_w" value=1.0></td><td class="tiny">+/-</td>
 					<td><input id="mu_w_err" value=''></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>COF Hood</th>
-					<td><input id='mu_h' value=0.5></td><td class="tiny">&#177;</td>
+					<td><input id='mu_h' value=0.5></td><td class="tiny">+/-</td>
 					<td><input id='mu_h_err' value=''></td>
 					<td class='unit'>[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Flywheel Target Velocity</th>
-					<td><input id='omega_w_0' value=3000></td><td class="tiny">&#177;</td>
+					<td><input id='omega_w_0' value=3000></td><td class="tiny">+/-</td>
 					<td><input id='omega_w_0_err' value=''></td>
 					<td class='unit' id='unit_omega_w_0'>[-]</td>
 				</tr>
@@ -1124,22 +1257,22 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Exit Velocity</th>
-					<td><input id='exit_v' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_v' readOnly></td><td class="tiny">+/-</td>
 					<td><input id='exit_v_err' readOnly></td>
 					<td class='unit' id='unit_exit_v'></td>
 				</tr><tr>
 					<th class='rowlabel'>Exit Angle</th>
-					<td><input id='exit_theta' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_theta' readOnly></td><td class="tiny">+/-</td>
 					<td><input id='exit_theta_err' readOnly></td>
 					<td class='unit' id='unit_exit_theta'></td>
 				</tr><tr>
 					<th class='rowlabel'>Exit Ball RPM</th>
-					<td><input id='exit_omega_b' readOnly></td><td class="tiny">&#177;</td>
+					<td><input id='exit_omega_b' readOnly></td><td class="tiny">+/-</td>
 					<td><input id='exit_omega_b_err' readOnly></td>
 					<td class='unit' id='unit_exit_omega_b'></td>
 				</tr><tr>
 					<th class="rowlabel">Exit Flywheel RPM</th>
-					<td><input id="exit_omega_w" readOnly></td><td class="tiny">&#177;</td>
+					<td><input id="exit_omega_w" readOnly></td><td class="tiny">+/-</td>
 					<td><input id="exit_omega_w_err" readOnly></td>
 					<td class="unit" id='unit_exit_omega_w'></td>
 				</tr><tr>
