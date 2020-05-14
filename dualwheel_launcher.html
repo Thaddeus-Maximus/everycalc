@@ -264,6 +264,12 @@ j<!DOCTYPE html>
 		}
 	}
 
+	function avg(arr) {
+		sum = 0;
+		for (X of arr) { sum+=X; }
+		return sum/arr.length;
+	}
+
 	function run_sim_launch(params_pack) {
 		[d_b, m_b, moi_rat_b, k_b, w,
 		d_w_top, I_w_top, mu_w_top, omega_w_0_top,
@@ -275,16 +281,61 @@ j<!DOCTYPE html>
 		OVERAMT = gidv('blur_amt');
 		dt = 1e-4; //u_f/(omega_w_0)/30;
 		i=0;
+
 		u0 = -Math.sqrt((d_w_top+w)*(d_w_bot+w)*(d_b*(d_b+d_w_top+d_w_bot)-w*(d_w_top+d_w_bot+w)))/(d_w_top+d_w_bot+2*w);
-		y  = (d_w_bot*(d_b+d_w_top+d_w_bot) + 2*w*(w + d_w_bot + d_w_top) - d_b*d_w_top)/2/(d_w_top+d_w_bot+2*w);
-		u=u0+1e-3;
+		y0 = (d_w_bot*(d_b+d_w_top+d_w_bot) + 2*w*(w + d_w_bot + d_w_top) - d_b*d_w_top)/2/(d_w_top+d_w_bot+2*w);
+
+		y=y0;
+		u=u0+w*3e-2;
 		t=0;
 		v=0;
 		omega_b=0;
 		omega_w_top=omega_w_0_top;
 		omega_w_bot=omega_w_0_bot;
 		res = [[t],[u-u0],[v],[omega_b],[omega_w_top],[omega_w_bot],[0],[0],[0],[0]];
+		dtv = [];
+		for (i=0;i<20;i++) dtv.push(8e-6);
+		console.log(y0);
 		while(i<10000) {
+			j = 0;
+			ya = y-w/2;
+			yb = y+w/2;
+
+			function FNET(Y) {
+				psi = Math.atan2(u, (d_w_bot+d_w_top)/2 + w - Y);
+				theta = Math.atan2(u, Y);
+				del_top = (d_b+d_w_top)/2 - Math.sqrt(u*u + Math.pow((d_w_bot+d_w_top)/2 + w - Y, 2));
+				del_bot = (d_b+d_w_bot)/2 - Math.sqrt(u*u + Y*Y);
+
+				N_w_top = 2*k_b*del_top; if (N_w_top < 0) N_w_top = 0;
+				N_w_bot = 2*k_b*del_bot; if (N_w_bot < 0) N_w_bot = 0;
+				F_w_top = - N_w_top * mu_w_top * smooth(v-omega_b*w/2 - omega_w_bot*d_w_top/2, omega_w_0_bot*d_w_top/2*OVERAMT);
+				F_w_bot = - N_w_bot * mu_w_bot * smooth(v+omega_b*w/2 - omega_w_top*d_w_bot/2, omega_w_0_top*d_w_bot/2*OVERAMT);
+				//console.log([N_w_bot*Math.cos(theta), N_w_top*Math.cos(psi), F_w_bot*Math.sin(theta), F_w_top*Math.sin(psi)]);
+				return N_w_bot*Math.cos(theta) - N_w_top*Math.cos(psi) - F_w_bot*Math.sin(theta) + F_w_top*Math.sin(psi);
+			}
+
+
+			fa = FNET(ya);
+			fb = FNET(yb);
+
+			while(j<100) {
+				yc = (ya+yb)/2;
+				fc = FNET(yc);
+
+				if (fc == 0 || Math.abs(ya-yb)<w/50) break;
+
+				if (sign(fc) == sign(fa)){
+					fa = fc;
+					ya = yc;
+				} else {
+					fb = fc;
+					yb = yc;
+				}
+				j++;
+			}
+			y=y0;
+
 			psi = Math.atan2(u, (d_w_bot+d_w_top)/2 + w - y);
 			theta = Math.atan2(u, y);
 			del_top = (d_b+d_w_top)/2 - Math.sqrt(u*u + Math.pow((d_w_bot+d_w_top)/2 + w - y, 2));
@@ -293,19 +344,41 @@ j<!DOCTYPE html>
 			N_w_top = 2*k_b*del_top; if (N_w_top < 0) N_w_top = 0;
 			N_w_bot = 2*k_b*del_bot; if (N_w_bot < 0) N_w_bot = 0;
 			F_w_top = - N_w_top * mu_w_top * smooth(v-omega_b*w/2 - omega_w_bot*d_w_top/2, OVERAMT);
-			F_w_bot = - N_w_bot * mu_w_bot * smooth(v+omega_b*w/2 - omega_w_top*d_w_bot/2, OVERAMT);
+			dvb = v+omega_b*w/2 - omega_w_top*d_w_bot/2;
+			F_w_bot = - N_w_bot * mu_w_bot * smooth(dvb, OVERAMT);
+
+			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
+			dt = avg(dtv);
+
+
+
+			//console.log(y, j);
 
 			dv       = N_w_bot*Math.sin(theta) + F_w_bot*Math.cos(theta) + N_w_top*Math.sin(psi) + F_w_bot*Math.cos(psi);
-			domega_b = (F_w_bot-F_w_top)*d_b/2 / I_b;
-			domega_w_top = 0; // - F_w*d_w/2 / I_w;
-			domega_w_bot = 0; // - F_w*d_w/2 / I_w;
+			domega_b = (F_w_bot*(d_b/2-del_bot)-F_w_top*(d_b/2-del_top)) / I_b;
 
 			v       += dv*dt;
 			omega_b += domega_b*dt;
-			omega_w_top += domega_w_top*dt;
-			omega_w_bot += domega_w_bot*dt;
 			u       += v*dt;
 			t       += dt;
+
+
+			//console.log(i, [dv, psi*180/Math.PI, theta*180/Math.PI, N_w_top, F_w_top, N_w_bot, F_w_bot]);			
+			
+			if(true) {
+
+			} else if (typeof G_top == 'string') {
+				domega_w_top = - F_w_top*d_w_top/2 / I_w_top;
+				domega_w_bot = - F_w_bot*d_w_bot/2 / I_w_bot;
+
+				omega_w_bot += domega_w_bot*dt;
+				omega_w_top += domega_w_top*dt;
+			} else {
+				domega_w_bot = - F_w_bot*d_w_bot/2 / (I_w_bot + I_w_top/G_top) - F_w_top*d_w_top/2/G_top / (I_w_bot + I_w_top/G_top);
+
+				omega_w_bot += domega_w_bot*dt;
+				omega_w_top = omega_w_bot/G_top;
+			}
 
 			res[0] .push(t);
 			res[1] .push(u-u0);
@@ -426,7 +499,7 @@ j<!DOCTYPE html>
 					params.push(gidv(params_list[j]));
 				}
 			}
-			params.push(document.getElementById('motortype_top')=="slave" ? gidv("G_top"):NaN);
+			params.push(document.getElementById('motortype_top')=="slave" ? gidv("G_top"):"free");
 			[run, stats] = run_sim_launch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
@@ -630,19 +703,19 @@ j<!DOCTYPE html>
 		gids('query_u', uq);
 		gids('query_i_1', lindx(focus_run_low[1], uq), 0);
 		gids('query_v_b_1', linterp(focus_run_low[1], focus_run_low[2], uq));
-		gids('query_N_h_1', linterp(focus_run_low[1], focus_run_low[5], uq));
-		gids('query_N_w_1', linterp(focus_run_low[1], focus_run_low[6], uq));
-		gids('query_F_h_1', linterp(focus_run_low[1], focus_run_low[7], uq));
-		gids('query_F_w_1', linterp(focus_run_low[1], focus_run_low[8], uq));
+		gids('query_N_h_1', linterp(focus_run_low[1], focus_run_low[6], uq));
+		gids('query_N_w_1', linterp(focus_run_low[1], focus_run_low[7], uq));
+		gids('query_F_h_1', linterp(focus_run_low[1], focus_run_low[8], uq));
+		gids('query_F_w_1', linterp(focus_run_low[1], focus_run_low[9], uq));
 		gids('query_omega_b_1', linterp(focus_run_low[1], focus_run_low[3], uq));
 		gids('query_omega_w_1', linterp(focus_run_low[1], focus_run_low[4], uq));
 		gids('query_t_1', linterp(focus_run_low[1], focus_run_low[0], uq));
 		gids('query_i_2', lindx(focus_run_high[1], uq), 0);
 		gids('query_v_b_2', linterp(focus_run_high[1], focus_run_high[2], uq));
-		gids('query_N_h_2', linterp(focus_run_high[1], focus_run_high[5], uq));
-		gids('query_N_w_2', linterp(focus_run_high[1], focus_run_high[6], uq));
-		gids('query_F_h_2', linterp(focus_run_high[1], focus_run_high[7], uq));
-		gids('query_F_w_2', linterp(focus_run_high[1], focus_run_high[8], uq));
+		gids('query_N_h_2', linterp(focus_run_high[1], focus_run_high[6], uq));
+		gids('query_N_w_2', linterp(focus_run_high[1], focus_run_high[7], uq));
+		gids('query_F_h_2', linterp(focus_run_high[1], focus_run_high[8], uq));
+		gids('query_F_w_2', linterp(focus_run_high[1], focus_run_high[9], uq));
 		gids('query_omega_b_2', linterp(focus_run_high[1], focus_run_high[3], uq));
 		gids('query_omega_w_2', linterp(focus_run_high[1], focus_run_high[4], uq));
 		gids('query_t_2', linterp(focus_run_high[1], focus_run_high[0], uq));
@@ -780,6 +853,13 @@ j<!DOCTYPE html>
 		G /= falseto1(document.getElementById("G2A_"+pos).value);
 		G /= falseto1(document.getElementById("G3A_"+pos).value);
 		G /= falseto1(document.getElementById("G4A_"+pos).value);
+
+		if (pos == 'top') {
+			if (document.getElementById('motortype_top').value == 'slave') {
+				gids('omega_w_0_top', gidv('omega_w_0_bot')/G);
+				gids('omega_w_0_top_err', gidv('omega_w_0_bot_err')/G);
+			}
+		}
 
 		gids("G_"+pos, G);
 	}
@@ -975,10 +1055,10 @@ j<!DOCTYPE html>
 					<td><input id="w_err" value=''></td>
 					<td class="unit" id='unit_w'></td>
 				</tr><tr>
-					<th class='rowlabel'>Frictional Blurring<span class='ttt'>Magic number that helps stability with frictional model.<br/>Friction is weird; 2N seems to be a reasonable amount.<br/>Make sure this is the same between any two runs you're comparing.</span></th>
+					<th class='rowlabel'>Frictional Blurring<span class='ttt'>Magic number that helps stability with frictional model. Ratio of interaction speed to flywheel surface speed.<br/>Friction is weird; XXX seems to be a reasonable amount.<br/>Make sure this is the same between any two runs you're comparing.</span></th>
 					<td><input id='blur_amt' value=2></td><td class="tiny"></td>
 					<td></td>
-					<td class='unit' id='unit_blur_amt'>[N]</td>
+					<td class='unit' id='unit_blur_amt'>[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Settling %<span class='ttt'>Percentage error to look for when drawing settling time (vertical black bars)</span></th>
 					<td><input id='settle_amt' value=1></td><td class="tiny"></td>
