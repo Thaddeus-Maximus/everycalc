@@ -290,8 +290,8 @@
 				retry = false;
 			}
 
-			N_h = k_b*(d_b-w); // + v_b*v_b/R*m_b/2;
-			N_w = k_b*(d_b-w); // - v_b*v_b/R*m_b/2;
+			N_h = k_b*(d_b-w) + v_b*v_b/R*m_b/2;
+			N_w = k_b*(d_b-w) - v_b*v_b/R*m_b/2;
 			if (N_w < 0) N_w = 0;
 
 			F_h = N_h * mu_h;
