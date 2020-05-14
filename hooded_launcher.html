@@ -51,7 +51,9 @@
 		'query_F_h_2':     ['N', 'lbf'],
 		'query_F_w_2':     ['N', 'lbf'],
 
-		'query_omega':   ['RPM', 'RPM']
+		'query_omega':   ['RPM', 'RPM'],
+
+		'kM': ['N-m/kRPM', 'in-lbf/kRPM']
 	};
 
 	function validate_computations(state, components) {
@@ -265,39 +267,85 @@
 		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, theta_0, theta_end] = params_pack;
 		I_b = moi_rat_b*m_b*w*w/4;
 
-		OVERAMT = gidv('blur_amt');
 		i=0;
+		i_settled=NaN;
 		u=theta_0; // angular positionx
 		t=0;
 		R=(w+d_w)/2;
 		v_b=0;
 		omega_b=0;
 		omega_w=omega_w_0;
-		res = [[t],[0],[v_b],[omega_b],[omega_w],[0],[0],[0],[0]];
-		dtv = [];
-		impls = 0;
-		for (i=0;i<20;i++) dtv.push(8e-6);
-		while(i<10000 && u>theta_end) {
-			N_h = 2*k_b*(d_b-w)/2 + v_b*v_b/R*m_b/2;
-			N_w = 2*k_b*(d_b-w)/2 - v_b*v_b/R*m_b/2; if (N_w < 0) N_w = 0;
-			dvt = v_b-omega_b*w/2;
-			dvb = omega_w*d_w/2 - v_b+omega_b*w/2;
-			F_h = N_h * mu_h * smooth(dvt, OVERAMT);
-			F_w = N_w * mu_w * smooth(dvb, OVERAMT);
 
-			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
-			dt = avg(dtv);
+		res = [[t],[0],[v_b],[omega_b],[omega_w],[0],[0],[0],[0]];
+
+		dt = dt0 = 1e-2/omega_w_0;
+
+		matched_w = false; matched_h = false;
+		u_regain = 0;
+		retry = false;
+
+		while(i<10000 && u>theta_end) {
+			if (u < u_regain){
+				dt = dt0;
+				retry = false;
+			}
+
+			N_h = k_b*(d_b-w); // + v_b*v_b/R*m_b/2;
+			N_w = k_b*(d_b-w); // - v_b*v_b/R*m_b/2;
+			if (N_w < 0) N_w = 0;
+
+			F_h = N_h * mu_h;
+			F_w = N_w * mu_w;
+
+			if (matched_w){ F_w = F_h*(w*w/4/I_b - 1/m_b) / (1/m_b + w*w/4/I_b + d_w*d_w/4/I_w); }
+			if (matched_h){ F_h = F_w*(w*w/4/I_b - 1/m_b) / (w*w/4/I_b + 1/m_b); }
+			if (matched_w && matched_h){ 
+				F_w = 0; F_h = 0; 
+				if (isNaN(i_settled)) i_settled = i;
+			}
+
 
 			dv       = (F_w+F_h) / m_b;
 			domega_b = (F_w-F_h)*w/2 / I_b;
 			domega_w = (-F_w*d_w/2) / I_w;
-			impls += F_w*d_w/2*dt;
 
-			v_b      += dv*dt;
+			v_b     += dv*dt;
 			omega_b += domega_b*dt;
 			omega_w += domega_w*dt;
 			u       -= v_b*dt/R;
 			t       += dt;
+
+			if (!retry) {
+				if (!matched_w && v_b + omega_b*w/2 > omega_w*d_w/2) {
+					// really, should go back and try again with lower timestep
+					retry = true;
+				}
+				if (!matched_h && v_b - omega_b*w/2 > 0) {
+					// really, should go back and try again with lower timestep
+					retry = true;
+				}
+				if (retry) { // fuk go back, do it slower
+					u_regain = u;
+
+					v_b     -= dv*dt;
+					omega_b -= domega_b*dt;
+					omega_w -= domega_w*dt;
+					u       += v_b*dt/R;
+					t       -= dt;
+
+					dt = dt0/100;
+					continue; // do not write to result array, do not pass go, do not collect 200 dollars
+				}
+			} else {
+				if (v_b + omega_b*w/2 > omega_w*d_w/2) {
+					matched_w = true;
+					retry = false;
+				}
+				if (v_b - omega_b*w/2 > 0) {
+					matched_h = true;
+					retry = false;
+				}
+			}
 
 			res[0] .push(t);
 			res[1] .push(theta_0-u);
@@ -317,14 +365,14 @@
 			theta_b_exit: theta_end,
 			omega_b_exit: omega_b,
 			omega_w_exit: omega_w,
-			i_settle: proc_settle(res)
+			i_settle: i_settled
 		}
 
 		return [res, stats];
 	}
 
 	function run_sim_rev(params_pack) {
-		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, omega_drop, load_eqn] = params_pack;
+		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, kM, omega_drop] = params_pack;
 
 		dt = 0.01;
 
@@ -338,10 +386,13 @@
 		t_drop = 0;
 		validity = 0;
 
+		console.log('run until ', omega_target, omega_drop, kM);
+		console.log(params_pack);
+		
 		while(i<1000) {
 			T = T_stall*(omega_max-omega)/omega_max;
 			cur = cur_free + (cur_stall-cur_free)*(omega_max-omega)/omega_max;
-			M = eval(load_eqn);
+			M = kM * omega;
 			domega = (T-M)/I_w;
 			omega += domega*dt;
 			cur_cons += cur*dt;
@@ -363,8 +414,9 @@
 			}
 		}
 
-		cur_idle = 0; // if no resistance, no current consumption // TODO
-
+		cmd_pct  = kM/(T_stall*(omega_max-omega_target)/omega_max / omega_target)
+		cur_idle = cmd_pct * (cur_free + (cur_stall-cur_free)*(omega_max-omega_target)/omega_max);
+		
 		stats = {
 			idle_current: cur_idle,
 			cur_cons_live: cur_cons-cur_cons_drop,
@@ -453,6 +505,7 @@
 			gidv('motor_stall_current_adj'),
 			gidv('I_w') + gidv('I_w_err'),
 			gidv('omega_w_0'),
+			gidv('kM'),
 			low_omega_w, '0']);
 
       	drawchart_launch(max_low_run, max_high_run, max_low_stat, max_high_stat);
@@ -786,7 +839,7 @@
 			document.getElementById("motor_"+a).value=get_motor_data(e.value, a);
 			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
 			if (a=="stall_torque")
-				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+				adjVal *= gidv("motornum");
 			if (a=="free_current" || a=="stall_current" )
 				adjVal *= gidv("motornum");
 			gids("motor_"+a+"_adj",adjVal);
@@ -991,16 +1044,6 @@
 					<td><input id='omega_w_0' value=3000></td><td class="tiny">&#177;</td>
 					<td><input id='omega_w_0_err' value=''></td>
 					<td class='unit' id='unit_omega_w_0'>[-]</td>
-				</tr><tr>
-					<th class='rowlabel'>Frictional Blurring<span class='ttt'>Magic number that helps stability with frictional model.<br/>Friction is weird; 2N seems to be a reasonable amount.<br/>Make sure this is the same between any two runs you're comparing.</span></th>
-					<td><input id='blur_amt' value=2></td><td class="tiny"></td>
-					<td></td>
-					<td class='unit' id='unit_blur_amt'>[N]</td>
-				</tr><tr>
-					<th class='rowlabel'>Settling %<span class='ttt'>Percentage error to look for when drawing settling time (vertical black bars)</span></th>
-					<td><input id='settle_amt' value=1></td><td class="tiny"></td>
-					<td></td>
-					<td class='unit' id='unit_blur_amt'>[%]</td>
 				</tr>
 			</table>
 		</div>
@@ -1019,9 +1062,9 @@
 					<td><input class='' id="op_voltage" oninput="motortype_select(); compute();" value=12 /></td>
 					<td class="unit">[V]</td>
 				</tr><tr>
-					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-					<td><input class=''  id="efficiency" oninput="motortype_select(); compute();" value=85 /></td>
-					<td class="unit">[%]</td>
+					<th class="rowlabel">Resistance<span class="ttt">Resistance value.<br/>You could find this empirically using this tool by guessing values until the idle current matches your shooter.</span></th>
+					<td><input class=''  id="kM" oninput="motortype_select(); compute();" value=0 /></td>
+					<td class="unit" id="unit_kM"></td>
 				</tr>
 				<tr>
 					<th></th>
@@ -1038,7 +1081,7 @@
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 					<td><input id="motor_stall_torque" readonly /></td>
 					<td><input id="motor_stall_torque_adj" readonly /></td>
-					<td class="unit" id="unit_motor_stall_torque"></td>
+					<td class="unit">[N-m]</td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 					<td><input id="motor_free_current" readonly /></td>
@@ -1106,19 +1149,19 @@
 					<td><input id="settling_dist_max" readOnly></td>
 					<td class="unit" id='unit_settling_dist_min'></td>
 				</tr><tr>
-					<th class="rowlabel" colspan=3>Time to Revved</th>
+					<th class="rowlabel" colspan=3>Time to Recover</th>
 					<td><input id="t_rev_live" readOnly></td>
 					<td class="unit">[s]</td>
 				</tr><tr>
-					<th class="rowlabel" colspan=3>Current to Rev</th>
+					<th class="rowlabel" colspan=3>Current to Recover</th>
 					<td><input id="cur_cons_live" readOnly></td>
 					<td class="unit">[A-s]</td>
 				</tr><tr>
-					<th class="rowlabel" colspan=3>Time to Recover</th>
+					<th class="rowlabel" colspan=3>Time to Revved</th>
 					<td><input id="t_rev_dead" readOnly></td>
 					<td class="unit">[s]</td>
 				</tr><tr>
-					<th class="rowlabel" colspan=3>Current to Recover</th>
+					<th class="rowlabel" colspan=3>Current to Rev</th>
 					<td><input id="cur_cons_dead" readOnly></td>
 					<td class="unit">[A-s]</td>
 				</tr><tr>
