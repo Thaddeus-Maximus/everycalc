@@ -295,7 +295,6 @@ j<!DOCTYPE html>
 		res = [[t],[u-u0],[v],[omega_b],[omega_w_top],[omega_w_bot],[0],[0],[0],[0]];
 		dtv = [];
 		for (i=0;i<20;i++) dtv.push(8e-6);
-		console.log(y0);
 		while(i<10000) {
 			j = 0;
 			ya = y-w/2;
@@ -311,7 +310,6 @@ j<!DOCTYPE html>
 				N_w_bot = 2*k_b*del_bot; if (N_w_bot < 0) N_w_bot = 0;
 				F_w_top = - N_w_top * mu_w_top * smooth(v-omega_b*w/2 - omega_w_bot*d_w_top/2, omega_w_0_bot*d_w_top/2*OVERAMT);
 				F_w_bot = - N_w_bot * mu_w_bot * smooth(v+omega_b*w/2 - omega_w_top*d_w_bot/2, omega_w_0_top*d_w_bot/2*OVERAMT);
-				//console.log([N_w_bot*Math.cos(theta), N_w_top*Math.cos(psi), F_w_bot*Math.sin(theta), F_w_top*Math.sin(psi)]);
 				return N_w_bot*Math.cos(theta) - N_w_top*Math.cos(psi) - F_w_bot*Math.sin(theta) + F_w_top*Math.sin(psi);
 			}
 
@@ -350,10 +348,6 @@ j<!DOCTYPE html>
 			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
 			dt = avg(dtv);
 
-
-
-			//console.log(y, j);
-
 			dv       = N_w_bot*Math.sin(theta) + F_w_bot*Math.cos(theta) + N_w_top*Math.sin(psi) + F_w_bot*Math.cos(psi);
 			domega_b = (F_w_bot*(d_b/2-del_bot)-F_w_top*(d_b/2-del_top)) / I_b;
 
@@ -361,9 +355,6 @@ j<!DOCTYPE html>
 			omega_b += domega_b*dt;
 			u       += v*dt;
 			t       += dt;
-
-
-			//console.log(i, [dv, psi*180/Math.PI, theta*180/Math.PI, N_w_top, F_w_top, N_w_bot, F_w_bot]);			
 			
 			if(true) {
 
@@ -402,8 +393,6 @@ j<!DOCTYPE html>
 			omega_w_bot_exit: omega_w_bot,
 			i_settle: proc_settle(res)
 		}
-
-		console.log(res);
 
 		return [res, stats];
 	}
@@ -779,8 +768,6 @@ j<!DOCTYPE html>
 		v_b_max     = v_b_ticks[v_b_ticks.length-1];
 		omega_b_max = omega_b_ticks[omega_b_ticks.length-1];
 		omega_w_max = omega_w_ticks[omega_w_ticks.length-1];
-
-		console.log(omega_b_max, omega_b);
 
 		drawTicks('chart_launch', 'x', u_ticks, u_max, x_ticklabels, xf, x0, yf, y0, 15);
 		drawTicks('chart_launch', 'y', null, null, y_ticklabels, yf, y0, xf, x0, 5);

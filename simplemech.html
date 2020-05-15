@@ -33,7 +33,6 @@
 			unit_sys = 1;
 		
 		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
 		for (unit in unit_labels) {
 			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
 				varname = unit_labels[unit].id.substring(5);
@@ -146,8 +145,6 @@
 		var Is = gidv("motor_stall_current_adj");
 		var G = gidv("G");
 
-		//console.log(r,m,Ts,wf,If,Is,G);
-
 		load_expr = document.getElementById("load").value;
 		end_expr = document.getElementById("endcond").value;
 
@@ -172,7 +169,6 @@
 		gids("theor_stall_current", If + (Is-If) * (wf-omega_m_theor)/wf);
 
 		enc_plc = document.getElementById('encoder_placement').value;
-		//console.log(enc_plc);
 		enc_els = document.getElementsByClassName('encoder_detail');
 		if (enc_plc == 'none') {
 			for (i=0;i<enc_els.length;i++) {
@@ -186,7 +182,6 @@
 			cpx = gidv('encoder_cpr')/NaNto1(gidv('encoder_reduction'))/(r*2*Math.PI);
 			if(enc_plc == 'motor') cpx *= G;
 
-			console.log(cpx);
 			gids('encoder_cpx', cpx);
 			gids('encoder_max_cps', cpx*R*wf/G);
 		}
@@ -203,7 +198,6 @@
 		channels = [[],[],[],[],[],[]]; //[[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
       	i=0;
 		while(1) {
-			//console.log(dt);
 			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
 			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
 			t = t_ar[t_ar.length-1];
@@ -216,7 +210,6 @@
 			Mres = convert(eval(load_expr), inputs_unit_map["load"][unit_sys])*R;
 			if(isNaN(Mres)) Mres = 0;
 			alpha = (T-Mres) / I;
-			//console.log(T, Mres, alpha);
 			if(isNaN(alpha_o)) alpha_o = alpha;
 
 			alpha_ar.push(alpha);
@@ -397,8 +390,6 @@
 		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
 		a = convert_to(a_raw, inputs_unit_map['query_a'][unit_sys]);
 
-		//console.log([t,v,d,cur,f]);
-
 		svg = document.getElementById('chart');
 		x_axis = document.getElementById('chart_x_axis');
 		y_axis = document.getElementById('chart_y_axis');
@@ -536,7 +527,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 		for (btn of document.getElementsByClassName('toggle_button'))
@@ -620,8 +610,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {
