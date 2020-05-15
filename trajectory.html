@@ -24,7 +24,11 @@
 		'sweep_height':     ['m',   'ft',  'in'],
 		'sweep_height_err': ['m',   'ft',  'in'],
 		'strike_angle':     ['deg', 'deg', 'deg'],
-		'strike_angle_err': ['deg', 'deg', 'deg']
+		'strike_angle_err': ['deg', 'deg', 'deg'],
+		'm_ball':     		 ['kg', 'lbm', 'lbm'],
+		'm_ball_err': 		 ['kg', 'lbm', 'deg'],
+		'omega_initial': 	 ['RPM', 'RPM', 'RPM'],
+		'omega_initial_err': ['RPM', 'RPM', 'RPM']
 	};
 
 	function populate_units() {
@@ -182,13 +186,20 @@
 	}
 
 	function run_sim(params_pack) {
-		[v, theta, y0, xtarg, d] = params_pack;
+		[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = params_pack;
 		
+		rho = 1.1839; // kg/m^3
+		A   = d*d*Math.PI/4;
+
+		mu_d = 1/2*rho*A*Cd;
+		mu_l = 1/2*rho*A*Cl;
+		mu_m = 1/2*rho*A*Cm;
 
 		x=-xtarg;
 		y=y0;
 		vx=Math.cos(theta)*v;
 		vy=Math.sin(theta)*v;
+		vbar = v;
 		g=9.81;
 		xl=x; xh=x;
 
@@ -204,15 +215,29 @@
 		i=0;
 		t=0;
 		while(i<3000 && xh<=xtarg*0.05 && xl<=xtarg*0.05 && y>=0) {
-			vy -= g*dt;
+			// Normal-tangent components
+			Tx =  vx/vbar;
+			Ty =  vy/vbar;
+			Nx = -vy/vbar;
+			Ny =  vx/vbar;
+
+			Fd = mu_d * vbar*vbar;
+			Fl = mu_l * vbar*vbar;
+			Fm = mu_m * vbar*omega;
+
+			vy += (-g - Fd*Ty + Fl*Ny + Fm*Ny)*dt;
+			vx += (   - Fd*Tx + Fl*Nx + Fm*Nx)*dt;
 			x += vx*dt;
 			y += vy*dt;
 			t += dt;
+			vbar = Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
 
-			xl = x + d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			xh = x - d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			yl = y - d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			yh = y + d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+			
+
+			xl = x + d/2 * vy/vbar;
+			xh = x - d/2 * vy/vbar;
+			yl = y - d/2 * vx/vbar;
+			yh = y + d/2 * vx/vbar;
 
 			if (x>0) {
 				tof = t;
@@ -314,12 +339,29 @@
 		max_high      = -Infinity;
 		max_high_stat = {};
 		max_high_run  = [];
-		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball'];
+		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
+		params_var_list  = [];
+		params_var_count = 0;
+		for (param of params_list) {
+			if (gidv(param+'_err')) {
+				params_var_list.push(true);
+				params_var_count++;
+			} else {
+				params_var_list.push(false);
+			}
+		}
+		low_omega_w   = +Infinity;
 
-		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+		for (var i=0; i<Math.pow(2, params_var_count); i++) {
 			params = [];
+			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
-				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+				if (params_var_list[j]) {
+					params.push(gidv(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					pvc ++;
+				} else {
+					params.push(gidv(params_list[j]));
+				}
 			}
 			run = run_sim(params);
 			if (run[3]['y_low'] < max_low)   {
@@ -763,6 +805,11 @@
 					<td><input id="v_initial_err" value=''></td>
 					<td class="unit" id='unit_v_initial'></td>
 				</tr><tr>
+					<th class="rowlabel">Backspin</th>
+					<td><input id="omega_initial" value=''></td><td class="tiny">+/-</td>
+					<td><input id="omega_initial_err" value=''></td>
+					<td class="unit" id='unit_omega_initial'></td>
+				</tr><tr>
 					<th class='rowlabel'>Distance to Target</th>
 					<td><input id='x_target' value=15></td><td class="tiny">+/-</td>
 					<td><input id="x_target_err" value=''></td>
@@ -777,6 +824,26 @@
 					<td><input id='d_ball' value=7></td><td class="tiny">+/-</td>
 					<td><input id='d_ball_err' value=''></td>
 					<td class='unit' id='unit_d_ball'></td>
+				</tr><tr>
+					<th class='rowlabel'>Projectile Mass</th>
+					<td><input id='m_ball' value=0.5></td><td class="tiny">+/-</td>
+					<td><input id='m_ball_err' value=''></td>
+					<td class='unit' id='unit_m_ball'></td>
+				</tr><tr>
+					<th class="rowlabel">Drag Coefficient</th>
+					<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
+					<td><input id="Cd_err" value=''></td>
+					<td class="unit" id='unit_Cd'></td>
+				</tr><tr>
+					<th class='rowlabel'>Lift Coefficient</th>
+					<td><input id='Cl' value=''></td><td class="tiny">+/-</td>
+					<td><input id='Cl_err' value=''></td>
+					<td class='unit' id='unit_Cl'></td>
+				</tr><tr>
+					<th class='rowlabel'>Magnus Coefficient</th>
+					<td><input id='Cm' value=''></td><td class="tiny">+/-</td>
+					<td><input id='Cm_err' value=''></td>
+					<td class='unit' id='unit_Cm'></td>
 				</tr><tr>
 					<th class="rowlabel">Target Center Height</th>
 					<td><input id="y_target" value=8></td>
