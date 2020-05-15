@@ -29,6 +29,8 @@
 		'sweep_height_err': ['m',   'ft',  'in'],
 		'strike_angle':     ['deg', 'deg', 'deg'],
 		'strike_angle_err': ['deg', 'deg', 'deg'],
+		'strike_v':    		['m/s', 'ft/s', 'in/s'],
+		'strike_v_err': 	['deg', 'deg', 'deg'],
 		'm_ball':     		 ['kg', 'lbm', 'lbm'],
 		'm_ball_err': 		 ['kg', 'lbm', 'deg'],
 		'omega_initial': 	 ['RPM', 'RPM', 'RPM'],
@@ -236,8 +238,6 @@
 			t += dt;
 			vbar = Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
 
-			
-
 			xl = x + d/2 * vy/vbar;
 			xh = x - d/2 * vy/vbar;
 			yl = y - d/2 * vx/vbar;
@@ -262,7 +262,8 @@
 			'y_high': linterp(res_high[0],res_high[1], 0),
 			'y_ctr':  linterp(res_ctr[0],res_ctr[1], 0),
 			'ang':    Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
-			'tof':    tof
+			'tof':    tof,
+			'sv':     v 
 		}
 
 		return [res_low, res_ctr, res_high, stats];
@@ -275,6 +276,12 @@
 	g = 9.81;
 
 	function compute(simulate) {
+		params_list = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
+		params_pack = [];
+		for (j=0; j<params_list.length; j++) {
+			params_pack.push(gidv(params_list[j]));
+		}
+
 		mode = document.getElementById('mode').value;
 		var x,y,v,theta;
 		if (mode=='raw') {
@@ -289,6 +296,32 @@
     		v = gidv('v_initial');
 
     		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
+    		// take ballistic target, spread it open
+    		ya = theta*0.5;
+    		yb = theta*1.5;
+    		if (isNaN(theta)) {
+    			ya = 0;
+    			yb = 45*Math.PI/180;
+    		}
+    		params_pack[1] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    		params_pack[1] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    		// use bisection to solve
+    		while(j<100) {
+				yc = (ya+yb)/2;
+    			params_pack[1] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+				if (Math.abs(fc)<gidv('h_target')/100) break;
+
+				if (sign(fc) == sign(fa)){
+					fa = fc;
+					ya = yc;
+				} else {
+					fb = fc;
+					yb = yc;
+				}
+				j++;
+			}
+			theta = yc;
     		
     		gids('theta', theta);
     	} else if (mode=='find_v') {
@@ -297,7 +330,31 @@
     		theta = gidv('theta');
 
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+    		
+    		if (!isNaN(v)) {
+    			// take ballistic target, spread it open
+	    		ya = v*0.5;
+	    		yb = v*1.5;
+	    		params_pack[0] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[0] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[0] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
 
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				v = yc;
+    		}
     		gids('v_initial', v);
     	} else if (mode=='find_min_v') {
     		x = gidv('x_target');
@@ -315,6 +372,32 @@
     		y     = gidv('y_target') - gidv('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+
+    		if (!isNaN(x)) {
+    			// take ballistic target, spread it open
+	    		ya = x*0.5;
+	    		yb = x*1.5;
+	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				x = yc;
+    		}
+
     		gids('x_target', x);
     	} else if (mode=='find_distance_near') {
     		// There are two positions...
@@ -323,10 +406,36 @@
     		y     = gidv('y_target') - gidv('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+
+    		if (!isNaN(x)) {
+    			// take ballistic target, spread it open
+	    		ya = x*0.5;
+	    		yb = x*1.5;
+	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				x = yc;
+    		}
+
     		gids('x_target', x);
     	}
 
-    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'time_of_flight', 'time_of_flight_err']
+    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'strike_v', 'strike_v_err', 'time_of_flight', 'time_of_flight_err']
     	for (id of computable_ids) {
 	    	document.getElementById(id).classList.remove('error');    
 	    	document.getElementById(id).classList.remove('uncomputed');    
@@ -343,7 +452,6 @@
 		max_high      = -Infinity;
 		max_high_stat = {};
 		max_high_run  = [];
-		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
 		params_var_list  = [];
 		params_var_count = 0;
 		for (param of params_list) {
@@ -396,6 +504,8 @@
       	gids('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
       	gids('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
       	gids('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
+      	gids('strike_v',      (max_high_stat['sv']   +max_low_stat['sv'])/2);
+      	gids('strike_v_err',  Math.abs(max_high_stat['sv']-max_low_stat['sv'])/2);
       	gids('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
       	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
 	}
@@ -576,8 +686,9 @@
 
 		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
 		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, 0));
-		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
+		//obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
 		obstacle.points.appendItem(makept(scaling, x_obstacle, h_obstacle));
+		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
 
 		/*
 		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
@@ -838,17 +949,17 @@
 					<td><input id='m_ball_err' value=''></td>
 					<td class='unit' id='unit_m_ball'></td>
 				</tr><tr>
-					<th class="rowlabel">Drag Coefficient</th>
+					<th class="rowlabel">Drag Coefficient<span class="ttt">Lift coefficient, used to compute drag as Fdrag = 1/2*rho*A*Cd*v^2 (refer to documentation for more info)</span></th>
 					<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
 					<td><input id="Cd_err" value=''></td>
 					<td class="unit" id='unit_Cd'></td>
 				</tr><tr>
-					<th class='rowlabel'>Lift Coefficient</th>
+					<th class='rowlabel'>Lift Coefficient<span class="ttt">Lift coefficient, used to compute lift as Flift = 1/2*rho*A*Cl*v^2 (refer to documentation for more info)</span></th>
 					<td><input id='Cl' value=''></td><td class="tiny">+/-</td>
 					<td><input id='Cl_err' value=''></td>
 					<td class='unit' id='unit_Cl'></td>
 				</tr><tr>
-					<th class='rowlabel'>Magnus Coefficient</th>
+					<th class='rowlabel'>Magnus Coefficient<span class="ttt">Magnus coefficient, used to compute lift as Fmag = pi/3*rho*d^3*Cm*v*omega (refer to documentation for more info)</span></th>
 					<td><input id='Cm' value=''></td><td class="tiny">+/-</td>
 					<td><input id='Cm_err' value=''></td>
 					<td class='unit' id='unit_Cm'></td>
@@ -857,16 +968,16 @@
 					<td><input id="y_target" value=8></td>
 					<td class="unit" id='unit_y_target'></td>
 				</tr><tr>
-					<th class="rowlabel">Target Height</th>
+					<th class="rowlabel">Target Opening</th>
 					<td><input id="h_target" value=30></td>
 					<td class="unit" id='unit_h_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
-					<td><input id="x_obstacle" value=></td>
+					<td><input id="x_obstacle" value="-3"></td>
 					<td class="unit" id='unit_x_obstacle'></td>
 				</tr><tr>
 					<th class="rowlabel">Obstacle Height</th>
-					<td><input id="h_obstacle" value=></td>
+					<td><input id="h_obstacle" value="45/12"></td>
 					<td class="unit" id='unit_h_obstacle'></td>
 				</tr>
 			</table>
@@ -890,6 +1001,11 @@
 					<td><input id="strike_angle_err" readOnly></td>
 					<td class="unit" id='unit_strike_angle'></td>
 				</tr><tr>
+					<th class="rowlabel">Stike Velocity</th>
+					<td><input id="strike_v" readOnly></td><td class="tiny">+/-</td>
+					<td><input id="strike_v_err" readOnly></td>
+					<td class="unit" id='unit_strike_v'>[s]</td>
+				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
 					<td><input id="time_of_flight" readOnly></td><td class="tiny">+/-</td>
 					<td><input id="time_of_flight_err" readOnly></td>
@@ -908,7 +1024,9 @@
 				<tr>
 					<td colspan=3>
 							When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
-							When the chart background is red, the current combination of inputs cannot be solved for.
+							When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
+							Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.<br/><br/>
+							The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.<br/><br/>
 					</td>
 				</tr>
 			</table>
@@ -946,14 +1064,6 @@
 		<!--<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>-->
 	</g>
 	<polyline
-		id='chart_shot_area'
-		fill='#3a6a30'
-		stroke='#3a6a30'
-		stroke-width=2
-		fill-opacity=0.5
-		points="
-		"/>
-	<polyline
 		id='chart_target_low'
 		fill="#444"
 		stroke='none'
@@ -967,10 +1077,19 @@
 		points=""/>
 	<polyline
 		id='chart_obstacle'
-		fill="#444"
-		stroke='none'
+		fill="#933"
+		stroke-width=2
+		stroke="#722"
 		opacity=1.0
 		points=""/>
+	<polyline
+		id='chart_shot_area'
+		fill='#3a6a30'
+		stroke='#3a6a30'
+		stroke-width=2
+		fill-opacity=0.5
+		points="
+		"/>
 </svg>			
 
 		</div>
