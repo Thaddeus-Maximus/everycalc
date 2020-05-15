@@ -1,4 +1,4 @@
-j<!DOCTYPE html>
+<!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 <script type="text/javascript" src="include/specs.js"></script>
 <script type="text/javascript">
@@ -104,7 +104,7 @@ j<!DOCTYPE html>
 		}
 
 		document.getElementById(chart_launch_name+'_v_b_label').innerHTML = 'Ball Velocity ['+inputs_unit_map['query_v_b_1'][unit_sys]+']';
-		document.getElementById(chart_launch_name+'_u_label').innerHTML = 'Ball Travel Position From Hood Start ['+inputs_unit_map['query_u'][unit_sys]+']';
+		document.getElementById(chart_launch_name+'_u_label').innerHTML = 'Ball Travel Position From Start ['+inputs_unit_map['query_u'][unit_sys]+']';
 	}
 
 	function switch_units() {
@@ -145,6 +145,8 @@ j<!DOCTYPE html>
 	}
 
 	function thload() {
+		document.getElementById('topbar_version').innerHTML = VERSION;
+		if(packed_inputs) unpack_inputs();
 		populate_units();
 
 		var inputs, index;
@@ -245,10 +247,10 @@ j<!DOCTYPE html>
 		return newxyn;
 	}
 
-	function smooth(x, over) {
-		if (x>over) return 1;
-		if (x<-over) return -1;
-		return x/over;
+	function smooth(X, over) {
+		if (X>over) return 1;
+		if (X<-over) return -1;
+		return X/over;
 	}
 
 	function proc_settle(chnls) {
@@ -264,6 +266,12 @@ j<!DOCTYPE html>
 		}
 	}
 
+	function posatan2(X,Y) {
+		atn = Math.atan2(X,Y);
+		if (atn < 0) atn += Math.PI*2;
+		return atn;
+	}
+
 	function avg(arr) {
 		sum = 0;
 		for (X of arr) { sum+=X; }
@@ -271,31 +279,38 @@ j<!DOCTYPE html>
 	}
 
 	function run_sim_launch(params_pack) {
-		[d_b, m_b, moi_rat_b, k_b, w,
-		d_w_top, I_w_top, mu_w_top, omega_w_0_top,
-		d_w_bot, I_w_bot, mu_w_bot, omega_w_0_bot,
-		G_top] = params_pack;
+		[d_b, m_b, moi_rat_b, k_b, w, d_w, I_w, mu_w, mu_h, omega_w_0, theta_0, theta_end] = params_pack;
+		I_b = moi_rat_b*m_b*w*w/4;
 
-		I_b = moi_rat_b*m_b*d_b*d_b/4;
-
-		OVERAMT = gidv('blur_amt');
-		dt = 1e-4; //u_f/(omega_w_0)/30;
 		i=0;
 
 		u0 = -Math.sqrt((d_w_top+w)*(d_w_bot+w)*(d_b*(d_b+d_w_top+d_w_bot)-w*(d_w_top+d_w_bot+w)))/(d_w_top+d_w_bot+2*w);
 		y0 = (d_w_bot*(d_b+d_w_top+d_w_bot) + 2*w*(w + d_w_bot + d_w_top) - d_b*d_w_top)/2/(d_w_top+d_w_bot+2*w);
 
-		y=y0;
-		u=u0+w*3e-2;
+
+
+		i_settled=NaN;
+		u=theta_0; // angular positionx
 		t=0;
-		v=0;
+		R=(w+d_w)/2;
+		v_b=0;
 		omega_b=0;
-		omega_w_top=omega_w_0_top;
-		omega_w_bot=omega_w_0_bot;
-		res = [[t],[u-u0],[v],[omega_b],[omega_w_top],[omega_w_bot],[0],[0],[0],[0]];
-		dtv = [];
-		for (i=0;i<20;i++) dtv.push(8e-6);
-		while(i<10000) {
+		omega_w=omega_w_0;
+
+		res = [[t],[0],[v_b],[omega_b],[omega_w],[0],[0],[0],[0]];
+
+		dt = dt0 = 1e-2/omega_w_0;
+
+		matched_w = false; matched_h = false;
+		u_regain = 0;
+		retry = false;
+
+		while(i<10000 && u>theta_end) {
+			if (u < u_regain){
+				dt = dt0;
+				retry = false;
+			}
+
 			j = 0;
 			ya = y-w/2;
 			yb = y+w/2;
@@ -339,23 +354,31 @@ j<!DOCTYPE html>
 			del_top = (d_b+d_w_top)/2 - Math.sqrt(u*u + Math.pow((d_w_bot+d_w_top)/2 + w - y, 2));
 			del_bot = (d_b+d_w_bot)/2 - Math.sqrt(u*u + y*y);
 
-			N_w_top = 2*k_b*del_top; if (N_w_top < 0) N_w_top = 0;
-			N_w_bot = 2*k_b*del_bot; if (N_w_bot < 0) N_w_bot = 0;
-			F_w_top = - N_w_top * mu_w_top * smooth(v-omega_b*w/2 - omega_w_bot*d_w_top/2, OVERAMT);
-			dvb = v+omega_b*w/2 - omega_w_top*d_w_bot/2;
-			F_w_bot = - N_w_bot * mu_w_bot * smooth(dvb, OVERAMT);
+			N_h = k_b*(d_b-w) + v_b*v_b/R*m_b/2;
+			N_w = k_b*(d_b-w) - v_b*v_b/R*m_b/2;
+			if (N_w < 0) N_w = 0;
 
-			dtv.unshift(Math.max(Math.min(1e-6*30/Math.abs(dvb), 1e-4), 8e-6)); dtv.pop();
-			dt = avg(dtv);
+			F_h = N_h * mu_h;
+			F_w = N_w * mu_w;
 
-			dv       = N_w_bot*Math.sin(theta) + F_w_bot*Math.cos(theta) + N_w_top*Math.sin(psi) + F_w_bot*Math.cos(psi);
-			domega_b = (F_w_bot*(d_b/2-del_bot)-F_w_top*(d_b/2-del_top)) / I_b;
+			if (matched_w){ F_w = F_h*(w*w/4/I_b - 1/m_b) / (1/m_b + w*w/4/I_b + d_w*d_w/4/I_w); }
+			if (matched_h){ F_h = F_w*(w*w/4/I_b - 1/m_b) / (w*w/4/I_b + 1/m_b); }
+			if (matched_w && matched_h){ 
+				F_w = 0; F_h = 0; 
+				if (isNaN(i_settled)) i_settled = i;
+			}
 
-			v       += dv*dt;
+
+			dv       = (F_w+F_h) / m_b;
+			domega_b = (F_w-F_h)*w/2 / I_b;
+			domega_w = (-F_w*d_w/2) / I_w;
+
+			v_b     += dv*dt;
 			omega_b += domega_b*dt;
-			u       += v*dt;
+			omega_w += domega_w*dt;
+			u       -= v_b*dt/R;
 			t       += dt;
-			
+
 			if(true) {
 
 			} else if (typeof G_top == 'string') {
@@ -371,10 +394,42 @@ j<!DOCTYPE html>
 				omega_w_top = omega_w_bot/G_top;
 			}
 
+			if (!retry) {
+				if (!matched_w && v_b + omega_b*w/2 > omega_w*d_w/2) {
+					// really, should go back and try again with lower timestep
+					retry = true;
+				}
+				if (!matched_h && v_b - omega_b*w/2 > 0) {
+					// really, should go back and try again with lower timestep
+					retry = true;
+				}
+				if (retry) { // fuk go back, do it slower
+					u_regain = u;
+
+					v_b     -= dv*dt;
+					omega_b -= domega_b*dt;
+					omega_w -= domega_w*dt;
+					u       += v_b*dt/R;
+					t       -= dt;
+
+					dt = dt0/100;
+					continue; // do not write to result array, do not pass go, do not collect 200 dollars
+				}
+			} else {
+				if (v_b + omega_b*w/2 > omega_w*d_w/2) {
+					matched_w = true;
+					retry = false;
+				}
+				if (v_b - omega_b*w/2 > 0) {
+					matched_h = true;
+					retry = false;
+				}
+			}
+
 			res[0] .push(t);
-			res[1] .push(u-u0);
-			res[2] .push(v);
-			res[3] .push(Math.abs(omega_b));
+			res[1] .push(theta_0-u);
+			res[2] .push(v_b);
+			res[3] .push(omega_b);
 			res[4] .push(omega_w_top);
 			res[5] .push(omega_w_bot);
 			res[6] .push(N_w_top);
@@ -387,18 +442,19 @@ j<!DOCTYPE html>
 		}
 
 		stats = {
-			v_b_exit: v,
+			v_b_exit: v_b,
+			theta_b_exit: theta_end,
 			omega_b_exit: omega_b,
 			omega_w_top_exit: omega_w_top,
 			omega_w_bot_exit: omega_w_bot,
-			i_settle: proc_settle(res)
+			i_settle: i_settled
 		}
 
 		return [res, stats];
 	}
 
 	function run_sim_rev(params_pack) {
-		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, omega_drop, load_eqn] = params_pack;
+		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, kM, omega_drop] = params_pack;
 
 		dt = 0.01;
 
@@ -411,11 +467,11 @@ j<!DOCTYPE html>
 
 		t_drop = 0;
 		validity = 0;
-
+		
 		while(i<1000) {
 			T = T_stall*(omega_max-omega)/omega_max;
 			cur = cur_free + (cur_stall-cur_free)*(omega_max-omega)/omega_max;
-			M = eval(load_eqn);
+			M = kM * omega;
 			domega = (T-M)/I_w;
 			omega += domega*dt;
 			cur_cons += cur*dt;
@@ -437,8 +493,9 @@ j<!DOCTYPE html>
 			}
 		}
 
-		cur_idle = 0; // if no resistance, no current consumption // TODO
-
+		cmd_pct  = kM/(T_stall*(omega_max-omega_target)/omega_max / omega_target)
+		cur_idle = cmd_pct * (cur_free + (cur_stall-cur_free)*(omega_max-omega_target)/omega_max);
+		
 		stats = {
 			idle_current: cur_idle,
 			cur_cons_live: cur_cons-cur_cons_drop,
@@ -462,6 +519,8 @@ j<!DOCTYPE html>
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
 
+		
+
 		max_low       = +Infinity;
 		max_low_stat  = {};
 		max_low_run   = [];
@@ -475,9 +534,17 @@ j<!DOCTYPE html>
 		'd_w_bot', 'I_w_bot', 'mu_w_bot', 'omega_w_0_bot'];
 		params_var_list  = [];
 		params_var_count = 0;
+		for (param of params_list) {
+			if (gidv(param+'_err')) {
+				params_var_list.push(true);
+				params_var_count++;
+			} else {
+				params_var_list.push(false);
+			}
+		}
 		low_omega_w   = +Infinity;
 
-		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+		for (var i=0; i<Math.pow(2, params_var_count); i++) {
 			params = [];
 			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
@@ -487,6 +554,7 @@ j<!DOCTYPE html>
 				} else {
 					params.push(gidv(params_list[j]));
 				}
+
 			}
 			params.push(document.getElementById('motortype_top')=="slave" ? gidv("G_top"):"free");
 			[run, stats] = run_sim_launch(params);
@@ -505,12 +573,12 @@ j<!DOCTYPE html>
 			if (stats.omega_w_exit < low_omega_w) {
 				low_omega_w = stats.omega_w_exit;
 			}
-			break;
+			//break;
 		}
 
 		
 
-		/*G = gidv('G');
+		G = gidv('G');
 
 		[rev_run, rev_stats] = run_sim_rev([
 			gidv('motor_stall_torque_adj')*G,
@@ -519,30 +587,33 @@ j<!DOCTYPE html>
 			gidv('motor_stall_current_adj'),
 			gidv('I_w') + gidv('I_w_err'),
 			gidv('omega_w_0'),
+			gidv('kM'),
 			low_omega_w, '0']);
-		drawchart_rev(rev_run, rev_stats);*/
 
       	drawchart_launch(max_low_run, max_high_run, max_low_stat, max_high_stat);
 
+		drawchart_rev(rev_run, rev_stats);
 
 		gids('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
+		gids('exit_theta', (max_low_stat.theta_b_exit + max_high_stat.theta_b_exit)/2);
 		gids('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
-		//gids('exit_omega_w', (max_low_stat.omega_w_exit + max_high_stat.omega_w_exit)/2);
+		gids('exit_omega_w', (max_low_stat.omega_w_exit + max_high_stat.omega_w_exit)/2);
 		gids('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
+		gids('exit_theta_err', Math.abs(max_low_stat.theta_b_exit - max_high_stat.theta_b_exit)/2);
 		gids('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
-		//gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
+		gids('exit_omega_w_err', Math.abs(max_low_stat.omega_w_exit - max_high_stat.omega_w_exit)/2);
 		gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 		gids('settling_dist_max', Math.max(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 
-		/*gids('t_rev_live', rev_stats.t_live);
+		gids('t_rev_live', rev_stats.t_live);
 		gids('t_rev_dead', rev_stats.t_dead);
 		gids('cur_cons_dead', rev_stats.cur_cons_dead);
 		gids('cur_cons_live', rev_stats.cur_cons_live);
-		gids('cur_idle', rev_stats.idle_current);*/
+		gids('cur_idle', rev_stats.idle_current);
 
 		validate_computations('valid');
-		//if (rev_stats.valid != 2)
-		//	validate_computations('error', ['t_rev_live', 't_rev_dead', 'cur_cons_dead', 'cur_cons_live', 'cur_idle']);
+		if (rev_stats.valid != 2)
+			validate_computations('error', ['t_rev_live', 't_rev_dead', 'cur_cons_dead', 'cur_cons_live', 'cur_idle']);
 	}
 
 	function NaNtoerr(x) {
@@ -559,7 +630,7 @@ j<!DOCTYPE html>
 
 <script type="text/javascript">
 	function makeTicks(maxes, num_to_print, n) {
-		//if (Math.min(maxes) < 0) return [0];
+		if (Math.min(maxes) < 0) return [0];
 		H = [];
 		bases = [];
 		for(var i=0; i<maxes.length; i++){
@@ -727,13 +798,13 @@ j<!DOCTYPE html>
 		u_l = convert_to(run_low[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_l = convert_to(run_low[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_l = convert_to(run_low[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w_top'][unit_sys]);
+		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w'][unit_sys]);
 
 		t_h = convert_to(run_high[0], 's');
 		u_h = convert_to(run_high[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_h = convert_to(run_high[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_h = convert_to(run_high[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w_top'][unit_sys]);
+		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w'][unit_sys]);
 
 		t = t_l.reverse().concat(t_h);
 		u = u_l.reverse().concat(u_h);
@@ -760,7 +831,6 @@ j<!DOCTYPE html>
 		[[u_ticks], x_ticklabels] 					= makeTicks([Math.max(...u)], 1, 10);
 		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_w)], 2, 8);
 		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_w), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
-
 
 		u_ticks.pop(); x_ticklabels.pop();
 		
@@ -995,15 +1065,141 @@ j<!DOCTYPE html>
 	}
 </script>
 
+<script id="packed_inputs_dump">
+	packed_inputs = null; // set to an object/dict (id => value) with some specials
+	// unit_sys
+</script>
+
+<script>
+	function pack_inputs() {
+		packed_inputs = {};
+		for (input of document.getElementsByTagName('input')) {
+			if (input.type == "text") {
+				packed_inputs[input.id] = input.value;
+			}
+			if (input.type == "checkbox" || input.type == "radio") {
+				packed_inputs[input.id] = input.checked;
+			}
+		}
+		for (input of document.getElementsByTagName('select')) {
+			packed_inputs[input.id] = input.value;
+		}
+
+		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+	}
+
+	function unpack_inputs() {
+		for (key in packed_inputs) {
+			if (typeof packed_inputs[key] == "boolean")
+				document.getElementById(key).checked = packed_inputs[key];
+			else
+				document.getElementById(key).value   = packed_inputs[key];
+		}
+
+		loads = document.getElementsByClassName('load');
+		for (load of loads) {
+			load.identifier = load.firstChild.getAttribute('identifier');
+		}
+		for (btn of document.getElementsByClassName('toggle_button'))
+			btn.innerHTML = "&#9650;";
+	}
+
+	function readTextFile(file)
+	{
+		var allText = null;
+	    var rawFile = new XMLHttpRequest();
+	    rawFile.open("GET", file, false);
+	    rawFile.onreadystatechange = function ()
+	    {
+	        if(rawFile.readyState === 4)
+	        {
+	            if(rawFile.status === 200 || rawFile.status == 0)
+	            {
+	                allText = rawFile.responseText;
+	            }
+	        }
+	    }
+	    rawFile.send(null);
+	    return allText;
+	}
+
+	if (!String.prototype.decodeHTML) {
+	  String.prototype.decodeHTML = function () {
+	    return this.replace(/&apos;/g, "'")
+	               .replace(/&quot;/g, '"')
+	               .replace(/&gt;/g, '>')
+	               .replace(/&lt;/g, '<')
+	               .replace(/&amp;/g, '&')
+	               .replace(/â–¼/g, '&#9650;');
+	  };
+	}
+
+	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+	function download_page() {
+		today = new Date();
+		var fileName = 'dualwhl_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
+		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
+		if (!fileName) return;
+		document.getElementById('topbar_fname').innerHTML = fileName;
+		fileName += '.html';
+
+
+		head = document.head || document.getElementsByTagName('head')[0];
+
+		pack_inputs();
+
+		scripts   = document.getElementsByTagName('script');
+		for (script of scripts) {
+			if (script.src) {
+				scr = readTextFile(script.src);
+				script.innerHTML = scr;
+				script.removeAttribute('src');
+			}
+		}
+
+		links = document.getElementsByTagName('link');
+		for (link of links) {
+			if (link.href) {
+				scr = readTextFile(link.href);
+				style = document.createElement('style');
+				style.type='text/css';
+				if(style.styleSheet) {
+					style.styleSheet.cssText = scr;
+				} else {
+					style.appendChild(document.createTextNode(scr));
+				}
+				head.prepend(style);
+				link.parentElement.removeChild(link);
+			}
+		}
+
+
+		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
+		var myFile = new Blob([fileContent], {type: 'text/html'});
+		window.URL = window.URL || window.webkitURL;
+		dlurl = window.URL.createObjectURL(myFile);
+		document.getElementById('download_iframe').download = fileName;
+		document.getElementById('download_iframe').href = dlurl;
+		document.getElementById('download_iframe').click();
+	}
+
+	function print_page() {
+		window.print();
+	}
+</script>
 
 <html>
 <body onload="thload()">
+<div id="topbar">
+	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar_la" id='topbar_version'></div>
+	<div class="topbar_la" id='topbar_fname'></div>
+	<div class="topbar_ctr">Dual Wheel Launcher</div>
+	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<a id="download_iframe" hidden></a>
+</div>
 <div style="width: 100%; float: left;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Dual Flywheel Shooter Calculator</h3>
-	<center><a href="./">Back To Index</a><br/></center>
-
-	
-
 	<div style='display:table-row'>
 		<div class="odd" style='display:table-cell'>
 			<table>
