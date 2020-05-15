@@ -1,25 +1,39 @@
-# Swiss Army Engineer
-What it says on the tin. A suite of tools to help engineer things quickly rather than redoing analysis all the time.
+# [EveryCalc](https://thaddeus-maximus.github.io/swissarmyengineer/)
+A set of analysis tools for common circumstances ranging from slightly annoying, to very complex.
 
-Hosted at https://thaddeus-maximus.github.io/swissarmyengineer/
+![Screenshot](include/preview.png)
 
-Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-calc-past-and-future) clones, this aims to (maybe) put an end to the cloning. Maybe it'll just steer it in a different web-based direction. Or maybe
+Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-calc-past-and-future) clones, this aims to (maybe) put an end to the cloning, and accomplish some other awesome things in the process.
 
-![xkcd 927](https://imgs.xkcd.com/comics/standards.png)
+# Aims Accomplished
+- Complex and targeted analysis tools to make mechatronic systems
+-- Generalized motorized mechanism
+-- Belt sizing
+-- Trajectory simulation
+-- Rocker pods
 
-# Aims
-- Make something that works without fancy macros, but is still interactive
-- Make something that can be used offline (i.e. by downloading this whole repo)
-- Provide all the useful analysis tools I've seen to make mechatronic mechanisms in FRC
-- Maybe provide basic structural analysis tools (like beam deflection/strength calculators)
+- Basic structural analysis tools
+-- Beam deflection and stress tool
+
+- An o-ring groove calculator
+
+- Interactivity with a sleek but simple UX 
+- Exportable/savable as a future and portable reference (self-contained files, or at least generation thereof)
+- English and metric units (in orders of magnitude that are... reasonable... for my uses)
+
+# Aims on the Horizon
+- Flywheel-based launchers
+- Clean everything the hell up and document it
+- Transmission strength calc
+- Transient pneumatic cylinder model
+- Barrowman stability calculator
 
 # Documentation
 
-[Rocker Pod Model](docs/rocker_pod_model.pdf)
-
-[Adiabatic Cylinder Model](docs/adiabatic_cylinder_model.pdf)
-
-
+- [Rocker Pod Model](docs/rocker_pod_model.pdf)
+- [Adiabatic Cylinder Model](docs/adiabatic_cylinder_model.pdf)
+- [Belt Calculator](docs/beltcalc.pdf)
+- [Beam Tool](docs/beamcalc.pdf)
 
 # Credits
-Using [hiddentao's linear-algebra package](https://github.com/hiddentao/linear-algebra) for beam calculator (as some rudimentary FEA is performed).
+Using [mathjs](https://mathjs.org/) for beam calculator (as some rudimentary FEA is performed).
