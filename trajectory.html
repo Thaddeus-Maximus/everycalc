@@ -15,6 +15,10 @@
 		'y_target_err':  	['m',   'ft',  'in'],
 		'y_initial':     	['m',   'ft',  'in'],
 		'y_initial_err': 	['m',   'ft',  'in'],
+		'x_obstacle':     	['m',   'ft',  'in'],
+		'x_obstacle_err': 	['m',   'ft',  'in'],
+		'h_obstacle':     	['m',   'ft',  'in'],
+		'h_obstacle_err': 	['m',   'ft',  'in'],
 		'h_target':      	['mm',  'in',  'in'],
 		'h_target_err':  	['mm',  'in',  'in'],
 		'd_ball':        	['mm',  'in',  'in'],
@@ -193,7 +197,7 @@
 
 		mu_d = 1/2*rho*A*Cd;
 		mu_l = 1/2*rho*A*Cl;
-		mu_m = 1/2*rho*A*Cm;
+		mu_m = Math.PI/3*rho*d*d*d*Cm;
 
 		x=-xtarg;
 		y=y0;
@@ -378,8 +382,7 @@
 		
 		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
 		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
-		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
-		console.log(max_high_stat.y_high, targetstuff[1]+targetstuff[2]/2, max_low_stat.y_low, targetstuff[1]-targetstuff[2]/2);
+		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target'), gidv('x_obstacle'), gidv('h_obstacle')], inputs_unit_map['y_target'][unit_sys] ) ;
       	drawchart(max_low_run, max_high_run, targetstuff, 
       		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
 
@@ -500,7 +503,7 @@
 	}
 
 	function drawchart(low_run, high_run, targetstuff, missed) {
-		[target_d, target_h, target_diam] = targetstuff;
+		[target_d, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
 		low_run = clean_run(low_run);
 		high_run = clean_run(high_run);
 
@@ -550,12 +553,15 @@
 
 		target_low  = document.getElementById('chart_target_low');
 		target_high = document.getElementById('chart_target_high');
+		obstacle    = document.getElementById('chart_obstacle');
 
-		console.log(missed ? 'missed': 'hit');
 		shot_area.setAttribute('fill', missed ? '#6a1a10': '#3a6a30')
 
-		target_low.setAttribute("points","");
+		if (x_obstacle > 0) x_obstacle -= target_d;
+
+		target_low .setAttribute("points","");
 		target_high.setAttribute("points","");
+		obstacle   .setAttribute("points","");
 
 		scaling = [x0, y0, xf, yf, d_min, d_max, h_max];
 		target_low.points.appendItem(makept(scaling,      0, 			0));
@@ -567,6 +573,11 @@
 		target_high.points.appendItem(makept(scaling,     0, 			target_h+target_diam/2));
 		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam/2));
 		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam));
+
+		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
+		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, 0));
+		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
+		obstacle.points.appendItem(makept(scaling, x_obstacle, h_obstacle));
 
 		/*
 		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
@@ -660,7 +671,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 		for (btn of document.getElementsByClassName('toggle_button'))
@@ -744,8 +754,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {
@@ -852,6 +860,14 @@
 					<th class="rowlabel">Target Height</th>
 					<td><input id="h_target" value=30></td>
 					<td class="unit" id='unit_h_target'></td>
+				</tr><tr>
+					<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
+					<td><input id="x_obstacle" value=></td>
+					<td class="unit" id='unit_x_obstacle'></td>
+				</tr><tr>
+					<th class="rowlabel">Obstacle Height</th>
+					<td><input id="h_obstacle" value=></td>
+					<td class="unit" id='unit_h_obstacle'></td>
 				</tr>
 			</table>
 		</div><div class="output" style='display:table-cell'>
@@ -945,6 +961,12 @@
 		points=""/>
 	<polyline
 		id='chart_target_high'
+		fill="#444"
+		stroke='none'
+		opacity=1.0
+		points=""/>
+	<polyline
+		id='chart_obstacle'
 		fill="#444"
 		stroke='none'
 		opacity=1.0
