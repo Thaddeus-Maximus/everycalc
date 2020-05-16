@@ -321,41 +321,51 @@
 			psi = Math.atan2(u, (d_bot+d_top)/2 + w - y);
 			theta = Math.atan2(u, y);
 			R_top   = Math.sqrt(u*u + Math.pow((d_bot+d_top)/2 + w - y, 2)) - d_top/2;
-			R_bot   = Math.sqrt(u*u + y*y) - d_bot/2;
-			del_top = (d_b+d_top)/2 - Math.sqrt(u*u + Math.pow((d_bot+d_top)/2 + w - y, 2));
-			del_bot = (d_b+d_bot)/2 - Math.sqrt(u*u + y*y);
+			R_bot   = Math.sqrt(u*u + y*y) - d_bot/2; 
+			R_top = R_bot = (R_top+R_bot)/2; //GRUMBLE GRUMBLE
+			del_top = (d_b)/2 - R_top;
+			del_bot = (d_b)/2 - R_bot;
 
 			N_bot = 2*k_b*del_bot;
-			N_top = 2*k_b*del_bot;
+			N_top = 2*k_b*del_top;
 
 			F_top = N_top * mu_top;
 			F_bot = N_bot * mu_bot;
 
 			var A,B,C,D,E,F;
-			//if (typeof G_top == 'string') {
-			if (true) {
+			if (typeof G_top == 'string') {
 				A = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(theta)/m_b;
-				B = Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b;
-				C = - R_bot*R_bot/I_b + Math.cos(theta)*Math.cos(theta)/m_b - d_bot/2/I_bot;
+				B = - Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b;
+				C = - R_bot*R_bot/I_b - Math.cos(theta)*Math.cos(theta)/m_b - d_bot*d_bot/4/I_bot;
 
 				D = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(psi)/m_b;
-				E = Math.cos(psi)*Math.cos(theta)/m_b - R_top*R_bot/I_b;
-				F = R_top*R_top/I_b + Math.cos(psi)*Math.cos(psi)/m_b - d_top/2/I_top;
+				E = - Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b;
+				F = - R_top*R_top/I_b - Math.cos(psi)*Math.cos(psi)/m_b - d_top*d_top/4/I_top;
 			} else {
 				// it's different when there's coupled flywheels
+				A = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(theta)/m_b;
+				B = - Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b - (d_top*d_bot)/4/G_top/(I_bot+I_top/G_top/G_top);
+				C = - (d_top*d_top)/4/(I_bot + I_top/G_top/G_top) - R_bot*R_bot/I_b - Math.cos(theta)*Math.cos(theta)/m_b;
+
+				D = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(psi)/m_b;
+				E = - Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b - (d_top*d_bot)/4/G_top/(I_bot+I_top/G_top/G_top);
+				F = - Math.cos(psi)*Math.cos(psi)/m_b   - R_top*R_top/I_b - (d_top*d_top)/4/(I_bot + I_top/G_top/G_top) ;
 			}
 
 			if (matched_top){ 
-				F_top = (D+F_bot*E)/F;
+				F_top = (D+F_bot*E)/(-F);
 			}
 			if (matched_bot){ 
-				F_bot = (A+F_top*B)/C;
+				F_bot = (A+F_top*B)/(-C);
 			}
 			if (matched_top && matched_bot){
 				F_bot = (A*F-B*D)/(B*E-C*F);
 				F_top = (C*D-A*E)/(B*E-C*F);
 				//if (isNaN(i_settled)) i_settled = i;
 			}
+
+			F_y = F_top*Math.sin(psi) - F_bot*Math.sin(theta) - N_top*Math.sin(psi) + N_bot*Math.sin(theta);
+			//console.log(F_y);
 
 
 			dv = N_bot*Math.sin(theta) + F_bot*Math.cos(theta)
@@ -373,7 +383,7 @@
 				omega_bot += domega_bot*dt;
 				omega_top += domega_top*dt;
 			} else {
-				domega_bot = - F_bot*d_bot/2 / (I_bot + I_top/G_top) - F_top*d_top/2/G_top / (I_bot + I_top/G_top);
+				domega_bot = - F_bot*d_bot/2 / (I_bot + I_top/G_top/G_top) - F_top*d_top/2/G_top / (I_bot + I_top/G_top/G_top);
 				//console.log(domega_bot);
 				omega_bot += domega_bot*dt;
 				omega_top = omega_bot/G_top;
@@ -504,6 +514,8 @@
 
 	function compute(simulate) {
 		validate_computations('error');
+		if(document.getElementById('motortype_top').value=="slave")
+			gids('omega_w_0_top', gidv('omega_w_0_bot')/gidv('G_top'));
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
 
