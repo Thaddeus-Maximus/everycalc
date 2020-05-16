@@ -53,6 +53,8 @@
 		'query_v_b_2':     ['m/s','ft/s'],
 		'query_F_h_2':     ['N', 'lbf'],
 		'query_F_w_2':     ['N', 'lbf'],
+		'query_N_h_2':     ['N', 'lbf'],
+		'query_N_w_2':     ['N', 'lbf'],
 
 		'query_omega':   ['RPM', 'RPM']
 	};
@@ -329,20 +331,35 @@
 			F_top = N_top * mu_top;
 			F_bot = N_bot * mu_bot;
 
+			var A,B,C,D,E,F;
+			//if (typeof G_top == 'string') {
+			if (true) {
+				A = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(theta)/m_b;
+				B = Math.cos(psi)*Math.cos(theta)/m_b + R_top*R_bot/I_b;
+				C = - R_bot*R_bot/I_b + Math.cos(theta)*Math.cos(theta)/m_b - d_bot/2/I_bot;
+
+				D = (N_bot*Math.sin(theta)+N_top*Math.sin(psi))*Math.cos(psi)/m_b;
+				E = Math.cos(psi)*Math.cos(theta)/m_b - R_top*R_bot/I_b;
+				F = R_top*R_top/I_b + Math.cos(psi)*Math.cos(psi)/m_b - d_top/2/I_top;
+			} else {
+				// it's different when there's coupled flywheels
+			}
+
 			if (matched_top){ 
-				F_top = ( F_bot*d_bot/2/I_bot + R_top*R_bot*F_bot/I_b - (N_bot*Math.sin(theta)+N_top*Math.sin(psi)+F_bot*Math.cos(psi))*Math.cos(theta)/m_b)/(Math.cos(psi)*Math.cos(psi)/m_b + R_top*R_top/I_b);
+				F_top = (D+F_bot*E)/F;
 			}
 			if (matched_bot){ 
-				F_bot = ( F_top*d_top/2/I_top + R_top*R_bot*F_top/I_b - (N_bot*Math.sin(theta)+N_top*Math.sin(psi)+F_top*Math.cos(psi))*Math.cos(theta)/m_b)/(Math.cos(theta)*Math.cos(theta)/m_b + R_bot*R_bot/I_b);
+				F_bot = (A+F_top*B)/C;
 			}
-			if (matched_top && matched_bot){ 
-				F_top = 0; F_bot = 0; 
+			if (matched_top && matched_bot){
+				F_bot = (A*F-B*D)/(B*E-C*F);
+				F_top = (C*D-A*E)/(B*E-C*F);
 				//if (isNaN(i_settled)) i_settled = i;
 			}
 
 
-			dv       = N_bot*Math.sin(theta) + F_bot*Math.cos(theta)
-			+ N_top*Math.sin(psi) + F_bot*Math.cos(psi);
+			dv = N_bot*Math.sin(theta) + F_bot*Math.cos(theta)
+			   + N_top*Math.sin(psi) + F_bot*Math.cos(psi);
 			domega_b = (F_bot*R_bot-F_top*R_top) / I_b;
 
 			v_b       += dv*dt;
@@ -401,7 +418,7 @@
 			res[0] .push(t);
 			res[1] .push(u-u0);
 			res[2] .push(v_b);
-			res[3] .push(Math.abs(omega_b));
+			res[3] .push(Math.abs(omega_b) < 1e-2 ? 0 : Math.abs(omega_b));
 			res[4] .push(omega_top);
 			res[5] .push(omega_bot);
 			res[6] .push(N_top);
@@ -767,19 +784,22 @@
 		u_l = convert_to(run_low[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_l = convert_to(run_low[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_l = convert_to(run_low[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
+		omega_top_l = convert_to(run_low[4], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
+		omega_bot_l = convert_to(run_low[5], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
 
 		t_h = convert_to(run_high[0], 's');
 		u_h = convert_to(run_high[1], inputs_unit_map['query_u'][unit_sys]);
 		v_b_h = convert_to(run_high[2], inputs_unit_map['exit_v'][unit_sys]);
 		omega_b_h = convert_to(run_high[3], inputs_unit_map['exit_omega_b'][unit_sys]);
-		omega_w_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
+		omega_top_h = convert_to(run_high[4], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
+		omega_bot_h = convert_to(run_high[5], inputs_unit_map['exit_omega_w_bot'][unit_sys]);
 
 		t = t_l.reverse().concat(t_h);
 		u = u_l.reverse().concat(u_h);
 		v_b = v_b_l.reverse().concat(v_b_h);
 		omega_b = omega_b_l.reverse().concat(omega_b_h);
-		omega_w = omega_w_l.reverse().concat(omega_w_h);
+		omega_bot = omega_bot_l.reverse().concat(omega_bot_h);
+		omega_top = omega_top_l.reverse().concat(omega_top_h);
 
 		svg = document.getElementById('chart_launch');
 		x_axis = document.getElementById('chart_launch_x_axis');
@@ -790,16 +810,18 @@
 		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
 
-		omega_b_line = document.getElementById('chart_launch_omega_b_area');
-		omega_w_line = document.getElementById('chart_launch_omega_w_area');
-		v_b_line     = document.getElementById('chart_launch_v_b_area');
-		omega_b_line.setAttribute("points","");
-		omega_w_line.setAttribute("points","");
-		v_b_line    .setAttribute("points","");
+		omega_b_line   = document.getElementById('chart_launch_omega_b_area');
+		omega_top_line = document.getElementById('chart_launch_omega_top_area');
+		omega_bot_line = document.getElementById('chart_launch_omega_bot_area');
+		v_b_line       = document.getElementById('chart_launch_v_b_area');
+		omega_b_line  .setAttribute("points","");
+		omega_top_line.setAttribute("points","");
+		omega_bot_line.setAttribute("points","");
+		v_b_line      .setAttribute("points","");
 
 		[[u_ticks], x_ticklabels] 					= makeTicks([Math.max(...u)], 1, 10);
-		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_w)], 2, 8);
-		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_w), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
+		[[v_b_ticks, omega_b_ticks], y_ticklabels] 	= makeTicks([Math.max(...v_b), Math.max(...omega_b), Math.max(...omega_top, ...omega_bot)], 2, 8);
+		[[omega_w_ticks], z_ticklabels] 			= makeTicks([Math.max(...omega_top, ...omega_bot), Math.max(...v_b), Math.max(...omega_b)], 1, 8);
 
 		u_ticks.pop(); x_ticklabels.pop();
 		
@@ -825,8 +847,13 @@
 
 			var pt = svg.createSVGPoint();
 			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
-			pt.y = y0 + (yf-y0)/(omega_w_max-0)*(omega_w[i]-0);
-			omega_w_line.points.appendItem(pt);
+			pt.y = y0 + (yf-y0)/(omega_w_max-0)*(omega_bot[i]-0);
+			omega_bot_line.points.appendItem(pt);
+
+			var pt = svg.createSVGPoint();
+			pt.x = x0 + (xf-x0)/(u_max-0)*(u[i]-0);
+			pt.y = y0 + (yf-y0)/(omega_w_max-0)*(omega_top[i]-0);
+			omega_top_line.points.appendItem(pt);
 		}
 
 		bg=document.getElementById('chart_launch');
@@ -1572,9 +1599,18 @@
 			points="
 			"/>
 		<polyline
-			id='chart_launch_omega_w_area'
-			stroke='#c48900'
-			fill='#c48900'
+			id='chart_launch_omega_bot_area'
+			stroke='#c46900'
+			fill='#c46900'
+			stroke-width=2
+			fill-opacity=0.3
+			points="
+			"/>
+
+		<polyline
+			id='chart_launch_omega_top_area'
+			stroke='#c49900'
+			fill='#c49900'
 			stroke-width=2
 			fill-opacity=0.3
 			points="
@@ -1614,22 +1650,22 @@
 				<td><input id="query_omega_w_2" readonly /></td>
 				<td class="unit" id='unit_query_omega_w_1'></td>
 			</tr><tr>
-				<th class="rowlabel">Hood Normal</th>
+				<th class="rowlabel">Top Normal</th>
 				<td><input id="query_N_h_1" readonly /></td>
 				<td><input id="query_N_h_2" readonly /></td>
 				<td class="unit" id='unit_query_N_h_1'></td>
 			</tr><tr>
-				<th class="rowlabel">Hood Force</th>
+				<th class="rowlabel">Top Force</th>
 				<td><input id="query_F_h_1" readonly /></td>
 				<td><input id="query_F_h_2" readonly /></td>
 				<td class="unit" id='unit_query_F_h_1'></td>
 			</tr><tr>
-				<th class="rowlabel">Flywheel Normal</th>
+				<th class="rowlabel">Bottom Normal</th>
 				<td><input id="query_N_w_1" readonly /></td>
 				<td><input id="query_N_w_2" readonly /></td>
 				<td class="unit" id='unit_query_N_w_1'></td>
 			</tr><tr>
-				<th class="rowlabel">Flywheel Force</th>
+				<th class="rowlabel">Bottom Force</th>
 				<td><input id="query_F_w_1" readonly /></td>
 				<td><input id="query_F_w_2" readonly /></td>
 				<td class="unit" id='unit_query_F_w_1'></td>
