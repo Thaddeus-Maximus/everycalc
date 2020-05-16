@@ -641,9 +641,6 @@
 			}
 		}
 
-		console.log('run_fe( ', gidv('moi'), gidv('elastic_modulus'),
-			order, poses, forces, moments, pinned, fixed);
-
 		[xp, qp, tp, mp, sp, rxns] = run_fe(gidv('moi'), gidv('elastic_modulus'),
 			order, poses, forces, moments, pinned, fixed);
 
@@ -1074,7 +1071,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 		for (btn of document.getElementsByClassName('toggle_button'))
@@ -1157,8 +1153,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {

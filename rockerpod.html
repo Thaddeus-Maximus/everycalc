@@ -22,7 +22,6 @@
 			unit_sys = 1;
 
 		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
 		for (unit in unit_labels) {
 			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
 				varname = unit_labels[unit].id.substring(5);
@@ -35,7 +34,6 @@
 	function gidv(id, default_value) {
 
 		v =  eval(document.getElementById(id).value);
-		console.log(id, v);
 		if (typeof default_value!=='undefined' && typeof v === 'undefined') v=default_value;
 		if (typeof inputs_unit_map[id] !== 'undefined')
 			v = convert(v, inputs_unit_map[id][unit_sys]);
@@ -273,8 +271,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {

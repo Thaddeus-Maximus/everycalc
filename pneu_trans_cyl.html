@@ -33,7 +33,6 @@
 			unit_sys = 1;
 
 		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
 		for (unit in unit_labels) {
 			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
 				varname = unit_labels[unit].id.substring(5);
@@ -467,7 +466,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 	}
@@ -549,8 +547,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {

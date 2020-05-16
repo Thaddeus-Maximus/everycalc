@@ -15,6 +15,10 @@
 		'y_target_err':  	['m',   'ft',  'in'],
 		'y_initial':     	['m',   'ft',  'in'],
 		'y_initial_err': 	['m',   'ft',  'in'],
+		'x_obstacle':     	['m',   'ft',  'in'],
+		'x_obstacle_err': 	['m',   'ft',  'in'],
+		'h_obstacle':     	['m',   'ft',  'in'],
+		'h_obstacle_err': 	['m',   'ft',  'in'],
 		'h_target':      	['mm',  'in',  'in'],
 		'h_target_err':  	['mm',  'in',  'in'],
 		'd_ball':        	['mm',  'in',  'in'],
@@ -24,7 +28,13 @@
 		'sweep_height':     ['m',   'ft',  'in'],
 		'sweep_height_err': ['m',   'ft',  'in'],
 		'strike_angle':     ['deg', 'deg', 'deg'],
-		'strike_angle_err': ['deg', 'deg', 'deg']
+		'strike_angle_err': ['deg', 'deg', 'deg'],
+		'strike_v':    		['m/s', 'ft/s', 'in/s'],
+		'strike_v_err': 	['deg', 'deg', 'deg'],
+		'm_ball':     		 ['kg', 'lbm', 'lbm'],
+		'm_ball_err': 		 ['kg', 'lbm', 'deg'],
+		'omega_initial': 	 ['RPM', 'RPM', 'RPM'],
+		'omega_initial_err': ['RPM', 'RPM', 'RPM']
 	};
 
 	function populate_units() {
@@ -182,13 +192,20 @@
 	}
 
 	function run_sim(params_pack) {
-		[v, theta, y0, xtarg, d] = params_pack;
+		[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = params_pack;
 		
+		rho = 1.1839; // kg/m^3
+		A   = d*d*Math.PI/4;
+
+		mu_d = 1/2*rho*A*Cd;
+		mu_l = 1/2*rho*A*Cl;
+		mu_m = Math.PI/3*rho*d*d*d*Cm;
 
 		x=-xtarg;
 		y=y0;
 		vx=Math.cos(theta)*v;
 		vy=Math.sin(theta)*v;
+		vbar = v;
 		g=9.81;
 		xl=x; xh=x;
 
@@ -204,15 +221,27 @@
 		i=0;
 		t=0;
 		while(i<3000 && xh<=xtarg*0.05 && xl<=xtarg*0.05 && y>=0) {
-			vy -= g*dt;
+			// Normal-tangent components
+			Tx =  vx/vbar;
+			Ty =  vy/vbar;
+			Nx = -vy/vbar;
+			Ny =  vx/vbar;
+
+			Fd = mu_d * vbar*vbar;
+			Fl = mu_l * vbar*vbar;
+			Fm = mu_m * vbar*omega;
+
+			vy += (-g - Fd*Ty + Fl*Ny + Fm*Ny)*dt;
+			vx += (   - Fd*Tx + Fl*Nx + Fm*Nx)*dt;
 			x += vx*dt;
 			y += vy*dt;
 			t += dt;
+			vbar = Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
 
-			xl = x + d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			xh = x - d/2 * vy/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			yl = y - d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
-			yh = y + d/2 * vx/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+			xl = x + d/2 * vy/vbar;
+			xh = x - d/2 * vy/vbar;
+			yl = y - d/2 * vx/vbar;
+			yh = y + d/2 * vx/vbar;
 
 			if (x>0) {
 				tof = t;
@@ -233,7 +262,8 @@
 			'y_high': linterp(res_high[0],res_high[1], 0),
 			'y_ctr':  linterp(res_ctr[0],res_ctr[1], 0),
 			'ang':    Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
-			'tof':    tof
+			'tof':    tof,
+			'sv':     v 
 		}
 
 		return [res_low, res_ctr, res_high, stats];
@@ -246,6 +276,12 @@
 	g = 9.81;
 
 	function compute(simulate) {
+		params_list = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
+		params_pack = [];
+		for (j=0; j<params_list.length; j++) {
+			params_pack.push(gidv(params_list[j]));
+		}
+
 		mode = document.getElementById('mode').value;
 		var x,y,v,theta;
 		if (mode=='raw') {
@@ -260,6 +296,32 @@
     		v = gidv('v_initial');
 
     		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
+    		// take ballistic target, spread it open
+    		ya = theta*0.5;
+    		yb = theta*1.5;
+    		if (isNaN(theta)) {
+    			ya = 0;
+    			yb = 45*Math.PI/180;
+    		}
+    		params_pack[1] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    		params_pack[1] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    		// use bisection to solve
+    		while(j<100) {
+				yc = (ya+yb)/2;
+    			params_pack[1] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+				if (Math.abs(fc)<gidv('h_target')/100) break;
+
+				if (sign(fc) == sign(fa)){
+					fa = fc;
+					ya = yc;
+				} else {
+					fb = fc;
+					yb = yc;
+				}
+				j++;
+			}
+			theta = yc;
     		
     		gids('theta', theta);
     	} else if (mode=='find_v') {
@@ -268,7 +330,31 @@
     		theta = gidv('theta');
 
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+    		
+    		if (!isNaN(v)) {
+    			// take ballistic target, spread it open
+	    		ya = v*0.5;
+	    		yb = v*1.5;
+	    		params_pack[0] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[0] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[0] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
 
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				v = yc;
+    		}
     		gids('v_initial', v);
     	} else if (mode=='find_min_v') {
     		x = gidv('x_target');
@@ -286,6 +372,32 @@
     		y     = gidv('y_target') - gidv('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+
+    		if (!isNaN(x)) {
+    			// take ballistic target, spread it open
+	    		ya = x*0.5;
+	    		yb = x*1.5;
+	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				x = yc;
+    		}
+
     		gids('x_target', x);
     	} else if (mode=='find_distance_near') {
     		// There are two positions...
@@ -294,10 +406,36 @@
     		y     = gidv('y_target') - gidv('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+
+    		if (!isNaN(x)) {
+    			// take ballistic target, spread it open
+	    		ya = x*0.5;
+	    		yb = x*1.5;
+	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		// use bisection to solve
+	    		while(j<100) {
+					yc = (ya+yb)/2;
+	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+
+					if (Math.abs(fc)<gidv('h_target')/100) break;
+
+					if (sign(fc) == sign(fa)){
+						fa = fc;
+						ya = yc;
+					} else {
+						fb = fc;
+						yb = yc;
+					}
+					j++;
+				}
+				x = yc;
+    		}
+
     		gids('x_target', x);
     	}
 
-    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'time_of_flight', 'time_of_flight_err']
+    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'strike_v', 'strike_v_err', 'time_of_flight', 'time_of_flight_err']
     	for (id of computable_ids) {
 	    	document.getElementById(id).classList.remove('error');    
 	    	document.getElementById(id).classList.remove('uncomputed');    
@@ -314,12 +452,28 @@
 		max_high      = -Infinity;
 		max_high_stat = {};
 		max_high_run  = [];
-		params_list   = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball'];
+		params_var_list  = [];
+		params_var_count = 0;
+		for (param of params_list) {
+			if (gidv(param+'_err')) {
+				params_var_list.push(true);
+				params_var_count++;
+			} else {
+				params_var_list.push(false);
+			}
+		}
+		low_omega_w   = +Infinity;
 
-		for (var i=0; i<Math.pow(2, params_list.length); i++) {
+		for (var i=0; i<Math.pow(2, params_var_count); i++) {
 			params = [];
+			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
-				params.push(gidv(params_list[j]) + (bit_test(i,j) ? 1:-1)*gidv(params_list[j]+'_err'));
+				if (params_var_list[j]) {
+					params.push(gidv(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					pvc ++;
+				} else {
+					params.push(gidv(params_list[j]));
+				}
 			}
 			run = run_sim(params);
 			if (run[3]['y_low'] < max_low)   {
@@ -336,8 +490,7 @@
 		
 		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
 		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
-		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target')], inputs_unit_map['y_target'][unit_sys] ) ;
-		console.log(max_high_stat.y_high, targetstuff[1]+targetstuff[2]/2, max_low_stat.y_low, targetstuff[1]-targetstuff[2]/2);
+		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target'), gidv('x_obstacle'), gidv('h_obstacle')], inputs_unit_map['y_target'][unit_sys] ) ;
       	drawchart(max_low_run, max_high_run, targetstuff, 
       		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
 
@@ -351,6 +504,8 @@
       	gids('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
       	gids('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
       	gids('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
+      	gids('strike_v',      (max_high_stat['sv']   +max_low_stat['sv'])/2);
+      	gids('strike_v_err',  Math.abs(max_high_stat['sv']-max_low_stat['sv'])/2);
       	gids('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
       	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
 	}
@@ -458,7 +613,7 @@
 	}
 
 	function drawchart(low_run, high_run, targetstuff, missed) {
-		[target_d, target_h, target_diam] = targetstuff;
+		[target_d, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
 		low_run = clean_run(low_run);
 		high_run = clean_run(high_run);
 
@@ -508,12 +663,15 @@
 
 		target_low  = document.getElementById('chart_target_low');
 		target_high = document.getElementById('chart_target_high');
+		obstacle    = document.getElementById('chart_obstacle');
 
-		console.log(missed ? 'missed': 'hit');
 		shot_area.setAttribute('fill', missed ? '#6a1a10': '#3a6a30')
 
-		target_low.setAttribute("points","");
+		if (x_obstacle > 0) x_obstacle -= target_d;
+
+		target_low .setAttribute("points","");
 		target_high.setAttribute("points","");
+		obstacle   .setAttribute("points","");
 
 		scaling = [x0, y0, xf, yf, d_min, d_max, h_max];
 		target_low.points.appendItem(makept(scaling,      0, 			0));
@@ -525,6 +683,12 @@
 		target_high.points.appendItem(makept(scaling,     0, 			target_h+target_diam/2));
 		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam/2));
 		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam));
+
+		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
+		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, 0));
+		//obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
+		obstacle.points.appendItem(makept(scaling, x_obstacle, h_obstacle));
+		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
 
 		/*
 		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
@@ -618,7 +782,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 		for (btn of document.getElementsByClassName('toggle_button'))
@@ -702,8 +865,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {
@@ -763,6 +924,11 @@
 					<td><input id="v_initial_err" value=''></td>
 					<td class="unit" id='unit_v_initial'></td>
 				</tr><tr>
+					<th class="rowlabel">Backspin</th>
+					<td><input id="omega_initial" value=''></td><td class="tiny">+/-</td>
+					<td><input id="omega_initial_err" value=''></td>
+					<td class="unit" id='unit_omega_initial'></td>
+				</tr><tr>
 					<th class='rowlabel'>Distance to Target</th>
 					<td><input id='x_target' value=15></td><td class="tiny">+/-</td>
 					<td><input id="x_target_err" value=''></td>
@@ -778,13 +944,41 @@
 					<td><input id='d_ball_err' value=''></td>
 					<td class='unit' id='unit_d_ball'></td>
 				</tr><tr>
+					<th class='rowlabel'>Projectile Mass</th>
+					<td><input id='m_ball' value=0.5></td><td class="tiny">+/-</td>
+					<td><input id='m_ball_err' value=''></td>
+					<td class='unit' id='unit_m_ball'></td>
+				</tr><tr>
+					<th class="rowlabel">Drag Coefficient<span class="ttt">Lift coefficient, used to compute drag as Fdrag = 1/2*rho*A*Cd*v^2 (refer to documentation for more info)</span></th>
+					<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
+					<td><input id="Cd_err" value=''></td>
+					<td class="unit" id='unit_Cd'></td>
+				</tr><tr>
+					<th class='rowlabel'>Lift Coefficient<span class="ttt">Lift coefficient, used to compute lift as Flift = 1/2*rho*A*Cl*v^2 (refer to documentation for more info)</span></th>
+					<td><input id='Cl' value=''></td><td class="tiny">+/-</td>
+					<td><input id='Cl_err' value=''></td>
+					<td class='unit' id='unit_Cl'></td>
+				</tr><tr>
+					<th class='rowlabel'>Magnus Coefficient<span class="ttt">Magnus coefficient, used to compute lift as Fmag = pi/3*rho*d^3*Cm*v*omega (refer to documentation for more info)</span></th>
+					<td><input id='Cm' value=''></td><td class="tiny">+/-</td>
+					<td><input id='Cm_err' value=''></td>
+					<td class='unit' id='unit_Cm'></td>
+				</tr><tr>
 					<th class="rowlabel">Target Center Height</th>
 					<td><input id="y_target" value=8></td>
 					<td class="unit" id='unit_y_target'></td>
 				</tr><tr>
-					<th class="rowlabel">Target Height</th>
+					<th class="rowlabel">Target Opening</th>
 					<td><input id="h_target" value=30></td>
 					<td class="unit" id='unit_h_target'></td>
+				</tr><tr>
+					<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
+					<td><input id="x_obstacle" value="-3"></td>
+					<td class="unit" id='unit_x_obstacle'></td>
+				</tr><tr>
+					<th class="rowlabel">Obstacle Height</th>
+					<td><input id="h_obstacle" value="45/12"></td>
+					<td class="unit" id='unit_h_obstacle'></td>
 				</tr>
 			</table>
 		</div><div class="output" style='display:table-cell'>
@@ -807,6 +1001,11 @@
 					<td><input id="strike_angle_err" readOnly></td>
 					<td class="unit" id='unit_strike_angle'></td>
 				</tr><tr>
+					<th class="rowlabel">Stike Velocity</th>
+					<td><input id="strike_v" readOnly></td><td class="tiny">+/-</td>
+					<td><input id="strike_v_err" readOnly></td>
+					<td class="unit" id='unit_strike_v'>[s]</td>
+				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
 					<td><input id="time_of_flight" readOnly></td><td class="tiny">+/-</td>
 					<td><input id="time_of_flight_err" readOnly></td>
@@ -825,7 +1024,9 @@
 				<tr>
 					<td colspan=3>
 							When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
-							When the chart background is red, the current combination of inputs cannot be solved for.
+							When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
+							Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.<br/><br/>
+							The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.<br/><br/>
 					</td>
 				</tr>
 			</table>
@@ -863,14 +1064,6 @@
 		<!--<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>-->
 	</g>
 	<polyline
-		id='chart_shot_area'
-		fill='#3a6a30'
-		stroke='none'
-		stroke-width=2
-		opacity=0.5
-		points="
-		"/>
-	<polyline
 		id='chart_target_low'
 		fill="#444"
 		stroke='none'
@@ -882,6 +1075,21 @@
 		stroke='none'
 		opacity=1.0
 		points=""/>
+	<polyline
+		id='chart_obstacle'
+		fill="#933"
+		stroke-width=2
+		stroke="#722"
+		opacity=1.0
+		points=""/>
+	<polyline
+		id='chart_shot_area'
+		fill='#3a6a30'
+		stroke='#3a6a30'
+		stroke-width=2
+		fill-opacity=0.5
+		points="
+		"/>
 </svg>			
 
 		</div>

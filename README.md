@@ -1,3 +1,4 @@
+
 # [EveryCalc](https://thaddeus-maximus.github.io/swissarmyengineer/)
 A set of analysis tools for common circumstances ranging from slightly annoying, to very complex.
 
@@ -7,6 +8,7 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 
 # Aims Accomplished
 - Complex and targeted analysis tools to make mechatronic systems
+-- Flywheel-based launchers
 -- Generalized motorized mechanism
 -- Belt sizing
 -- Trajectory simulation
@@ -22,7 +24,6 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 - English and metric units (in orders of magnitude that are... reasonable... for my uses)
 
 # Aims on the Horizon
-- Flywheel-based launchers
 - Clean everything the hell up and document it
 - Transmission strength calc
 - Transient pneumatic cylinder model
@@ -33,7 +34,8 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 - [Rocker Pod Model](docs/rocker_pod_model.pdf)
 - [Adiabatic Cylinder Model](docs/adiabatic_cylinder_model.pdf)
 - [Belt Calculator](docs/beltcalc.pdf)
-- [Beam Tool](docs/beamcalc.pdf)
+- [Beam Tool](docs/beamcalc.pdf
+- [Wheel Pitchers](docs/pitchers.pdf)
 
 # Credits
 Using [mathjs](https://mathjs.org/) for beam calculator (as some rudimentary FEA is performed).

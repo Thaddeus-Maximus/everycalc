@@ -58,7 +58,6 @@
 			if (fc*fa > 0)	a = c;
 			else			b = c;
 		}
-		//console.log('found', c, 'in', n);
 		return c;
 	}
 
@@ -90,12 +89,10 @@
 
 
 		v = document.getElementById("driver").value;
-		//console.log(v);
 		if(v == "teeth") {
 			nb = gidv('driver_val');
 			l = nb*pitch;
 			cc = calc_cc(l, p1, p2, false) + gidv("center_add");
-			//console.log("center-center: ", cc);
 			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
 				document.getElementById("n_teeth_s").value = 'pulleys';
 				document.getElementById("l_s")		.value = 'are';
@@ -120,7 +117,6 @@
 				nb_s = Math.floor(nb/inc)*inc;
 				nb_l = nb_s + inc;
 			} else {
-				//console.log(vendor);
 				var belts_opts = belts_data[vendor][document.getElementById('pitch').value+"mm"];
 				i=0;
 				nb_s = NaN;
@@ -192,8 +188,7 @@
 	}
 
 	function vendor_select() {
-		v = document.getElementById("vendor").value
-		//console.log(v);
+		v = document.getElementById("vendor").value;
 		if(v == "raw") {
 			document.getElementById("raw_inc").style.display="inline-block";
 			document.getElementById("raw_inc_label").style.display="inline-block";
@@ -208,7 +203,6 @@
 	function driver_select() {
 		v = document.getElementById("driver").value;
 		timing = document.getElementById("type_timing").checked;
-		//console.log(v);
 		if(v == "teeth" || !timing) {
 			document.getElementById("n_teeth_l").style.display="none";
 			document.getElementById("l_l").style.display="none";
@@ -301,7 +295,6 @@
 				select.appendChild(opt);
 			}
 		} else {
-			console.log(chg_series);
 			gids('torque_cap_1', 'invalid width');
 			gids('fos_1', 'invalid width');
 		}
@@ -505,8 +498,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {

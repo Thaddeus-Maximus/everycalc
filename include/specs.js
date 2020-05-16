@@ -139,10 +139,13 @@ var unit_bases = {
 	'rad/s^2': ['rad/s^2', 'RPM/s'],
 	'm^4': ['mm^4', 'in^4'],
 	'm^2': ['mm^2', 'in^2'],
-	'kg/m^3': ['kg/m^3', 'g/cm^3', 'lbm/in^3'] 
+	'kg/m^3': ['kg/m^3', 'g/cm^3', 'lbm/in^3'],
+	'N/m': ['lbf/in']
 };
 
 var unit_conversions = {
+	's': 1,
+	
 	"m":  1,
 	"mm": 1e-3,
 	"in": 0.0254,
@@ -212,7 +215,15 @@ var unit_conversions = {
 
 	'kg/m^3': 1,
 	'g/cm^3': 1000,
-	'lbm/in^3': 27679.9
+	'lbm/in^3': 27679.9,
+
+	'N/m': 1,
+	'lbf/in': 4.448/0.0254,
+
+	'N-m/RPM': 60/Math.PI/2,
+	'in-lbf/RPM': 60/Math.PI/2*0.113,
+	'N-m/kRPM': 60/Math.PI/2/1000,
+	'in-lbf/kRPM': 60/Math.PI/2*0.113/1000
 }
 
 // converting between things is for suckers. Just convert to base units, always.
