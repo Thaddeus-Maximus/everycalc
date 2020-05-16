@@ -32,6 +32,7 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 - [Adiabatic Cylinder Model](docs/adiabatic_cylinder_model.pdf)
 - [Belt Calculator](docs/beltcalc.pdf)
 - [Beam Tool](docs/beamcalc.pdf)
+- [Wheel Pitchers](docs/pitchers.pdf)
 
 # Credits
 Using [mathjs](https://mathjs.org/) for beam calculator (as some rudimentary FEA is performed).
