@@ -443,8 +443,8 @@
 		stats = {
 			v_b_exit: v_b,
 			omega_b_exit: omega_b,
-			omega_w_top_exit: omega_top,
-			omega_w_bot_exit: omega_bot,
+			omega_top_exit: omega_top,
+			omega_bot_exit: omega_bot,
 			i_settle: i_settled
 		}
 
@@ -570,8 +570,8 @@
 				max_high_stat = stats;
 				max_high_param = params;
 			}
-			if (stats.omega_w_exit < low_omega_w) {
-				low_omega_w = stats.omega_w_exit;
+			if (stats.omega_bot_exit < low_omega_w) {
+				low_omega_w = stats.omega_bot_exit;
 			}
 			//break;
 		}
@@ -597,11 +597,13 @@
 		gids('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
 		gids('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
 		gids('exit_omega_w_top', (max_low_stat.omega_top_exit + max_high_stat.omega_top_exit)/2);
+		gids('exit_omega_w_bot', (max_low_stat.omega_bot_exit + max_high_stat.omega_bot_exit)/2);
 		gids('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
 		gids('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
 		gids('exit_omega_w_top_err', Math.abs(max_low_stat.omega_top_exit - max_high_stat.omega_top_exit)/2);
-		gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
-		gids('settling_dist_max', Math.max(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
+		gids('exit_omega_w_bot_err', Math.abs(max_low_stat.omega_bot_exit - max_high_stat.omega_bot_exit)/2);
+		//gids('settling_dist_min', Math.min(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
+		//gids('settling_dist_max', Math.max(max_low_run[1][max_low_stat.i_settle], max_high_run[1][max_high_stat.i_settle]));
 
 		/*gids('t_rev_live', rev_stats.t_live);
 		gids('t_rev_dead', rev_stats.t_dead);
@@ -883,7 +885,7 @@
 
 		if (typeof last_uq != 'undefined') focus_handler(last_uq);
 
-		sline_1 = document.getElementById('chart_launch_stable_line_1');
+		/*sline_1 = document.getElementById('chart_launch_stable_line_1');
 		sline_2 = document.getElementById('chart_launch_stable_line_2');
 
 		sline_1.setAttribute('opacity', 1);
@@ -891,7 +893,7 @@
 		sline_1.setAttribute('x2', x0 + (xf-x0)/(focus_u_max-0)*(run_low[1][stats_low.i_settle]-0));
 		sline_2.setAttribute('opacity', 1);
 		sline_2.setAttribute('x1', x0 + (xf-x0)/(focus_u_max-0)*(run_high[1][stats_high.i_settle]-0));
-		sline_2.setAttribute('x2', x0 + (xf-x0)/(focus_u_max-0)*(run_high[1][stats_high.i_settle]-0));
+		sline_2.setAttribute('x2', x0 + (xf-x0)/(focus_u_max-0)*(run_high[1][stats_high.i_settle]-0));*/
 	}
 
 </script>
@@ -1466,16 +1468,16 @@
 					<td><input id='exit_omega_b_err' readOnly></td>
 					<td class='unit' id='unit_exit_omega_b'></td>
 				</tr><tr>
-					<th class="rowlabel">Exit Flywheel Speed (Top)</th>
+					<th class="rowlabel">Exit Wheelspeed (Top)</th>
 					<td><input id="exit_omega_w_top" readOnly></td><td class="tiny">&#177;</td>
 					<td><input id="exit_omega_w_top_err" readOnly></td>
 					<td class="unit" id='unit_exit_omega_w_top'></td>
 				</tr><tr>
-					<th class="rowlabel">Exit Flywheel Speed (Top)</th>
+					<th class="rowlabel">Exit Wheelspeed (Bottom)</th>
 					<td><input id="exit_omega_w_bot" readOnly></td><td class="tiny">&#177;</td>
 					<td><input id="exit_omega_w_bot_err" readOnly></td>
 					<td class="unit" id='unit_exit_omega_w_bot'></td>
-				</tr><tr>
+				</tr><!--<tr>
 					<th class="rowlabel">Settling Distance</th>
 					<td><input id="settling_dist_min" readOnly></td>
 					<td class="tiny">to</td>
@@ -1501,7 +1503,7 @@
 					<th class="rowlabel" colspan=3>Idle Current</th>
 					<td><input id="cur_idle" readOnly></td>
 					<td class="unit">[A]</td>
-				</tr>
+				</tr>-->
 			</table>
 		</div>
 		<div class="even" style='display:table-cell'>
@@ -1683,7 +1685,7 @@
 				<td class="unit" id='unit_query_F_w_1'></td>
 			</tr>
 		</table>
-	</div><div style="margin-left: 0px; display:table-cell;">
+	</div><!--<div style="margin-left: 0px; display:table-cell;">
 		<center>Spin-Up Simulation</center>
 		<svg version="1.2" class="graph" id='chart_rev' aria-labelledby="title" role="img">
 			<title id="title">Revving Simulation</title>
@@ -1759,7 +1761,7 @@
 				<td class="unit">[A]</td>
 			</tr>
 		</table>
-	</div>
+	</div>-->
 	</div>
 </div>
 </body>
