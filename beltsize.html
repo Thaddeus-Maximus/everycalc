@@ -1,194 +1,47 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
-<script type="text/javascript">
+<script id="defines">
+	EXP_FN_BASE = 'beltsize';
+	UNIT_MAP = {
+		'torque':     	['N-m', 'in-lbf'],
+		'torque_cap': 	['N-m', 'in-lbf'],
+		'pitch': 		['mm', 'mm'], // always metric pitches...
+		'center_add': 	['mm', 'in'],
+		'p1_od': 		['mm', 'in'],
+		'p2_od': 		['mm', 'in'],
+		'p1_pd': 		['mm', 'in'],
+		'p2_pd': 		['mm', 'in'],
+		// 'driver_val': 	['mm', 'in'], // this may make more sense to just handle with a computeFrom later on since it changes from teeth to length
+		'dval': 		['mm', 'in'],
+		'l_s': 			['mm', 'in'],
+		'l_l': 			['mm', 'in'],
+		'cc_s': 		['mm', 'in'],
+		'cc_l': 		['mm', 'in']
+	};
+</script>
+<script id="EXP_inputs_frame" ></script>
+<script type="text/javascript" src="include/units.js"></script>
+<script type="text/javascript" src="include/belts.js"></script>
+<script type="text/javascript" src="include/export.js"></script>
+<script type="text/javascript" src="include/eclib.js"></script>
+
+<script type="text/javascript" id="main">
 	function thload() {
-		if(packed_inputs) unpack_inputs();
-		switch_type();
-		chg_series();
-		if(packed_inputs) unpack_inputs();
-		vendor_select();
-		driver_select();
-		switch_type();
-		chg_units();
-		strength_compute();
-		document.getElementById('topbar_version').innerHTML = VERSION;
+		UNIT_change();
+		EXP_onload();
+		switchBeltType();
+		changeSeries();
+		EXP_onload();
+		EC_onload();
+
+		selectVendor();
+		selectDriver();
+		switchBeltType();
+		computeStrength();
 	}
 
-	function gidv(id) {
-		return parseFloat(document.getElementById(id).value);
-	}
-
-	function calc_l (cc, d1t, d2t, crossed) {
-		d1 = Math.min(d1t, d2t);
-		d2 = Math.max(d1t, d2t);
-		theta = Math.asin((crossed ? (d2+d1) : (d2-d1))/2/cc);
-		if (crossed)
-			return 2*cc*Math.sqrt(1-((d2+d1)/2/cc)*((d2+d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2+d1);
-		else
-			return 2*cc*Math.sqrt(1-((d2-d1)/2/cc)*((d2-d1)/2/cc)) + Math.PI*(d1+d2)/2 + theta*(d2-d1);
-	}
-
-	function wrap_1(d1, d2, cc, pitch) {
-		theta = Math.asin((d2-d1)/2/cc);
-		return d1/2*(Math.PI - 2*theta)/pitch;
-	}
-
-	function wrap_2(d1, d2, cc, pitch) {
-		theta = Math.asin((d2-d1)/2/cc);
-		return d2/2*(Math.PI + 2*theta)/pitch;
-	}
-
-	function calc_cc (l, d1, d2, crossed) {
-		a = l;
-		b = (d1+d2)/2;
-		c = (a+b)/2;
-		n = 0;
-		while (n<100) {
-			n++;
-			c = (a+b)/2;
-			fa = calc_l(a, d1, d2, crossed) - l;
-			fb = calc_l(b, d1, d2, crossed) - l;
-			fc = calc_l(c, d1, d2, crossed) - l;
-
-			if (Math.abs(fc)<1e-4) {
-				break;
-			}
-
-			if (fc*fa > 0)	a = c;
-			else			b = c;
-		}
-		return c;
-	}
-
-	function compute() {
-		var uconv = 1;
-
-		if (document.getElementById('unit_inch').checked) uconv = 25.4;
-		else if (document.getElementById('unit_mm').checked) uconv = 1;
-		else return;
-
-		pitch = gidv('pitch') / uconv;
-		p1 = gidv('p1_n') * pitch / Math.PI;	
-		p2 = gidv('p2_n') * pitch / Math.PI;
-
-		document.getElementById("ratio").value = (p2/p1).toFixed(4);
-
-		document.getElementById("p1_pd").value = p1.toFixed(4);
-		document.getElementById("p2_pd").value = p2.toFixed(4);
-
-		if (gidv('pitch')==5) {
-			od1 = p1 + 1.1/uconv;
-			od2 = p2 + 1.1/uconv;
-			document.getElementById('p1_od').value = od1.toFixed(4);
-			document.getElementById('p2_od').value = od2.toFixed(4);
-		} else {
-			document.getElementById('p1_od').value = '';
-			document.getElementById('p2_od').value = '';
-		}
-
-
-		v = document.getElementById("driver").value;
-		if(v == "teeth") {
-			nb = gidv('driver_val');
-			l = nb*pitch;
-			cc = calc_cc(l, p1, p2, false) + gidv("center_add");
-			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
-				document.getElementById("n_teeth_s").value = 'pulleys';
-				document.getElementById("l_s")		.value = 'are';
-				document.getElementById("cc_s")		.value = 'too';
-				document.getElementById("p1_s")		.value = 'close';
-				document.getElementById("p2_s")		.value = '!';
-			} else {
-				document.getElementById("n_teeth_s").value = nb.toFixed(4);
-				document.getElementById("l_s")		.value = l.toFixed(4);
-				document.getElementById("cc_s")		.value = cc.toFixed(4);
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,pitch).toFixed(4);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,pitch).toFixed(4);
-			}
-		} else if (document.getElementById('type_timing').checked) {
-			cc = gidv('driver_val') - gidv("center_add");
-			l = calc_l(cc, p1, p2, false);
-			nb = l/pitch;
-
-			vendor = document.getElementById('vendor').value;
-			if (vendor == 'raw') {
-				inc = gidv('raw_inc');
-				nb_s = Math.floor(nb/inc)*inc;
-				nb_l = nb_s + inc;
-			} else {
-				var belts_opts = belts_data[vendor][document.getElementById('pitch').value+"mm"];
-				i=0;
-				nb_s = NaN;
-				nb_l = NaN;
-				for(;i<belts_opts.length;i++) {
-					if(belts_opts[i] > nb) {
-						break;
-					}
-				}
-				nb_s = belts_opts[i-1];
-				nb_l = belts_opts[i];
-			}
-			
-			l_s = nb_s*pitch;
-			l_l = nb_l*pitch;
-			cc_s = calc_cc(l_s, p1, p2, false) + gidv("center_add");
-			cc_l = calc_cc(l_l, p1, p2, false) + gidv("center_add");
-
-			if (isNaN(cc_l) || cc_l <= (p1+p2)/2*1.01) {
-				document.getElementById("n_teeth_l").value = 'no';
-				document.getElementById("l_l")		.value = 'options';
-				document.getElementById("cc_l")		.value = '';
-				document.getElementById("p1_l")		.value = '';
-				document.getElementById("p2_l")		.value = '!';
-			} else {
-				document.getElementById("n_teeth_l").value = nb_l.toFixed(4);
-				document.getElementById("l_l")		.value = l_l.toFixed(4);
-				document.getElementById("cc_l")		.value = cc_l.toFixed(4);
-				document.getElementById("p1_l")		.value = wrap_1(p1,p2,cc_l,pitch).toFixed(4);
-				document.getElementById("p2_l")		.value = wrap_2(p1,p2,cc_l,pitch).toFixed(4);
-			}
-
-			if (isNaN(cc_s) || cc_s <= (p1+p2)/2*1.01) {
-				document.getElementById("n_teeth_s").value = 'no';
-				document.getElementById("l_s")		.value = 'options';
-				document.getElementById("cc_s")		.value = '';
-				document.getElementById("p1_s")		.value = '';
-				document.getElementById("p2_s")		.value = '!';
-			} else {
-				document.getElementById("n_teeth_s").value = nb_s.toFixed(4);
-				document.getElementById("l_s")		.value = l_s.toFixed(4);
-				document.getElementById("cc_s")		.value = cc_s.toFixed(4);
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc_s,pitch).toFixed(4);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc_s,pitch).toFixed(4);
-			}
-		} else {
-			crossed = document.getElementById("crossed").checked;
-			cc = gidv('driver_val') - gidv("center_add");
-			p1 = gidv('p1_n');
-			p2 = gidv('p2_n');
-			l = calc_l(cc, p1, p2, crossed) / (1+gidv("stretch")/100);
-
-			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
-				document.getElementById("n_teeth_s").value = 'no';
-				document.getElementById("l_s")		.value = 'options';
-				document.getElementById("cc_s")		.value = '';
-				document.getElementById("p1_s")		.value = '';
-				document.getElementById("p2_s")		.value = '!';
-			} else {
-				document.getElementById("n_teeth_s").value = "-";
-				document.getElementById("l_s")		.value = l.toFixed(4);
-				document.getElementById("cc_s")		.value = gidv('driver_val').toFixed(4);
-				document.getElementById("p1_s")		.value = wrap_1(p1,p2,cc,1).toFixed(4);
-				document.getElementById("p2_s")		.value = wrap_2(p1,p2,cc,1).toFixed(4);
-			}
-		}
-
-		strength_compute();
-	}
-
-	function vendor_select() {
-		v = document.getElementById("vendor").value;
+	function selectVendor() {
+		let v = document.getElementById("vendor").value;
 		if(v == "raw") {
 			document.getElementById("raw_inc").style.display="inline-block";
 			document.getElementById("raw_inc_label").style.display="inline-block";
@@ -196,13 +49,12 @@
 			document.getElementById("raw_inc").style.display="none";
 			document.getElementById("raw_inc_label").style.display="none";
 		}
-
-		compute();
+		computeGeometry();
 	}
 
-	function driver_select() {
-		v = document.getElementById("driver").value;
-		timing = document.getElementById("type_timing").checked;
+	function selectDriver() {
+		let v = document.getElementById("driver").value;
+		let timing = document.getElementById("type_timing").checked;
 		if(v == "teeth" || !timing) {
 			document.getElementById("n_teeth_l").style.display="none";
 			document.getElementById("l_l").style.display="none";
@@ -222,12 +74,11 @@
 			document.getElementById("src_label").style.display="table-row";
 			document.getElementById("no_teeth_out").style.display= timing ? "table-row" : "none";
 		}
-
-		compute();
+		computeGeometry();
 	}
 
-	function switch_type() {
-		v = document.getElementById("type_timing").checked;
+	function switchBeltType() {
+		let v = document.getElementById("type_timing").checked;
 		if (v) {
 			document.getElementById("driver").readOnly = false;
 			document.getElementById("th_pitch").style.display="table-row";
@@ -248,45 +99,21 @@
 			document.getElementById("strength_div").style.display = "none";
 			//document.getElementById("center_add").readOnly = true;
 		}
-		driver_select();
+		selectDriver();
 	}
-</script>
-
-<script type="text/javascript">
-	//https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf
-	unit_sys = 0;
-	unit_map = {
-		'torque': ['N-m', 'in-lbf'],
-		'torque_cap': ['N-m', 'in-lbf']
-	}
-
-	function chg_units() {
-		if(document.getElementById('unit_mm').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
-
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+unit_map[varname][unit_sys]+']';
-			}
-		}
-	}
-
-	function chg_series() {
-		select = document.getElementById('belt_width');
+	
+	function changeSeries() {
+		let select = document.getElementById('belt_width');
 		select.innerHTML = '';
 
-		series   = document.getElementById('series').value;
-		pitch    = document.getElementById('pitch').value;
+		let series   = document.getElementById('series').value;
+		let pitch    = document.getElementById('pitch').value;
 
-		bdata = belt_ratings[`${series}_${pitch}mm`];
+		let bdata = BELT_RATINGS[`${series}_${pitch}mm`];
 
 		if (!bdata) {
-			gids('torque_cap_1', 'invalid pitch');
-			gids('fos_1', 'invalid pitch');
+			setV('torque_cap_1', 'invalid pitch');
+			setV('fos_1', 'invalid pitch');
 		} else if(bdata['width_multipliers']) {
 			for(size in bdata['width_multipliers']) {
 				opt = document.createElement('option');
@@ -295,213 +122,178 @@
 				select.appendChild(opt);
 			}
 		} else {
-			gids('torque_cap_1', 'invalid width');
-			gids('fos_1', 'invalid width');
+			setV('torque_cap_1', 'invalid width');
+			setV('fos_1', 'invalid width');
 		}
 	}
 
-	function gidv(id) {
-		v =  eval(document.getElementById(id).value);
-		unit_id = id.substring(0, id.length-2);
-		if (typeof unit_map[unit_id] !== 'undefined')
-			v = convert(v, unit_map[unit_id][unit_sys]);
-		return v;
+	function computeTorque(el) {
+		let from  = el.id == 'torque_1' ? 1 : 2;
+		let to    = el.id == 'torque_1' ? 2 : 1;
+		let ratio = getV('ratio');
+
+		let torque = getV('p'+to+'_n')/getV('p'+from+'_n')*getV('torque_'+from);
+		setV('torque_'+to, torque);
 	}
 
-	function gids(id, value, places) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof value === 'string') {
-			document.getElementById(id).value = value;
+	function computeRPM(el) {
+		let from  = el.id == 'rpm_1' ? 1 : 2;
+		let to    = el.id == 'rpm_1' ? 2 : 1;
+		let ratio = getV('ratio');
+
+		let rpm = getV('p'+from+'_n')/getV('p'+to+'_n')*getV('rpm_'+from);
+		setV('rpm_'+to, rpm);
+	}
+
+	function computeGeometry() {
+		console.log('computeGeometry()');
+		let pitch = getV('pitch');
+		let p1 = getV('p1_n') * pitch / Math.PI;	
+		let p2 = getV('p2_n') * pitch / Math.PI;
+
+		setV("ratio", p2/p1, 4);
+
+		setV("p1_pd", p1, 4);
+		setV("p2_pd", p2, 4);
+
+		if (Math.abs(getV('pitch')-5e-3)<1e-5) {
+			od1 = p1 + 1.1e-3;
+			od2 = p2 + 1.1e-3;
+			setV('p1_od', od1, 4);
+			setV('p2_od', od2, 4);
 		} else {
-			unit_id = id.substring(0, id.length-2);
-			if (typeof unit_map[unit_id] !== 'undefined')
-				value = convert_to(value, unit_map[unit_id][unit_sys]);
-			document.getElementById(id).value = value.toFixed(places);
+			setV('p1_od', '');
+			setV('p2_od', '');
 		}
+
+
+		let v = document.getElementById("driver").value;
+		if(v == "teeth") {
+			let nb = getV('driver_val');
+			let l = nb*pitch;
+			let cc = BELT_calculateCenterDist(l, p1, p2, false) + getV("center_add");
+			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
+				setV("n_teeth_s", 'pulleys');
+				setV("l_s", 'are');
+				setV("cc_s", 'too');
+				setV("p1_s", 'close');
+				setV("p2_s", '!');
+			} else {
+				setV("n_teeth_s", nb, 4);
+				setV("l_s", l, 4);
+				setV("cc_s", cc, 4);
+				setV("p1_s", calculateWrap1(p1,p2,cc,pitch), 4);
+				setV("p2_s", calculateWrap2(p1,p2,cc,pitch), 4);
+			}
+		} else if (document.getElementById('type_timing').checked) {
+			let cc = convertFrom(getV('driver_val'), UNIT_MAP['dval'][UNIT_sys])- getV("center_add");
+			let l = BELT_calculateLength(cc, p1, p2, false);
+			let nb = l/pitch;
+			let nb_s = NaN;
+			let nb_l = NaN;
+			let vendor = document.getElementById('vendor').value;
+			if (vendor == 'raw') {
+				inc = getV('raw_inc');
+				nb_s = Math.floor(nb/inc)*inc;
+				nb_l = nb_s + inc;
+			} else {
+				let belts_opts = BELT_SIZES[vendor][document.getElementById('pitch').value+"mm"];
+				let i=0;
+				for(;i<belts_opts.length;i++) {
+					if(belts_opts[i] > nb) {
+						break;
+					}
+				}
+				nb_s = belts_opts[i-1];
+				nb_l = belts_opts[i];
+			}
+			
+			let l_s = nb_s*pitch;
+			let l_l = nb_l*pitch;
+			let cc_s = BELT_calculateCenterDist(l_s, p1, p2, false) + getV("center_add");
+			let cc_l = BELT_calculateCenterDist(l_l, p1, p2, false) + getV("center_add");
+			if (isNaN(cc_l) || cc_l <= (p1+p2)/2*1.01) {
+				setV("n_teeth_l", 'no');
+				setV("l_l", 'options');
+				setV("cc_l", '');
+				setV("p1_l", '');
+				setV("p2_l", '!');
+			} else {
+				setV("n_teeth_l", nb_l, 4);
+				setV("l_l", l_l, 4);
+				setV("cc_l", cc_l, 4);
+				setV("p1_l", BELT_calculateWrap1(p1,p2,cc_l,pitch), 4);
+				setV("p2_l", BELT_calculateWrap2(p1,p2,cc_l,pitch), 4);
+			}
+
+			if (isNaN(cc_s) || cc_s <= (p1+p2)/2*1.01) {
+				setV("n_teeth_s", 'no');
+				setV("l_s", 'options');
+				setV("cc_s", '');
+				setV("p1_s", '');
+				setV("p2_s", '!');
+			} else {
+				setV("n_teeth_s", nb_s, 4);
+				setV("l_s", l_s, 4);
+				setV("cc_s", cc_s, 4);
+				setV("p1_s", BELT_calculateWrap1(p1,p2,cc_s,pitch), 4);
+				setV("p2_s", BELT_calculateWrap2(p1,p2,cc_s,pitch), 4);
+			}
+		} else {
+			let crossed = document.getElementById("crossed").checked;
+			let cc = getV('driver_val') - getV("center_add");
+			p1 = getV('p1_n');
+			p2 = getV('p2_n');
+			let l = calculateLength(cc, p1, p2, crossed) / (1+getV("stretch")/100);
+
+			if (isNaN(cc) || cc <= (p1+p2)/2*1.01) {
+				setV("n_teeth_s", 'no');
+				setV("l_s", 'options');
+				setV("cc_s", '');
+				setV("p1_s", '');
+				setV("p2_s", '!');
+			} else {
+				setV("n_teeth_s", "-");
+				setV("l_s", l, 4);
+				setV("cc_s", getV('driver_val'), 4);
+				setV("p1_s", calculateWrap1(p1,p2,cc,1), 4);
+				setV("p2_s", calculateWrap2(p1,p2,cc,1), 4);
+			}
+		}
+
+		computeStrength();
 	}
 
-	function torque_compute(el) {
-		from  = el.id == 'torque_1' ? 1 : 2;
-		to    = el.id == 'torque_1' ? 2 : 1;
-		ratio = gidv('ratio');
+	function computeStrength() {
+		let teeth_1  = getV('p1_n');
+		let teeth_2  = getV('p2_n');
+		let rpm_1    = getV('rpm_1');
+		let rpm_2    = getV('rpm_2');
+		let torque_1 = getV('torque_1');
+		let torque_2 = getV('torque_2');
 
-		torque = gidv('p'+to+'_n')/gidv('p'+from+'_n')*gidv('torque_'+from);
-		gids('torque_'+to, torque);
-	}
+		let series   = document.getElementById('series').value;
+		let pitch    = document.getElementById('pitch').value;
+		let width    = document.getElementById('belt_width').value;
 
-	function rpm_compute(el) {
-		from  = el.id == 'rpm_1' ? 1 : 2;
-		to    = el.id == 'rpm_1' ? 2 : 1;
-		ratio = gidv('ratio');
-
-		rpm = gidv('p'+from+'_n')/gidv('p'+to+'_n')*gidv('rpm_'+from);
-		gids('rpm_'+to, rpm);
-	}
-
-	function interp1d(xs, ys, xq) {
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
-	}
-
-	function interp2d(xs, ys, zs, xq, yq) { // x indexes rows, y indexes columns
-		for (j=1; j<xs.length-1 && !isNaN(xs[j]) && xq>xs[j]; j++) {}
-		x1 = xs[j];
-		x2 = xs[j-1];
-		y1 = zs[j];
-		y2 = zs[j-1];
-		z1 = interp1d(ys, y1, yq);
-		z2 = interp1d(ys, y2, yq);
-		return interp1d([x1,x2], [z1,z2], xq);
-	}
-
-	function strength_compute() {
-		teeth_1  = gidv('p1_n');
-		teeth_2  = gidv('p2_n');
-		rpm_1    = gidv('rpm_1');
-		rpm_2    = gidv('rpm_2');
-		torque_1 = gidv('torque_1');
-		torque_2 = gidv('torque_2');
-
-		series   = document.getElementById('series').value;
-		pitch    = document.getElementById('pitch').value;
-		width    = document.getElementById('belt_width').value;
-
-		bdata = belt_ratings[`${series}_${pitch}mm`];
+		let bdata = BELT_RATINGS[`${series}_${pitch}mm`];
 
 		if (!bdata) {
-			gids('torque_cap_1', 'invalid pitch');
-			gids('fos_1', 'invalid pitch');
+			setV('torque_cap_1', 'invalid pitch');
+			setV('fos_1', 'invalid pitch');
 			return;
 		} else if(! bdata['width_multipliers'][width]) {
-			gids('torque_cap_1', 'invalid width');
-			gids('fos_1', 'invalid width');
+			setV('torque_cap_1', 'invalid width');
+			setV('fos_1', 'invalid width');
 			return;
 		}
 
-		torque_cap_1 = interp2d(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * bdata['width_multipliers'][width];
-		torque_cap_2 = interp2d(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * bdata['width_multipliers'][width];
-		gids('torque_cap_1', torque_cap_1);
-		gids('torque_cap_2', torque_cap_2);
-		gids('fos_1', Math.min(torque_cap_1/torque_1, torque_cap_2/torque_2));
-		//gids('fos_2', torque_cap_2/torque_2);
+		let torque_cap_1 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * bdata['width_multipliers'][width];
+		let torque_cap_2 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * bdata['width_multipliers'][width];
+		setV('torque_cap_1', torque_cap_1);
+		setV('torque_cap_2', torque_cap_2);
+		setV('fos_1', Math.min(torque_cap_1/torque_1, torque_cap_2/torque_2));
 		// TODO: Length correction factor
-	}
-
-</script>
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-			if (input.type == "radio") {
-				packed_inputs[input.id] = input.checked;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		for (key in packed_inputs) {
-			if (typeof packed_inputs[key] == "boolean")
-				document.getElementById(key).checked = packed_inputs[key];
-			else
-				document.getElementById(key).value   = packed_inputs[key];
-		}
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'beltsize_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-	}
-
-	function print_page() {
-		window.print();
 	}
 </script>
 
@@ -510,23 +302,24 @@
 <div id="topbar">
 	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
 	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_fname'></div>
+	<div class="topbar_la" id='topbar_filename'></div>
 	<div class="topbar_ctr">Belt/Pulley Sizing</div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<a id="download_frame" hidden></a>
 </div>
 <div style="float: left;" class="container">
 	<div class="even">
 		<center>
-			  <input type="radio" id="unit_inch" name="unit" value="inch" onclick="chg_units(); compute()"  checked>
-			  <label for="inch">English</label>
-			  <input type="radio" id="unit_mm" name="unit" value="mm" onclick="chg_units(); compute()" >
-			  <label for="mm">Metric</label><br>
-			  <input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switch_type()" checked>
-			  <label for="timing">Timing Belt</label>
-			  <input type="radio" id="type_poly" name="belt_type" value="timing" onclick="switch_type()" >
-			  <label for="timing">Polybelt</label>
+			<select id="unit_select" onchange="UNIT_change(); computeGeometry();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+			  
+			<input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switchBeltType()" checked>
+			<label for="timing">Timing Belt</label>
+			<input type="radio" id="type_poly" name="belt_type" value="timing" onclick="switchBeltType()" >
+			<label for="timing">Polybelt</label>
 		</center>
 	</div>
 
@@ -535,12 +328,12 @@
 		<table>
 			<tr id="th_pitch">
 				<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
-				<td><input id="pitch" value=5 onkeyup="chg_series(); compute()" /></td><td class="unit">mm</td>
+				<td><input id="pitch" value=5 onkeyup="changeSeries(); computeGeometry()" /></td><td class="unit" id='unit_pitch'></td>
 			</tr><tr id="th_stretch">
 				<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
-				<td><input id="stretch" value=5 onkeyup="compute()" /></td><td class="unit">%</td>
+				<td><input id="stretch" value=5 onkeyup="computeGeometry()" /></td><td class="unit">%</td>
 				<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
-				<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
+				<td><input type="checkbox" id="crossed" value="crossed" onclick="computeGeometry()"/></td>
 			</tr>
 			<tr>
 				<td></td>
@@ -549,23 +342,23 @@
 				<th class="collabel" colspan=2>Center</th>
 			</tr><tr>
 				<th class="rowlabel" id="no_teeth_1"># Teeth</th>
-				<th><input id="p1_n" value=24 onkeyup="compute()" /></th>
-				<th><input id="p2_n" value=18 onkeyup="compute()" /></th>
+				<th><input id="p1_n" value=24 onkeyup="computeGeometry()" /></th>
+				<th><input id="p2_n" value=18 onkeyup="computeGeometry()" /></th>
 				<th id="des_cc" class="rowlabel">
-					<select id="driver" onchange="driver_select()">
+					<select id="driver" onchange="selectDriver()">
 						<option value="teeth">Belt Teeth</option>
 						<option value="cc" selected="selected">Desired C-C</option>
 					</select>
 				</th>
-				<th><input id="driver_val" value=5 onkeyup="compute()" /></th>
+				<th><input id="driver_val" value=5 onkeyup="computeGeometry()" /></th>
 				<!--<th id="des_teeth_label" class="rowlabel" style="display:none">Belt Teeth</th>
 				<th><input id="des_teeth" value=500 style="display:none" /></th>-->
 			</tr><tr>
-				<th class="rowlabel">OD</th>
+				<th class="rowlabel">OD<span class="ttt">Outer diameter of the pulley / belt. Only valid for 5mm HTD belts currently.</span></th>
 				<th><input id="p1_od" readonly /></th>
 				<th><input id="p2_od" readonly /></th>
 				<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
-				<th><input id="center_add" value=0.000  onkeyup="compute()" /></th>
+				<th><input id="center_add" value=0.000  onkeyup="computeGeometry()" /></th>
 			</tr><tr>
 				<th class="rowlabel">PD</th>
 				<th><input id="p1_pd" readonly /></th>
@@ -574,12 +367,12 @@
 				<th><input id="ratio" readonly /></th>
 			</tr><tr id="src_label">
 					<th class="collabel" colspan=5>
-						Belting Option Source: <select id="vendor" onchange="vendor_select()">
+						Belting Option Source: <select id="vendor" onchange="selectVendor()">
 							<option value="vex">VexPro</option>
 							<option value="am">AndyMark</option>
 							<option value="raw" selected="selected">Increments of</option>
 						</select>
-						<input id="raw_inc" value=5 onkeyup="compute()" /><span id="raw_inc_label">Teeth</span>
+						<input id="raw_inc" value=5 onkeyup="computeGeometry()" /><span id="raw_inc_label">Teeth</span>
 					</th>
 				</tr>
 		</table>
@@ -619,26 +412,26 @@
 			<tr id="th_pitch">
 				<th class="rowlabel">
 					Belting Series
-				</th><td><select id="series" onchange="chg_series(); strength_compute()">
+				</th><td><select id="series" onchange="changeSeries(); computeStrength()">
 						<option value="htd" selected=selected >HTD</option>
 						<option value="gt2" >GT2</option>
 						<option value="gt3" >GT3</option>
 					</select>
 				</td><td>
-					<select id="belt_width" onchange="strength_compute()">
+					<select id="belt_width" onchange="computeStrength()">
 					</select>
 				</td><td>
 					width
 				</td>
 			</tr><tr>
 				<th class='rowlabel'>RPM</th>
-				<td><input id='rpm_1' onkeyup="rpm_compute(this); strength_compute();"></td>
-				<td><input id='rpm_2' onkeyup="rpm_compute(this); strength_compute();"></td>
+				<td><input id='rpm_1' onkeyup="computeRPM(this); computeStrength();"></td>
+				<td><input id='rpm_2' onkeyup="computeRPM(this); computeStrength();"></td>
 				<td>[RPM]</td>
 			</tr><tr>
 				<th class='rowlabel'>Torque</th>
-				<td><input id='torque_1' onkeyup="torque_compute(this); strength_compute();"></td>
-				<td><input id='torque_2' onkeyup="torque_compute(this); strength_compute();"></td>
+				<td><input id='torque_1' onkeyup="computeTorque(this); computeStrength();"></td>
+				<td><input id='torque_2' onkeyup="computeTorque(this); computeStrength();"></td>
 				<td class="unit" id="unit_torque"></td>
 			</tr><tr>
 				<th class='rowlabel'>Torque Capacity</th>
