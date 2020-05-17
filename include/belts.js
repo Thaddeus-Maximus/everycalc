@@ -1,5 +1,5 @@
 /*
- Belt module
+ Belt module (BELT)
 */
 
 function BELT_calculateLength(cc, d1t, d2t, crossed) {
@@ -44,7 +44,8 @@ function BELT_calculateCenterDist(l, d1, d2, crossed) {
 	return c;
 }
 
-
+// Belt sizes available at different manufacturers
+var BELT_MFRS = {"vex": "VexPro", "am": "AndyMark"};
 var BELT_SIZES = {
 	"vex": {
 		"5mm": [60,70,80,90,100,104,110,120,130,140,150,160,170,180,200,225,250],
@@ -54,16 +55,15 @@ var BELT_SIZES = {
 		"5mm": [40,45,48,93,55,85,104,107,110,117,120,131,140,151,160,170,180,200]
 	}
 };
-var BELT_MFRS = {"vex": "VexPro", "am": "AndyMark"};
 
 // Taken from https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf
 var BELT_RATINGS = {
 	'htd_3mm': {
-		'teeth': [10, 12, 14, 16, 18, 22, 26, 30, 34, 38, 44, 50, 56, 62, 72, 80],
+		'teeth': [10, 12, 14, 16, 18, 22, 26, 30, 34, 38, 44, 50, 56, 62, 72, 80], // number of teeth on the pulley
 		'rpms': [10, 20, 40, 60, 100, 200, 300, 400, 500, 600, 700, 800, 870, 1000,
-				1160, 1450, 1600, 1750, 2000, 2500, 3000, 3500, 5000, 8000, 10000],
-		'width_multipliers': {'6mm': 1.00, '9mm': 1.64, '15mm': 3.03},
-		'torques': [
+				1160, 1450, 1600, 1750, 2000, 2500, 3000, 3500, 5000, 8000, 10000], // pulley RPM
+		'width_multipliers': {'6mm': 1.00, '9mm': 1.64, '15mm': 3.03}, // multipliers for belt widths
+		'torques': [ // N-m, allowable design torque. Rows correspond to different RPMs, columns to different pulley teeth
 			[.4, .5, .5, .6, .7, .9, 1.2, 1.4, 1.6, 1.9, 2.3, 2.8, 3.1, 3.5, 4.0, 4.5],
 			[.4, .5, .5, .6, .7, .9, 1.2, 1.4, 1.6, 1.9, 2.3, 2.8, 3.1, 3.5, 4.0, 4.5],
 			[.4, .5, .5, .6, .7, .9, 1.2, 1.4, 1.6, 1.9, 2.3, 2.8, 3.1, 3.5, 4.0, 4.5],

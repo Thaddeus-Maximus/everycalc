@@ -1,3 +1,7 @@
+/*
+ * EveryCalc general purpose library
+ */
+
 VERSION = 0.5;
 
 function EC_onload() {

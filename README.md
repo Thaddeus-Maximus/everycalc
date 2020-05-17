@@ -26,6 +26,9 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 - Transient pneumatic cylinder model
 - Barrowman stability calculator
 
+# I want to help write things!
+Awesome! Take a look at the [belt size source code](beltsize.html). It's got some comments about what's going on.
+
 # Documentation
 
 - [Rocker Pod Model](docs/rocker_pod_model.pdf)

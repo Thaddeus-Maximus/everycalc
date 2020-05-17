@@ -258,3 +258,8 @@ button {
   background-color: #55a040;
   cursor: pointer;
 }
+
+#topbar select {
+  margin: 0px;
+  padding: 0px;
+}

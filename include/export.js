@@ -1,22 +1,22 @@
 /*
-Export Module (EXP).
-
-Please define the following:
- EXP_FN_BASE = <string>
-
-Please include the following in your onload script:
- EXP_onload()
- 
-Depends on following:
- element with id = EXP_inputs_frame: a script element where variables can be written/dumped to.
- element with id = topbar_filename: a div element to place the filename
- element with id = download_frame: a dummy (hidden) div element that enables downloading
-
-References the following entities:
- All <input> elements
- All <select> elements
-
-*/ 
+ * Export Module (EXP).
+ *
+ *	Please define the following:
+ *	 EXP_FN_BASE = <string>
+ *
+ *	Please include the following in your onload script:
+ *	  EXP_onload()
+ *	 
+ *	Depends on following:
+ *	 element with id = EXP_inputs_frame: a script element where variables can be written/dumped to.
+ *	 element with id = topbar_filename: a div element to place the filename
+ *	 element with id = download_frame: a dummy (hidden) div element that enables downloading
+ *
+ *	References the following entities:
+ *	 All <input> elements
+ *	 All <select> elements
+ *
+ */ 
 
 function EXP_onload() {
 	if (typeof EXP_inputs !== 'undefined') unpackInputs();
@@ -24,8 +24,8 @@ function EXP_onload() {
 
 function packInputs() {
 	/*
-		Gathers all input and select tags, and dumps them into one massive object (called EXP_inputs) placed inside a script tag.
-	*/
+	 *	Gathers all input and select tags, and dumps them into one massive object (called EXP_inputs) placed inside a script tag.
+	 */
 	packed_inputs = {};
 	for (input of document.getElementsByTagName('input')) {
 		if (input.type == "text") {
@@ -44,8 +44,8 @@ function packInputs() {
 
 function unpackInputs() {
 	/*
-		Takes data from EXP_inputs and fills it into the elements on page. 
-	*/
+	 *	Takes data from EXP_inputs and fills it into the elements on page. 
+	 */
 	for (key in EXP_inputs) {
 		if (typeof EXP_inputs[key] == "boolean")
 			document.getElementById(key).checked = EXP_inputs[key];
@@ -86,8 +86,8 @@ function readTextFile(file) {
 
 function downloadPage() {
 	/*
-		Gathers all referenced files, all inputs, dumps them into tags, and exports the DOM
-	*/
+	 *	Gathers all referenced files, all inputs, dumps them into tags, and exports the DOM
+	 */
 
 	// Prompt user for a filename
 	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];

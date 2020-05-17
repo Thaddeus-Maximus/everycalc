@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script id="defines">
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="include/eclib.js"></script>
+<script type="text/javascript" src="include/units.js"></script>
+<script type="text/javascript" src="include/belts.js"></script>
+<script type="text/javascript" src="include/export.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<!-- Main script that varies from calc-to-calc. You can call this whatever you want or split across multiple tags; libraries don't care -->
+<script type="text/javascript" id="main">
+	// Define constants that get used by other libraries
 	EXP_FN_BASE = 'beltsize';
 	UNIT_MAP = {
 		'torque':     	['N-m', 'in-lbf'],
@@ -18,19 +30,15 @@
 		'cc_s': 		['mm', 'in'],
 		'cc_l': 		['mm', 'in']
 	};
-</script>
-<script id="EXP_inputs_frame" ></script>
-<script type="text/javascript" src="include/units.js"></script>
-<script type="text/javascript" src="include/belts.js"></script>
-<script type="text/javascript" src="include/export.js"></script>
-<script type="text/javascript" src="include/eclib.js"></script>
 
-<script type="text/javascript" id="main">
-	function thload() {
+	// initialization function; hooked to onload
+	function init() {
 		UNIT_change();
 		EXP_onload();
+		
 		switchBeltType();
 		changeSeries();
+
 		EXP_onload();
 		EC_onload();
 
@@ -101,7 +109,7 @@
 		}
 		selectDriver();
 	}
-	
+
 	function changeSeries() {
 		let select = document.getElementById('belt_width');
 		select.innerHTML = '';
@@ -146,7 +154,6 @@
 	}
 
 	function computeGeometry() {
-		console.log('computeGeometry()');
 		let pitch = getV('pitch');
 		let p1 = getV('p1_n') * pitch / Math.PI;	
 		let p2 = getV('p2_n') * pitch / Math.PI;
@@ -165,7 +172,6 @@
 			setV('p1_od', '');
 			setV('p2_od', '');
 		}
-
 
 		let v = document.getElementById("driver").value;
 		if(v == "teeth") {
@@ -298,24 +304,31 @@
 </script>
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
 	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
 	<div class="topbar_la" id='topbar_version'></div>
 	<div class="topbar_la" id='topbar_filename'></div>
+	<div class="topbar_la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); computeGeometry();">
+			<option value=0 >Millimeters</option>
+			<option value=1 selected="selected">Inches</option>
+		</select>
+	</div>
 	<div class="topbar_ctr">Belt/Pulley Sizing</div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
+
+<!-- From here go nuts, do whatever works for you. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 	<div class="even">
 		<center>
-			<select id="unit_select" onchange="UNIT_change(); computeGeometry();">
-				<option value=0 >Millimeters</option>
-				<option value=1 selected="selected">Inches</option>
-			</select>
-			  
 			<input type="radio" id="type_timing" name="belt_type" value="timing" onclick="switchBeltType()" checked>
 			<label for="timing">Timing Belt</label>
 			<input type="radio" id="type_poly" name="belt_type" value="timing" onclick="switchBeltType()" >
@@ -324,13 +337,16 @@
 	</div>
 
 	<div class="odd">
-	
 		<table>
 			<tr id="th_pitch">
 				<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
+				<!-- onkeyup seems to be the most foolproof way to make sure inputs get captured. 
+						note the <td class="unit" id="unit_pitch">. This td is where units will be autopopulated by the unit library.
+					 	Just make sure you set the class type and id properly and you don't need to do anything else. -->
 				<td><input id="pitch" value=5 onkeyup="changeSeries(); computeGeometry()" /></td><td class="unit" id='unit_pitch'></td>
 			</tr><tr id="th_stretch">
 				<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
+				<!-- if you don't use the unit library for an input (because it's a ratio or percentage), don't worry about setting an id. It won't hurt or help. -->
 				<td><input id="stretch" value=5 onkeyup="computeGeometry()" /></td><td class="unit">%</td>
 				<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
 				<td><input type="checkbox" id="crossed" value="crossed" onclick="computeGeometry()"/></td>
@@ -351,10 +367,9 @@
 					</select>
 				</th>
 				<th><input id="driver_val" value=5 onkeyup="computeGeometry()" /></th>
-				<!--<th id="des_teeth_label" class="rowlabel" style="display:none">Belt Teeth</th>
-				<th><input id="des_teeth" value=500 style="display:none" /></th>-->
 			</tr><tr>
 				<th class="rowlabel">OD<span class="ttt">Outer diameter of the pulley / belt. Only valid for 5mm HTD belts currently.</span></th>
+				<!-- specify outputs as readonly. This can also be done dynamically in javascript with the .readOnly property. -->
 				<th><input id="p1_od" readonly /></th>
 				<th><input id="p2_od" readonly /></th>
 				<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
