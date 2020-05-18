@@ -42,10 +42,27 @@
 		EXP_onload();
 		EC_onload();
 
+		EC_setOnInputChange(function(e) {
+	    	let key = e.keyCode ? e.keyCode : e.which;
+	    	let input = e.target;
+			setError(1);
+
+			if(input.id.startsWith('rpm')){
+				computeRPM(input);
+				if (key==13) compute();
+			}
+			else if(input.id.startsWith('torque')){
+				computeTorque(input);
+				if (key==13) compute();
+			}
+			else {
+				compute();
+			}
+	    });
+
 		selectVendor();
 		selectDriver();
-		switchBeltType();
-		computeStrength();
+		compute();
 	}
 
 	function selectVendor() {
@@ -153,6 +170,17 @@
 		setV('rpm_'+to, rpm);
 	}
 
+	function compute() {
+		try{
+			computeGeometry();
+			computeStrength();
+		}catch(err){
+			setError(2, err);
+			return;
+		}
+		setError(0);		
+	}
+
 	function computeGeometry() {
 		let pitch = getV('pitch');
 		let p1 = getV('p1_n') * pitch / Math.PI;	
@@ -188,8 +216,8 @@
 				setV("n_teeth_s", nb, 4);
 				setV("l_s", l, 4);
 				setV("cc_s", cc, 4);
-				setV("p1_s", calculateWrap1(p1,p2,cc,pitch), 4);
-				setV("p2_s", calculateWrap2(p1,p2,cc,pitch), 4);
+				setV("p1_s", BELT_calculateWrap1(p1,p2,cc,pitch), 4);
+				setV("p2_s", BELT_calculateWrap2(p1,p2,cc,pitch), 4);
 			}
 		} else if (document.getElementById('type_timing').checked) {
 			let cc = convertFrom(getV('driver_val'), UNIT_MAP['dval'][UNIT_sys])- getV("center_add");
@@ -262,12 +290,11 @@
 				setV("n_teeth_s", "-");
 				setV("l_s", l, 4);
 				setV("cc_s", getV('driver_val'), 4);
-				setV("p1_s", calculateWrap1(p1,p2,cc,1), 4);
-				setV("p2_s", calculateWrap2(p1,p2,cc,1), 4);
+				setV("p1_s", BELT_calculateWrap1(p1,p2,cc,1), 4);
+				setV("p2_s", BELT_calculateWrap2(p1,p2,cc,1), 4);
 			}
 		}
-
-		computeStrength();
+		return 0;
 	}
 
 	function computeStrength() {
@@ -300,6 +327,7 @@
 		setV('torque_cap_2', torque_cap_2);
 		setV('fos_1', Math.min(torque_cap_1/torque_1, torque_cap_2/torque_2));
 		// TODO: Length correction factor
+		return 0;
 	}
 </script>
 
@@ -314,18 +342,19 @@
 	<div class="topbar_la" id='topbar_filename'></div>
 	<div class="topbar_la" id='topbar_unit'>
 		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); computeGeometry();">
+		<select id="unit_select" onchange="UNIT_change(); compute();">
 			<option value=0 >Millimeters</option>
 			<option value=1 selected="selected">Inches</option>
 		</select>
 	</div>
 	<div class="topbar_ctr">Belt/Pulley Sizing</div>
+	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
 
-<!-- From here go nuts, do whatever works for you. I'll point out patterns to pay attention to. -->
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 	<div class="even">
 		<center>
@@ -340,16 +369,15 @@
 		<table>
 			<tr id="th_pitch">
 				<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
-				<!-- onkeyup seems to be the most foolproof way to make sure inputs get captured. 
-						note the <td class="unit" id="unit_pitch">. This td is where units will be autopopulated by the unit library.
+				<!-- note the <td class="unit" id="unit_pitch">. This td is where units will be autopopulated by the unit library.
 					 	Just make sure you set the class type and id properly and you don't need to do anything else. -->
-				<td><input id="pitch" value=5 onkeyup="changeSeries(); computeGeometry()" /></td><td class="unit" id='unit_pitch'></td>
+				<td><input id="pitch" value=5 /></td><td class="unit" id='unit_pitch'></td>
 			</tr><tr id="th_stretch">
 				<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
 				<!-- if you don't use the unit library for an input (because it's a ratio or percentage), don't worry about setting an id. It won't hurt or help. -->
-				<td><input id="stretch" value=5 onkeyup="computeGeometry()" /></td><td class="unit">%</td>
+				<td><input id="stretch" value=5 /></td><td class="unit">%</td>
 				<th class="rowlabel">Crossed? <span class="ttt">Whether the belt is crossed in a figure-eight or infinity shape, in order to reverse the direction of motion.</span></th>
-				<td><input type="checkbox" id="crossed" value="crossed" onclick="computeGeometry()"/></td>
+				<td><input type="checkbox" id="crossed" value="crossed" onclick="compute()"/></td>
 			</tr>
 			<tr>
 				<td></td>
@@ -358,22 +386,22 @@
 				<th class="collabel" colspan=2>Center</th>
 			</tr><tr>
 				<th class="rowlabel" id="no_teeth_1"># Teeth</th>
-				<th><input id="p1_n" value=24 onkeyup="computeGeometry()" /></th>
-				<th><input id="p2_n" value=18 onkeyup="computeGeometry()" /></th>
+				<th><input id="p1_n" value=24 /></th>
+				<th><input id="p2_n" value=18 /></th>
 				<th id="des_cc" class="rowlabel">
 					<select id="driver" onchange="selectDriver()">
 						<option value="teeth">Belt Teeth</option>
 						<option value="cc" selected="selected">Desired C-C</option>
 					</select>
 				</th>
-				<th><input id="driver_val" value=5 onkeyup="computeGeometry()" /></th>
+				<th><input id="driver_val" value=5 /></th>
 			</tr><tr>
 				<th class="rowlabel">OD<span class="ttt">Outer diameter of the pulley / belt. Only valid for 5mm HTD belts currently.</span></th>
 				<!-- specify outputs as readonly. This can also be done dynamically in javascript with the .readOnly property. -->
 				<th><input id="p1_od" readonly /></th>
 				<th><input id="p2_od" readonly /></th>
 				<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
-				<th><input id="center_add" value=0.000  onkeyup="computeGeometry()" /></th>
+				<th><input id="center_add" value=0.000  /></th>
 			</tr><tr>
 				<th class="rowlabel">PD</th>
 				<th><input id="p1_pd" readonly /></th>
@@ -387,7 +415,7 @@
 							<option value="am">AndyMark</option>
 							<option value="raw" selected="selected">Increments of</option>
 						</select>
-						<input id="raw_inc" value=5 onkeyup="computeGeometry()" /><span id="raw_inc_label">Teeth</span>
+						<input id="raw_inc" value=5 /><span id="raw_inc_label">Teeth</span>
 					</th>
 				</tr>
 		</table>
@@ -427,26 +455,26 @@
 			<tr id="th_pitch">
 				<th class="rowlabel">
 					Belting Series
-				</th><td><select id="series" onchange="changeSeries(); computeStrength()">
+				</th><td><select id="series" onchange="changeSeries(); compute()">
 						<option value="htd" selected=selected >HTD</option>
 						<option value="gt2" >GT2</option>
 						<option value="gt3" >GT3</option>
 					</select>
 				</td><td>
-					<select id="belt_width" onchange="computeStrength()">
+					<select id="belt_width" onchange="compute()">
 					</select>
 				</td><td>
 					width
 				</td>
 			</tr><tr>
 				<th class='rowlabel'>RPM</th>
-				<td><input id='rpm_1' onkeyup="computeRPM(this); computeStrength();"></td>
-				<td><input id='rpm_2' onkeyup="computeRPM(this); computeStrength();"></td>
+				<td><input id='rpm_1' ></td>
+				<td><input id='rpm_2' ></td>
 				<td>[RPM]</td>
 			</tr><tr>
 				<th class='rowlabel'>Torque</th>
-				<td><input id='torque_1' onkeyup="computeTorque(this); computeStrength();"></td>
-				<td><input id='torque_2' onkeyup="computeTorque(this); computeStrength();"></td>
+				<td><input id='torque_1' ></td>
+				<td><input id='torque_2' ></td>
 				<td class="unit" id="unit_torque"></td>
 			</tr><tr>
 				<th class='rowlabel'>Torque Capacity</th>

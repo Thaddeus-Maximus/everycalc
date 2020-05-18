@@ -100,6 +100,7 @@ button {
 .container {
 	float: left;
 	margin: 0;
+  margin-top: 28px;
 }
 
 .container-oall {
@@ -122,26 +123,14 @@ button {
   background-color: #555;
   color: #fff;
   text-align: center;
-  border-radius: 6px;
   padding: 5px 0;
   position: absolute;
   z-index: 1;
-  bottom: 125%;
-  left: 50%;
+  top: 100%;
+  left: 5%;
   margin-left: 0px;
   opacity: 0;
   transition: opacity 0.3s;
-}
-
-.rowlabel .ttt::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: #555 transparent transparent transparent;
 }
 
 .rowlabel:hover .ttt {
@@ -217,10 +206,6 @@ button {
   background: #fd6 !important;
 }
 
-#k_table td {
-  width: 100px;
-}
-
 #compute_btn {
   background-color: #55a040;
 }
@@ -230,22 +215,31 @@ button {
 }
 
 #topbar {
-  width: 100%;
   background-color: #ddd;
   display: flex;
   flex-direction: row;
   font-weight: bold;
+  font-size: 10px;
+
+  position: fixed;
+  width: 100%;
+  height: 28px;
+  top: 0;
+  z-index: 5;
+  border-bottom: 1px solid #333;
 }
 .topbar_la {
   text-align: left;
   flex-grow: 0;
   padding: 5px;
+  margin: 0px;
   border-right: 1px solid #333;
 }
 .topbar_ra {
   text-align: right;
   flex-grow: 0;
   padding: 5px;
+  margin: 0px;
   border-left:  1px solid #333;
 }
 .topbar_ctr {
@@ -255,11 +249,36 @@ button {
 }
 
 .selectable:hover {
-  background-color: #55a040;
+  background-color: #0074d9;
   cursor: pointer;
 }
 
 #topbar select {
   margin: 0px;
   padding: 0px;
+}
+
+.topbar_ra .ttt {
+  visibility: hidden;
+  width: 400px;
+  background-color: #ddd;
+  color: black;
+  text-align: center;
+  padding: 5px 0;
+
+  position: fixed;
+  width: 300px;
+  top: 28px;
+  right: 0%;
+  margin-left: 0px; /* Use half of the width (120/2 = 60), to center the tooltip */
+  border: 1px solid #333;
+  z-index: 1;
+}
+
+.topbar_ra:hover .ttt {
+  visibility: visible;
+  opacity: 1;
+}
+#topbar_status {
+  background-color: #b5e0a0;
 }

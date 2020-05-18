@@ -3,6 +3,7 @@ Unit Module (UNIT).
 
 Please define the following:
  UNIT_MAP = <object> of structure 'input_id' => ['list','of','unit','names']
+ UNIT_PLACES = <integer> (number of places)
 
 Please include the following in your onload script:
  UNITOnload()
@@ -28,8 +29,14 @@ function UNIT_change() {
 	labels = document.getElementsByClassName('unit');
 	for (unit in labels) {
 		if (labels[unit].id && UNIT_MAP[labels[unit].id.substring(5)] ){
-			varname = labels[unit].id.substring(5);
-			document.getElementById('unit_'+varname).innerHTML = '['+UNIT_MAP[varname][UNIT_sys]+']';
+			let varname = labels[unit].id.substring(5);
+			let brktunit = '['+UNIT_MAP[varname][UNIT_sys]+']';
+			let oldstr = document.getElementById('unit_'+varname).innerHTML;
+			let start = oldstr.indexOf('[');
+			if (start < 0)
+				document.getElementById('unit_'+varname).innerHTML = brktunit;
+			else
+				document.getElementById('unit_'+varname).innerHTML = oldstr.substring(0, start) + brktunit;
 		}
 	}
 }
@@ -58,7 +65,7 @@ function getV(id, default_value, pct_err_en) {
 
 function setV(id, value, places) {
 	if (typeof places === 'undefined')
-		places = 3;
+		places = (typeof UNIT_PLACES ==='undefined') ? 3:UNIT_PLACES;
 	if (typeof value === 'string') {
 		document.getElementById(id).value = value;
 	} else {

@@ -1,9 +1,18 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
-<script type="text/javascript">
-	unit_sys = 0;
-	inputs_unit_map = {
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="include/eclib.js"></script>
+<script type="text/javascript" src="include/units.js"></script>
+<script type="text/javascript" src="include/export.js"></script>
+<script type="text/javascript" src="include/motors.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<script type="text/javascript" id="main">
+	EXP_FN_BASE = 'simplemech';
+	UNIT_MAP = {
 		"motor_stall_torque": ["N-m", "N-m"],
 		"motor_stall_torque_adj": ["N-m", "N-m"],
 		"encoder_cpx": ["c/m", "c/ft"],
@@ -14,162 +23,110 @@
 		"theor_runspd": ["m/s", "ft/s"],
 		"theor_stall_force": ["N", "lbf"],
 
-		"mass_ref": ["kg", "lbm"],
-		"moi_ref": ["kg m^2", "lbm in^2"],
-		"radius_ref": ["m"," in"],
-		"velocity_ref": ["m/s", "ft/s"],
-		"position_ref": ["m", "ft"],
+		"mass_ref": ["lbm", "kg"],
+		"moi_ref": ["lbm in^2", "kg m^2"],
+		"radius_ref": ["in"," m"],
+		"velocity_ref": ["ft/s", "m/s"],
+		"position_ref": ["ft", "m"],
+		"omega_ref": ["RPM", "RPM"],
+		"theta_ref": ["rev", "rev"],
+		"omega_m_ref": ["RPM", "RPM"],
+		"theta_m_ref": ["rev", "rev"],
 
 		"query_d": ["m", "ft"],
 		"query_v": ["m/s", "ft/s"],
 		"query_f": ["N", "lbf"],
-		"query_a": ["m/s^2", "ft/s^2"]
-	}
+		"query_a": ["m/s^2", "ft/s^2"],
 
-	function populate_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
-		
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
-			}
-		}
+		"d_label": ["m", "ft"],
+		"v_label": ["m/s", "ft/s"],
+		"f_label": ["N", "lbf"],
 
-		document.getElementById(chart_name+'_d_label').innerHTML = 'Position ['+inputs_unit_map['query_d'][unit_sys]+']';
-		document.getElementById(chart_name+'_v_label').innerHTML = 'Velocity ['+inputs_unit_map['query_v'][unit_sys]+']';
-		document.getElementById(chart_name+'_f_label').innerHTML = 'Force ['  +inputs_unit_map['query_f'][unit_sys]+']';
-	}
+		"motor_max_rpm_adj": ["RPM","RPM"]
+	};
 
-
-	function select_plot_mode(no_compute) {
+	function selectPlotMode() {
 		var v = document.getElementById('plot_mode').value;
 		if (v=='linear') {
-			inputs_unit_map["query_d"]=["m", "ft"];
-			inputs_unit_map["query_v"]=["m/s", "ft/s"];
-			inputs_unit_map["query_f"]=["N", "lbf"];
-			inputs_unit_map["query_a"]=["m/s^2", "ft/s^2"];
+			UNIT_MAP["query_d"]=["m", "ft"];
+			UNIT_MAP["query_v"]=["m/s", "ft/s"];
+			UNIT_MAP["query_f"]=["N", "lbf"];
+			UNIT_MAP["query_a"]=["m/s^2", "ft/s^2"];
 		} else if (v=='rotary') {
-			inputs_unit_map["query_d"]=["rev", "rev"];
-			inputs_unit_map["query_v"]=["RPM", "RPM"];
-			inputs_unit_map["query_f"]=["N-m", "ft-lbf"];
-			inputs_unit_map["query_a"]=["RPM/s", "RPM/s"];
+			UNIT_MAP["query_d"]=["rev", "rev"];
+			UNIT_MAP["query_v"]=["RPM", "RPM"];
+			UNIT_MAP["query_f"]=["N-m", "ft-lbf"];
+			UNIT_MAP["query_a"]=["RPM/s", "RPM/s"];
 		}
 
-		switch_units(no_compute);
+		UNIT_change();
 	}
 
-	function switch_units(no_compute) {
-		populate_units();
-		if(!no_compute) compute();
+	function init() {
+		EC_onload();
+		MOTOR_setupMotorSelect("motortype");
+		EXP_onload();
+
+		selectPlotMode(true);
+
+		EC_setOnInputChange(function(e) {
+	    	let key = e.keyCode ? e.keyCode : e.which;
+	    	let input = e.target;
+			setError(1);
+
+			if (key == 13) compute();
+	    });
+
+		calcRatio();
+		selectMotorType(document.getElementById("motortype"));
 	}
 
-	function get_motor_data(motor,key){
-		return motor_data[motor][key];
-	}
-
-	function gidv(id, ignore_units) {
-
-		v =  eval(document.getElementById(id).value);
-		if ((!ignore_units) && typeof inputs_unit_map[id] !== 'undefined')
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		return v;
-	}
-
-	function gids(id, value, places, disable_conversion) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof value === 'string') {
-			document.getElementById(id).value = value;
-		} else {
-			if ((!disable_conversion) && typeof inputs_unit_map[id] !== 'undefined')
-				value = convert_to(value, inputs_unit_map[id][unit_sys]);
-			document.getElementById(id).value = value.toFixed(places);
-		}
-	}
-
-	function thload() {
-		document.getElementById('topbar_version').innerHTML = VERSION;
-		select = document.getElementById("motortype");
-		i=0;
-		for(motor in motor_data) {
-			i++;
-			opt = document.createElement('option');
-			opt.innerHTML = motor_data[motor]["plain_name"];
-			opt.value = motor;
-			select.appendChild(opt);
-		}
-		if(packed_inputs) unpack_inputs();
-		var inputs, index;
-
-		select_plot_mode(true);
-
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-		    inputs[index].onkeyup = function(e) {
-		    	var key = e.keyCode ? e.keyCode : e.which;
-
-		    	if (key==13) {
-		    		compute(true);
-		    	} else {
-		    		compute(false);
-		    	}
-		    }
-		}
-
-
-		calc_ratio();
-		motortype_select(document.getElementById("motortype"));
-		
-	}
-
-	function compute(simulate) {
-		simulate = typeof simulate !== 'undefined' ? simulate : true;
-		document.getElementById('charts').classList.add('uncomputed');
-		document.getElementById('endcond_met').classList.add('uncomputed');
-		document.getElementById('current_cons').classList.add('uncomputed');
-		document.getElementById('current_end').classList.add('uncomputed');
-
-		var dt = 0;
+	function compute() {
+	try{
+		let dt = 0;
 		// overall, solve: alpha = (T-Mres)/I
 		// make x, v, theta, omega available
-		var R = gidv("radius"); var r = gidv('radius', true);
-		var M = gidv("mass");   var m = gidv('mass',   true);
-		var TS = gidv("motor_stall_torque_adj"); var Ts = gidv('motor_stall_torque_adj', true);
-		var wf = gidv("motor_max_rpm_adj") * 2*Math.PI/60; // convert to rad/s!
-		var If = gidv("motor_free_current_adj");
-		var Is = gidv("motor_stall_current_adj");
-		var G = gidv("G");
+		let r = getV("radius");
+		let m = getV("mass");
+		let TS = getV("motor_stall_torque_adj");
+		let wf = getV("motor_max_rpm_adj");
+		let If = getV("motor_free_current_adj");
+		let Is = getV("motor_stall_current_adj");
+		let G = getV("G");
 
 		load_expr = document.getElementById("load").value;
-		end_expr = document.getElementById("endcond").value;
+		end_expr  = document.getElementById("endcond").value;
 
 		if(end_expr == "") end_expr = "0";
 
-		I = M*R*R;
+		I = m*r*r;
 
-		alpha_ar = [0,0];
-		omega_ar = [0,0];
-		theta_ar = [0];
-		t_ar = [0];
+		alpha_ar 	= [0,0];
+		omega_ar 	= [0,0];
+		theta_ar 	= [0];
+		t_ar 		= [0];
 
-		omega=0; theta=0; theta_m=0; omega_m=0; v=0; x=0; t=0;
-		T = G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-		Mres = eval(load_expr)*R;
-		if(isNaN(Mres)) Mres = 0;
+		let variables = {
+			t 		: 0,
+			omega 	: 0,
+			theta 	: 0,
+			omega_m : 0,
+			theta_m : 0,
+			x 		: 0,
+			v 		: 0
+		}
+		Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP["load"][UNIT_sys])*r;
 		// T = Mres -> G*Ts - G*Ts*omega_m/wf = Mres -> omega_m = (G*Ts - Mres)/(G*Ts/wf)
 		omega_m_theor = (G*TS - Mres)/(G*TS/wf);
-		gids("theor_freespd", R*wf/G)
-		gids("theor_runspd", R*omega_m_theor/G);
-		gids("theor_stall_force", G*TS/R);
-		gids("theor_stall_current", If + (Is-If) * (wf-omega_m_theor)/wf);
+		setV("theor_freespd", r*wf/G)
+		setV("theor_runspd", r*omega_m_theor/G);
+		setV("theor_stall_force", G*TS/r);
+		setV("theor_stall_current", If + (Is-If) * (wf-omega_m_theor)/wf);
 
 		enc_plc = document.getElementById('encoder_placement').value;
 		enc_els = document.getElementsByClassName('encoder_detail');
+
+		// TODO: This should be moved to somewhere else, yeah?
 		if (enc_plc == 'none') {
 			for (i=0;i<enc_els.length;i++) {
 				enc_els[i].style.display = 'none';
@@ -179,39 +136,36 @@
 				enc_els[i].style.display = 'table-row';
 			}
 
-			cpx = gidv('encoder_cpr')/NaNto1(gidv('encoder_reduction'))/(r*2*Math.PI);
+			cpx = getV('encoder_cpr')/NaNto1(getV('encoder_reduction'))/(r*2*Math.PI);
 			if(enc_plc == 'motor') cpx *= G;
 
-			gids('encoder_cpx', cpx);
-			gids('encoder_max_cps', cpx*R*wf/G);
+			setV('encoder_cpx', cpx);
+			setV('encoder_max_cps', cpx*r*wf/G);
 		}
-
-		if (!simulate) return; // YARRR, NO MORE PLAIN CALCS BEYOND THIS POINT
 
 		cur_cons = 0;
 
 		alpha_o = NaN;
 
-		Rf = R;
+		Rf = r;
 		if (document.getElementById('plot_mode').value == 'linear') Rf = 1;
 
 		channels = [[],[],[],[],[],[]]; //[[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
       	i=0;
 		while(1) {
-			omega = omega_ar[omega_ar.length-1] * 60/2/Math.PI;
-			theta = theta_ar[theta_ar.length-1] * 2/Math.PI;
-			t = t_ar[t_ar.length-1];
-			x = convert_to(theta_ar[theta_ar.length-1]*R, inputs_unit_map['query_d'][unit_sys]);
-			v = convert_to(omega_ar[omega_ar.length-1]*R, inputs_unit_map['query_v'][unit_sys]);
-			omega_m = omega*G;
-			theta_m = theta*G;
+			variables.t 		= t_ar[t_ar.length-1];
+			variables.omega 	= convertTo(omega_ar[omega_ar.length-1], UNIT_MAP.omega_ref[UNIT_sys]);
+			variables.theta 	= convertTo(theta_ar[theta_ar.length-1], UNIT_MAP.theta_ref[UNIT_sys]);
+			variables.omega_m 	= convertTo(omega_ar[omega_ar.length-1]*G, UNIT_MAP.omega_m_ref[UNIT_sys]);
+			variables.theta_m 	= convertTo(theta_ar[theta_ar.length-1]*G, UNIT_MAP.theta_m_ref[UNIT_sys]);
+			variables.v 		= convertTo(omega_ar[omega_ar.length-1]*r, UNIT_MAP.velocity_ref[UNIT_sys]);
+			variables.x 		= convertTo(theta_ar[theta_ar.length-1]*r, UNIT_MAP.position_ref[UNIT_sys]);
+			if (i > 5000 || parseMath(end_expr, variables)) break;
 
 			T = G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-			Mres = convert(eval(load_expr), inputs_unit_map["load"][unit_sys])*R;
-			if(isNaN(Mres)) Mres = 0;
+			Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP["load"][UNIT_sys])*r;
 			alpha = (T-Mres) / I;
 			if(isNaN(alpha_o)) alpha_o = alpha;
-
 			alpha_ar.push(alpha);
 
 			// Use Adams-Bradforth Method
@@ -222,16 +176,13 @@
 			cur = If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf;
 			cur_cons = cur_cons + dt*cur;
 
-			if (i > 5000 || eval(end_expr)) break;
 
 			channels[0].push(t_ar[t_ar.length-1]);
-			channels[1].push(omega_ar[omega_ar.length-1]*R / Rf);
-			channels[2].push(theta_ar[theta_ar.length-1]*R / Rf);
+			channels[1].push(omega_ar[omega_ar.length-1]*r / Rf);
+			channels[2].push(theta_ar[theta_ar.length-1]*r / Rf);
 			channels[3].push(cur);
-			channels[4].push(T/R * Rf);
-			channels[5].push(alpha*R / Rf);
-
-			
+			channels[4].push(T/r * Rf);
+			channels[5].push(alpha*r / Rf);
 
 			dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/30));
 			i++;
@@ -240,71 +191,49 @@
 		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
 
 		drawchart1(channels);
-		document.getElementById('charts').classList.remove('uncomputed');
-		document.getElementById('endcond_met').classList.remove('uncomputed');
-		document.getElementById('current_cons').classList.remove('uncomputed');
-		document.getElementById('current_end').classList.remove('uncomputed');
 
-      	gids("endcond_met", eval(end_expr) ? t_ar[t_ar.length-1]:"NOT MET");
-      	gids("current_cons", cur_cons);
-      	gids("current_end", (If + (Is-If)*(wf-G*omega_ar[omega_ar.length-1])/wf));
+      	setV("endcond_met", parseMath(end_expr, variables) ? t_ar[t_ar.length-1]:"NOT MET");
+      	setV("current_cons", cur_cons);
+      	setV("current_end", (If + (Is-If)*(wf-G*omega_ar[omega_ar.length-1])/wf));
+
+    }catch(err){
+    	console.log(err);
+		setError(2, err);
+		return;
+	}
+	setError(0);
 	}
 
-	function motortype_select() {
+	function selectMotorType() {
 		e=document.getElementById("motortype");
 		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
 		props.forEach(function(a) {
 			
-			document.getElementById("motor_"+a).value=get_motor_data(e.value, a);
-			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
+			document.getElementById("motor_"+a).value=MOTOR_getSpecs(e.value, a);
+			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage")/12;
 			if (a=="stall_torque")
-				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+				adjVal *= getV("motornum")*getV("efficiency")/100;
 			if (a=="free_current" || a=="stall_current" )
-				adjVal *= gidv("motornum");
-			gids("motor_"+a+"_adj",adjVal);
+				adjVal *= getV("motornum");
+			setV("motor_"+a+"_adj", adjVal);
 		});
 
 		compute();
 	}
 
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
-	function calc_ratio() {
+	function calcRatio() {
 		var G = 1;
-		G *= NaNto1(gidv("G1B"));
-		G *= NaNto1(gidv("G2B"));
-		G *= NaNto1(gidv("G3B"));
-		G *= NaNto1(gidv("G4B"));
-		G /= NaNto1(gidv("G1A"));
-		G /= NaNto1(gidv("G2A"));
-		G /= NaNto1(gidv("G3A"));
-		G /= NaNto1(gidv("G4A"));
-
-		gids("G", G);
+		G *= getV("G1B",1);
+		G *= getV("G2B",1);
+		G *= getV("G3B",1);
+		G *= getV("G4B",1);
+		G /= getV("G1A",1);
+		G /= getV("G2A",1);
+		G /= getV("G3A",1);
+		G /= getV("G4A",1);
+		setV("G", G);
 	}
 
-	function collapse(id) {
-		el = document.getElementById('detail_'+id);
-		btn = document.getElementById('toggle_detail_'+id);
-		
-		if(el.style['display'] != 'none') {
-			el.style['display'] = 'none';
-			btn.innerHTML = "&#9660";
-			if (id=='gratio') document.getElementById('G').readOnly = false;
-		} else {
-			el.style['display'] = 'inherit';
-			btn.innerHTML = "&#9650";
-			if (id=='gratio'){ document.getElementById('G').readOnly = true; calc_ratio(); }
-		}
-	}
-
-</script>
-
-<script style="text/javascript">
 	function makeTicks(maxes, num_to_print, n) {
 		if (Math.min(maxes) < 0) return [0];
 		H = [];
@@ -385,10 +314,10 @@
 
 	function drawchart1(channels) {
 		[t, v_raw, d_raw, cur, F_raw, a_raw] = channels;
-		d = convert_to(d_raw, inputs_unit_map['query_d'][unit_sys]);
-		v = convert_to(v_raw, inputs_unit_map['query_v'][unit_sys]);
-		f = convert_to(F_raw, inputs_unit_map['query_f'][unit_sys]);
-		a = convert_to(a_raw, inputs_unit_map['query_a'][unit_sys]);
+		d = convertTo(d_raw, UNIT_MAP['query_d'][UNIT_sys]);
+		v = convertTo(v_raw, UNIT_MAP['query_v'][UNIT_sys]);
+		f = convertTo(F_raw, UNIT_MAP['query_f'][UNIT_sys]);
+		a = convertTo(a_raw, UNIT_MAP['query_a'][UNIT_sys]);
 
 		svg = document.getElementById('chart');
 		x_axis = document.getElementById('chart_x_axis');
@@ -447,17 +376,18 @@
 			f_line.points.appendItem(ptf);
 		}
 		
+		/* //don't mess with this yet
 		bg=document.getElementById('chart');
 
 		qline = document.getElementById('chart_query_line');
 		qline.setAttribute('opacity', 0);
 
-		gids('query_time', '-', 3, true);
-		gids('query_d', '-', 3, true);
-		gids('query_v', '-', 3, true);
-		gids('query_cur', '-', 3, true);
-		gids('query_f', '-', 3, true);
-		gids('query_a', '-', 3, true);
+		getV('query_time', '-', 3, true);
+		getV('query_d', '-', 3, true);
+		getV('query_v', '-', 3, true);
+		getV('query_cur', '-', 3, true);
+		getV('query_f', '-', 3, true);
+		getV('query_a', '-', 3, true);
 
 		handler = function(event){
 			if(event.buttons != 1) return;
@@ -490,177 +420,54 @@
 				gids('query_a', aq, 3, true);
 			}
 		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);
-	}
-</script>
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-			if (input.type == "radio") {
-				packed_inputs[input.id] = input.checked;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		for (key in packed_inputs) {
-			if (typeof packed_inputs[key] == "boolean")
-				document.getElementById(key).checked = packed_inputs[key];
-			else
-				document.getElementById(key).value   = packed_inputs[key];
-		}
-
-		loads = document.getElementsByClassName('load');
-		for (load of loads) {
-			load.identifier = load.firstChild.getAttribute('identifier');
-		}
-		for (btn of document.getElementsByClassName('toggle_button'))
-			btn.innerHTML = "&#9650;";
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&')
-	               .replace(/â–¼/g, '&#9650;');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'simplemech_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-	}
-
-	function print_page() {
-		window.print();
+		bg.addEventListener('mousedown', handler);*/
 	}
 </script>
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
 	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
 	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_fname'></div>
-	<div class="topbar_ctr">General Mechanism</div>
+	<div class="topbar_la" id='topbar_filename'></div>
+	<div class="topbar_la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Millimeters</option>
+			<option value=1 selected="selected">Inches</option>
+		</select>
+	</div>
+	<div class="topbar_ctr">Belt/Pulley Sizing</div>
+	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<a id="download_frame" hidden></a>
 </div>
-	<div style="display:table;">
-	<div style="width: 300px; float: left; display:table-cell;" class="container">
 
-	<div class="odd">
-		<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked>
-			  <label for="english">English</label>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()">
-			  <label for="metric">Metric</label><br>
-		</center>
-	</div>
-
-	
-
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="width: 300px; float: left; display:table-cell;" class="container">
 	<div class="even">
 		<div>
 			<span class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></span>
-			<input class='narrow' id="motornum" oninput="motortype_select()" value=1 />
+			<input class='narrow' id="motornum" oninput="selectMotorType()" value=1 />
 
 			<span class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></span>
-			<input class='narrow' id="op_voltage" oninput="motortype_select()" value=12 />
+			<input class='narrow' id="op_voltage" oninput="selectMotorType()" value=12 />
 			<span class="unit">[V]</span>
 			
 			<span class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></span>
-			<input class='narrow'  id="efficiency" oninput="motortype_select()" value=85 />
+			<input class='narrow'  id="efficiency" oninput="selectMotorType()" value=85 />
 			<span class="unit">[%]</span>
 			
 		</div>
 		<div>
 			
 			<span class="rowlabel">Motor</span>
-			<select class="doublewide" id="motortype" oninput="motortype_select()"></select>
-			<button type="button" onclick="collapse('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
+			<select class="doublewide" id="motortype" oninput="selectMotorType()"></select>
+			<button type="button" onclick="collapseDiv('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
 		</div>
 	<table id='detail_motor' style='display:none;'>
 		<tr>
@@ -696,31 +503,31 @@
 		<div>
 		<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
 		<input id="G"/>
-		<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
+		<button type="button" onclick="collapseDiv('gratio')" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
 	</div>
 	<table id='detail_gratio' style="display:none;">
 		<tr>
-			<td><input id="G1A" oninput="calc_ratio()" value=12 /></td>
+			<td><input id="G1A" oninput="calcRatio()" value=12 /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="calc_ratio()" value=72 /></td>
+			<td><input id="G1B" oninput="calcRatio()" value=72 /></td>
 		</tr><tr>
-			<td><input id="G2A" oninput="calc_ratio()" /></td>
+			<td><input id="G2A" oninput="calcRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2B" oninput="calc_ratio()" /></td>
+			<td><input id="G2B" oninput="calcRatio()" /></td>
 		</tr><tr>
-			<td><input id="G3A" oninput="calc_ratio()" /></td>
+			<td><input id="G3A" oninput="calcRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3B" oninput="calc_ratio()" /></td>
+			<td><input id="G3B" oninput="calcRatio()" /></td>
 		</tr><tr>
-			<td><input id="G4A" oninput="calc_ratio()" /></td>
+			<td><input id="G4A" oninput="calcRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G4B" oninput="calc_ratio()" /></td>
+			<td><input id="G4B" oninput="calcRatio()" /></td>
 		</tr>
 	</table>
 </div><div class="even">
 	<div>
 		<span class="rowlabel">Encoder Relativity<span class="ttt">(Optional) Where is the encoder placed - on (or in) the motor, or on the output shaft?</span></span>
-			<select id="encoder_placement" onchange="compute(false)">
+			<select id="encoder_placement" onchange="compute()">
 				<option value="none">No Encoder</option>
 				<option value="motor">To Motor</option>
 				<option value="output">To Output</option>
@@ -730,13 +537,13 @@
 		<table id='detail_encoder' style='display:none;'>
 		<tr class='encoder_detail'>
 			<th class="rowlabel">CPR<span class="ttt">Encoder Counts Per Revolution<br/>(you can also put ticks, and ticks will be computed. Math is the same)</span></th>
-			<td><input id="encoder_cpr" onchange="compute(false)" value=1 /></td>
+			<td><input id="encoder_cpr" onchange="compute()" value=1 /></td>
 			<th class="rowlabel">C/x<span class="ttt">Encoder Counts Per Distance Traveled<br/>(how many encoder counts per unit distance traveled)</span></th>
 			<td><input id="encoder_cpx" value=1 readonly /></td>
 			<td class="unit" id="unit_encoder_cpx"></td>
 		</tr><tr class='encoder_detail'>
 			<th class="rowlabel">Reduction<span class="ttt">Additional reduction applied between the shaft and the encoder</span></th>
-			<td><input id="encoder_reduction" onchange="compute(false)" value='' /></td>
+			<td><input id="encoder_reduction" onchange="compute()" value='' /></td>
 			<th class="rowlabel">Max CPS<span class="ttt">Maximum Counts per Second, at free speed</span></th>
 			<td><input id="encoder_max_cps" value=1 readonly /></td>
 		</tr>
@@ -748,7 +555,7 @@
 			<td><input id="radius" oninput="" value=2 /></td>
 			<td class="unit" id="unit_radius"></td>
 		</tr><tr>
-			<th class="rowlabel">Load Equation<span class="ttt">(Optional) Load equation. You can put a simple number here, or you can put an expression.<br/>If you put an expression, you can use any javascript operators (+,-,*,/,Math.sin(...),...).<br/>You can use any variables described in the pullout below.</span></th>
+			<th class="rowlabel">Load<span class="ttt">(Optional) Load.</span></th>
 			<td><input id="load" oninput="" /></td>
 			<td class="unit" id="unit_load"></td>
 		</tr><tr>
@@ -762,7 +569,7 @@
 	</table>
 <div class="even">
 	Variable reference for use in expressions
-	<button type="button" onclick="collapse('varref')" id='toggle_detail_varref' class="toggle_button">&#9660;</button>
+	<button type="button" onclick="collapseDiv('varref')" id='toggle_detail_varref' class="toggle_button">&#9660;</button>
 	<table id='detail_varref' style='display:none;'>
 			<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
 			<tr><th class='rowlabel'>m</th><td class="unit" id="unit_mass_ref">[kg]</td><td>Mass</td></tr>
@@ -771,10 +578,10 @@
 			<tr><th class='rowlabel'>t</th><td class="unit">[s]</td><td>Time</td></tr>
 			<tr><th class='rowlabel'>v</th><td class="unit" id="unit_velocity_ref"></td><td>Lin. Velocity</td></tr>
 			<tr><th class='rowlabel'>x</th><td class="unit" id="unit_position_ref"></td><td>Lin. Position</td></tr>
-			<tr><th class='rowlabel'>omega</th><td class="unit">[RPM]</td><td>Rot. Velocity</td></tr>
-			<tr><th class='rowlabel'>theta</th><td class="unit">[Rev]</td><td>Rot. Position</td></tr>
-			<tr><th class='rowlabel'>omega_m</th><td class="unit">[RPM]</td><td>Rot. Motor Velocity</td></tr>
-			<tr><th class='rowlabel'>theta_m</th><td class="unit">[Rev]</td><td>Rot. Motor Position</td></tr>
+			<tr><th class='rowlabel'>omega</th><td class="unit" id="unit_omega_ref"></td><td>Rot. Velocity</td></tr>
+			<tr><th class='rowlabel'>theta</th><td class="unit" id="unit_theta_ref"></td><td>Rot. Position</td></tr>
+			<tr><th class='rowlabel'>omega_m</th><td class="unit" id="unit_omega_m_ref"></td><td>Rot. Motor Velocity</td></tr>
+			<tr><th class='rowlabel'>theta_m</th><td class="unit" id="unit_theta_m_ref"></td><td>Rot. Motor Position</td></tr>
 	</table>
 	<center><button type="button" onclick="compute()">Compute!</button></center>
 </div>
@@ -814,7 +621,7 @@
 	</div>
 </div><div class="even">
 		<span class="rowlabel">Protips</span>
-		<button type="button" onclick="collapse('protips')" id='toggle_detail_protips' class="toggle_button">&#9660;</button>
+		<button type="button" onclick="collapseDiv('protips')" id='toggle_detail_protips' class="toggle_button">&#9660;</button>
 		<table id='detail_protips'>
 		<tr>
 			<td>
@@ -861,14 +668,14 @@
 </g>
 
 <g class="labels y-labels" id='chart_y_labels'>
-  <text x=-300 y=15 class="label-title" transform="rotate(270)" id="chart_d_label" fill="#0074d9">Position</text>
-  <text x=-180 y=15 class="label-title" transform="rotate(270)" id="chart_v_label" fill="#d91200">Velocity</text>
-  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
+  <text x=-300 y=15 class="label-title unit" transform="rotate(270)" id="unit_d_label" fill="#0074d9">Position []</text>
+  <text x=-180 y=15 class="label-title unit" transform="rotate(270)" id="unit_v_label" fill="#d91200">Velocity []</text>
+  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="unit_y1_divider" fill="#111">/</text>
 </g>
 
 <g class="labels z-labels" id='chart_z_labels'>
   <text x=-300 y=800 class="label-title" transform="rotate(270)" id="chart_cur_label" fill="#444">Current [A]</text>
-  <text x=-180 y=800 class="label-title" transform="rotate(270)" id="chart_f_label" fill="#c48900">Force</text>
+  <text x=-180 y=800 class="label-title unit" transform="rotate(270)" id="unit_f_label" fill="#c48900">Force []</text>
   <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 
@@ -915,7 +722,7 @@
 			<tr>
 				<th class="rowlabel">Plot Mode</th>
 				<td>
-					<select id="plot_mode" onchange="select_plot_mode()">
+					<select id="plot_mode" onchange="selectPlotMode()">
 						<option value="linear">Linear</option>
 						<option value="rotary">Rotary</option>
 					</select>

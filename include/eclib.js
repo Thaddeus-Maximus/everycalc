@@ -6,6 +6,27 @@ VERSION = 0.5;
 
 function EC_onload() {
 	document.getElementById('topbar_version').innerHTML = VERSION;
+	setError(1);
+}
+
+/* Recommend placing a call to setError in your handler. */
+/*
+	function(e) {
+    	let key = e.keyCode ? e.keyCode : e.which;
+	   	let input = e.target;
+		setError(1);
+    	if (key==13) { // enter key
+    		compute(true);
+    	} else {
+    		compute(false);
+    	}
+    }
+*/
+function EC_setOnInputChange(fn) {
+	let inputs = document.getElementsByTagName('input');
+	for (index = 0; index < inputs.length; ++index) {
+	    inputs[index].onkeyup = fn;
+	}
 }
 
 function interp1D(xs, ys, xq) {
@@ -24,4 +45,69 @@ function interp2D(xs, ys, zs, xq, yq) { // x indexes rows, y indexes columns
 	let z1 = interp1D(ys, y1, yq);
 	let z2 = interp1D(ys, y2, yq);
 	return interp1D([x1,x2], [z1,z2], xq);
+}
+
+function NaNto1(x) {
+	if (isNaN(x))
+		return 1;
+	return x;
+}
+
+/*
+Status Module (STAT).
+
+Depends on following:
+- <div> with id "topbar_status".
+*/ 
+
+ERR_CODES = ['Up-To-Date', 'Waiting on Computation...', 'ERROR'];
+DEFAULT_ERR_MSGS = [
+	'Results are valid and up-to-date with current inputs.',
+	'Waiting on user to prompt computation (please press enter, or the compute button)',
+	'DEFAULT ERROR MESSAGE<br/>Please submit a bug ticket.'
+]
+
+function setError(code, msg) {
+	let topbar_box = document.getElementById('topbar_status');
+	if (code) 
+		topbar_box.classList.add('error');
+	else
+		topbar_box.classList.remove('error');
+	if (typeof msg === 'undefined')
+		msg = DEFAULT_ERR_MSGS[code];
+	topbar_box.children[0].innerHTML=ERR_CODES[code];
+	topbar_box.children[1].innerHTML=msg;
+}
+
+
+// Collapsing Functions
+
+function collapseDiv(id) {
+	el = document.getElementById('detail_'+id);
+	btn = document.getElementById('toggle_detail_'+id);
+	
+	if(el.style['display'] != 'none') {
+		el.style['display'] = 'none';
+		btn.innerHTML = "&#9660";
+		if (id=='gratio') document.getElementById('G').readOnly = false;
+	} else {
+		el.style['display'] = 'inherit';
+		btn.innerHTML = "&#9650";
+		if (id=='gratio'){ document.getElementById('G').readOnly = true; calcRatio(); }
+	}
+}
+
+function parseMath(expr, variables) {
+	for (variable in variables) {
+		expr = expr.replace(variable, variables[variable]);
+	}
+	try{
+		let res = 0;
+		if (expr != '')
+			res = eval(expr);
+		//console.log(expr, res);
+		return res;
+	}catch(err){
+		throw 'Failed to parse mathematical expression.'
+	}
 }
