@@ -1,4 +1,4 @@
-var VERSION = "V0.3";
+var VERSION = "V0.4";
 
 var motor_data = {
 		"neo": {
