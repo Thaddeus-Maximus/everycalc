@@ -6,7 +6,7 @@ Please define the following:
  UNIT_PLACES = <integer> (number of places)
 
 Please include the following in your onload script:
- UNITOnload()
+ UNIT_onload()
  
 Depends on following:
 

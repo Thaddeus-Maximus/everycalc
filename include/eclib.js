@@ -29,6 +29,10 @@ function EC_setOnInputChange(fn) {
 	}
 }
 
+function roundToZero(x) {
+	return x < 0 ? Math.ceil(x) : Math.floor(x);
+}
+
 function interp1D(xs, ys, xq) {
 	let i=1;
 	for (; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
@@ -110,4 +114,10 @@ function parseMath(expr, variables) {
 	}catch(err){
 		throw 'Failed to parse mathematical expression.'
 	}
+}
+
+function sign(x) {
+	if(x>0) return 1;
+	if(x<0) return -1;
+	return 0;
 }

@@ -6,6 +6,7 @@
 <script type="text/javascript" src="include/units.js"></script>
 <script type="text/javascript" src="include/export.js"></script>
 <script type="text/javascript" src="include/motors.js"></script>
+<script type="text/javascript" src="include/plots.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -190,7 +191,47 @@
 
 		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
 
-		drawchart1(channels);
+		PLOT_drawLinePlot({
+			chartName: "chart",
+			axes: {
+				x: {
+					numTicks: 10,
+					boxEnds: false,
+					negativeHandling: 'posonly',
+					margin: 15
+				}, y: {
+					numTicks: 6,
+					boxEnds: true,
+					negativeHandling: 'posonly',
+					margin: 15
+				}, z: {
+					syncWithY: true,
+					margin: 15
+				}
+			},
+			datasets: {
+				t: {
+					axis: 'x',
+					channel: 0
+				},
+				d: {
+					axis: 'y',
+					channel: 2
+				},
+				v: {
+					axis: 'y',
+					channel: 1
+				},
+				cur: {
+					axis: 'z',
+					channel: 3
+				},
+				f: {
+					axis: 'z',
+					channel: 4
+				}
+			}
+		}, channels)
 
       	setV("endcond_met", parseMath(end_expr, variables) ? t_ar[t_ar.length-1]:"NOT MET");
       	setV("current_cons", cur_cons);
@@ -232,195 +273,6 @@
 		G /= getV("G3A",1);
 		G /= getV("G4A",1);
 		setV("G", G);
-	}
-
-	function makeTicks(maxes, num_to_print, n) {
-		if (Math.min(maxes) < 0) return [0];
-		H = [];
-		bases = [];
-		for(var i=0; i<maxes.length; i++){
-			h = maxes[i]/n;
-			base = Math.floor(Math.log10(h)-Math.log10(5));
-			bases.push(base);
-			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
-		}
-
-		ticks = [];
-		ticksstr = [];
-		alive = true;
-		for(var i=0; alive; i++) {
-			alive = false;
-			labelstr = '';
-			for(var j=0; j<maxes.length; j++) {
-				if (j<num_to_print) {
-					if (ticks.length <= j+1)
-						ticks.push([]);
-					ticks[j].push(H[j]*i);
-					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-					if (j != num_to_print-1)
-						labelstr += ' / ';
-				}
-				if (H[j]*(i) < maxes[j])
-					alive = true;
-			}
-			ticksstr.push(labelstr);
-			
-		}
-		return [ticks, ticksstr];
-	}
-
-	function sign(x) {
-		if(x>0) return 1;
-		if(x<0) return -1;
-		return 0;
-	}
-
-	chart_name = 'chart';
-
-	function drawTicks(axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
-		altaxis = axis == 'x' ? 'y':'x';
-		realaxis = axis == 'z' ? 'y':axis;
-		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
-		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
-
-		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
-		while(labels.firstChild) labels.removeChild(labels.firstChild);
-
-		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
-
-		for (i in ticklabels) {
-			line = document.createElementNS('http://www.w3.org/2000/svg','line');
-			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(ticks==null ? i/(ticklabels.length-1) : ticks[i]/maxtick);
-			//fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
-			line.setAttribute(realaxis+'1', fp);
-			line.setAttribute(realaxis+'2', fp);
-			line.setAttribute('class', 'grid');
-			xgrid.append(line);
-
-			label = document.createElementNS('http://www.w3.org/2000/svg','text');
-			label.setAttribute(altaxis, gfl);
-			label.setAttribute(realaxis, fp);
-			label.innerHTML = i==0 ? '0' : ticklabels[i];
-			labels.append(label);
-		}
-	}
-
-	function linterp(xs, ys, xq) {
-		i;
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
-	}
-
-	function drawchart1(channels) {
-		[t, v_raw, d_raw, cur, F_raw, a_raw] = channels;
-		d = convertTo(d_raw, UNIT_MAP['query_d'][UNIT_sys]);
-		v = convertTo(v_raw, UNIT_MAP['query_v'][UNIT_sys]);
-		f = convertTo(F_raw, UNIT_MAP['query_f'][UNIT_sys]);
-		a = convertTo(a_raw, UNIT_MAP['query_a'][UNIT_sys]);
-
-		svg = document.getElementById('chart');
-		x_axis = document.getElementById('chart_x_axis');
-		y_axis = document.getElementById('chart_y_axis');
-
-		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
-		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
-
-		d_line = document.getElementById('chart_d_line');
-		v_line = document.getElementById('chart_v_line');
-		cur_line = document.getElementById('chart_cur_line');
-		f_line = document.getElementById('chart_f_line');
-		d_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		v_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		cur_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		f_line.setAttribute('points','');
-
-
-
-		[[t_ticks], xticklabels] = makeTicks([Math.max(...t)], 1, 9);
-		[[d_ticks, v_ticks], yticklabels] = makeTicks([Math.max(...d), Math.max(...v), Math.max(...cur), Math.max(...f)], 2, 6);
-		[[cur_ticks, f_ticks], zticklabels] = makeTicks([Math.max(...cur), Math.max(...f), Math.max(...d), Math.max(...v)], 2, 6);
-
-		t_ticks.pop(); xticklabels.pop();
-		
-		t_max = Math.max(...t); //t_ticks[t_ticks.length-1];
-		d_max = d_ticks[d_ticks.length-1];
-		v_max = v_ticks[v_ticks.length-1];
-		cur_max = cur_ticks[cur_ticks.length-1];
-		f_max = f_ticks[f_ticks.length-1];
-
-
-
-		drawTicks('x', t_ticks, t_max, xticklabels, xf, x0, yf, y0, 15);
-		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
-		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
-
-		for (i in t) {
-			var ptd = svg.createSVGPoint();
-			var ptv = svg.createSVGPoint();
-			var ptcur = svg.createSVGPoint();
-			var ptf = svg.createSVGPoint();
-
-			xq = x0 + (xf-x0)/(t_max-0)*t[i];
-			ptf.x = ptv.x = ptd.x = ptcur.x = xq;
-
-			ptd.y   = y0 + (yf-y0)/(d_max-0)*d[i];
-			ptv.y   = y0 + (yf-y0)/(v_max-0)*v[i];
-			ptcur.y = y0 + (yf-y0)/(cur_max-0)*cur[i];
-			ptf.y   = y0 + (yf-y0)/(f_max-0)*f[i];
-			d_line.points.appendItem(ptd);
-			v_line.points.appendItem(ptv);
-			cur_line.points.appendItem(ptcur);
-			f_line.points.appendItem(ptf);
-		}
-		
-		/* //don't mess with this yet
-		bg=document.getElementById('chart');
-
-		qline = document.getElementById('chart_query_line');
-		qline.setAttribute('opacity', 0);
-
-		getV('query_time', '-', 3, true);
-		getV('query_d', '-', 3, true);
-		getV('query_v', '-', 3, true);
-		getV('query_cur', '-', 3, true);
-		getV('query_f', '-', 3, true);
-		getV('query_a', '-', 3, true);
-
-		handler = function(event){
-			if(event.buttons != 1) return;
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				yq = event.clientY - bg.getBoundingClientRect().top;
-
-				tq = (t_max-0)/(xf-x0)*(xq-x0);
-				if (tq>Math.max(...t)){
-					tq = Math.max(...t);
-					xq = x0 + (xf-x0)/(t_max-0)*tq;
-				}
-				if (tq<Math.min(...t)) {
-					tq=Math.min(...t); xq=x0;
-				}
-				dq   = linterp(t, d, tq);
-				vq   = linterp(t, v, tq);
-				curq = linterp(t, cur, tq);
-				fq   = linterp(t, f, tq);
-				aq   = linterp(t, a, tq);
-				qline.setAttribute('opacity', 1);
-
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
-
-				gids('query_time', tq, 3, true);
-				gids('query_d', dq, 3, true);
-				gids('query_v', vq, 3, true);
-				gids('query_cur', curq, 3, true);
-				gids('query_f', fq, 3, true);
-				gids('query_a', aq, 3, true);
-			}
-		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);*/
 	}
 </script>
 
@@ -655,8 +507,8 @@
   <line id="chart_x_axis" class="axes" x1="90" x2="90" y1="20" y2="450"></line>
 </g>
 <g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1="90" x2="705" y1=450 y2=450></line>
-  <line id="chart_z_axis" class="axes" x1="705" x2="705" y1="20" y2=450></line>
+  <line class="axes" id="chart_y_axis" x1=90  x2=705 y1=450 y2=450></line>
+  <line class="axes" id="chart_z_axis" x1=705 x2=705 y1=20  y2=450></line>
 </g>
 
 <g class="x-grid" id="chart_x_grid"></g>
@@ -679,9 +531,9 @@
   <text x=-240 y=800 class="label-title" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
 </g>
 
-<g class="labels x-labels" id='chart_x_axis_labels'></g>
-<g class="labels z-labels" id='chart_z_axis_labels'></g>
-<g class="labels y-labels" id='chart_y_axis_labels'></g>
+<g class="labels x-labels" id='chart_x_axlabels'></g>
+<g class="labels z-labels" id='chart_z_axlabels'></g>
+<g class="labels y-labels" id='chart_y_axlabels'></g>
 
 <g class="query-line">
 	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
