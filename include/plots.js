@@ -87,12 +87,10 @@ function PLOT_computeScaling(config, mins, maxs) {
 				);
 				break;
 			case 'fit':
-				let span = maxs[i] - mins[i];
-				h    = span/config.numTicks;
+				h    = (maxs[i] - mins[i])/config.numTicks;
 				break;
 			case 'fitzero':
-				let span = Math.max(0, maxs[i]) - Math.min(0, mins[i]);
-				h    = span/config.numTicks;
+				h    = (Math.max(0, maxs[i]) - Math.min(0, mins[i]))/config.numTicks;
 				break;
 		}
 
@@ -102,12 +100,12 @@ function PLOT_computeScaling(config, mins, maxs) {
 		ticks.push([]);
 
 		min_scaling.push(mins[i]/H[i]);
-		max_scaling.push(max_rem, maxs[i]/H[i]);
+		max_scaling.push(maxs[i]/H[i]);
 	}
 
 	// how many intervals to the end? (may be a float with non-boxed ends)
-	let min_rem = Math.min(min_scaling);
-	let max_rem = Math.min(max_scaling);
+	let min_rem = Math.min(...min_scaling);
+	let max_rem = Math.max(...max_scaling);
 	switch(neg_mode) {
 		case 'posonly':
 			min_idx = 0;
@@ -168,34 +166,38 @@ function PLOT_computeScaling(config, mins, maxs) {
 }
 
 function PLOT_drawTicks(chartName, axis, plotScaling, axisScaling, margin) {
-	altaxis  = axis == 'x' ? 'y':'x';  // which axis am I opposed to?
-	realaxis = axis == 'z' ? 'y':axis; // which axis does this really plot onto (in the x-y plane)
+	let isx = axis == 'x';
+	let altaxis  = axis == 'x' ? 'y':'x';  // which axis am I opposed to?
+	let realaxis = axis == 'z' ? 'y':axis; // which axis does this really plot onto (in the x-y plane)
 
 	grid = document.getElementById(`${chartName}_${axis}_grid`);
 	while(grid.firstChild) grid.removeChild(grid.firstChild);
 	labels = document.getElementById(`${chartName}_${axis}_axlabels`);
 	while(labels.firstChild) labels.removeChild(labels.firstChild);
 
-	let g = (axis=='z' ? plotScaling.xH:plotScaling.xL) + (axis=='y' ? -1:1)*margin;
+	let g = (isx ? plotScaling.yL : (axis=='z' ? plotScaling.xH:plotScaling.xL)) + (axis=='y' ? -1:1)*margin;
 
-	for (let i=min_idx; i<=max_idx; i++) {
+	for (let i=axisScaling.minIdx; i<=axisScaling.maxIdx; i++) {
 		let labelstr = '';
-		for (j in mins) {
+		for (j in axisScaling.intervalHt) {
 			if (i==0) {
-				ticks[j].push(0);
 				labelstr = '0';
 			} else {
-				ticks[j].push(H[j]*i);
-				labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-				if (j != maxs.x.length-1)
+				labelstr += (axisScaling.intervalHt[j]*i).toFixed(axisScaling.labelBases[j] > 0 ? 0:-axisScaling.labelBases[j]);
+				if (j != axisScaling.intervalHt.length-1)
 					labelstr += ' / ';
 			}
 		}
 
-		// draw ticks now
+		// draw grid
 		let line = document.createElementNS('http://www.w3.org/2000/svg','line');
-		line.setAttribute(altaxis+'1', xH); line.setAttribute(altaxis+'2', xL);
-		let f = plotScaling.yL + (plotScaling.yH-plotScaling.yL)*(i-min_rem)/(max_rem-min_rem);
+		line.setAttribute(altaxis+'1', isx ? plotScaling.yH : plotScaling.xH);
+		line.setAttribute(altaxis+'2', isx ? plotScaling.yL : plotScaling.xL);
+
+		// draw ticks
+		let f = isx ? 
+				plotScaling.xL + (plotScaling.xH-plotScaling.xL)*(i-axisScaling.minRem)/(axisScaling.maxRem-axisScaling.minRem):
+				plotScaling.yL + (plotScaling.yH-plotScaling.yL)*(i-axisScaling.minRem)/(axisScaling.maxRem-axisScaling.minRem);
 		line.setAttribute(realaxis+'1', f);
 		line.setAttribute(realaxis+'2', f);
 		line.setAttribute('class', 'grid');
@@ -209,10 +211,10 @@ function PLOT_drawTicks(chartName, axis, plotScaling, axisScaling, margin) {
 	}
 }
 
-function PLOT_makePoint(plotScaling, xScaling, yScaling, xq, yq) {
+function PLOT_makePoint(svg, plotScaling, xScaling, yScaling, xq, yq) {
 	var pt = svg.createSVGPoint();
-	pt.x = plotScaling.xL + (plotScaling.xH-plotScaling.xL)/(xScaling.fH-yScaling.fL)*(xq-scaling.fL);
-	pt.y = plotScaling.yL + (plotScaling.yH-plotScaling.yL)/(yScaling.fH-yScaling.fL)*(yq-scaling.fL);
+	pt.x = plotScaling.xL + (plotScaling.xH-plotScaling.xL)/(xScaling.fH-xScaling.fL)*(xq-xScaling.fL);
+	pt.y = plotScaling.yL + (plotScaling.yH-plotScaling.yL)/(yScaling.fH-yScaling.fL)*(yq-yScaling.fL);
 	return pt;
 }
 
@@ -228,7 +230,7 @@ function PLOT_drawLinePlot(config, channels) {
 		f = convertTo(F_raw, UNIT_MAP['query_f'][UNIT_sys]);
 		a = convertTo(a_raw, UNIT_MAP['query_a'][UNIT_sys]);*/
 
-	let channels_conv = convertTo(channels); // TODO: Make this dream not a meme
+	let channels_conv = channels; //convertTo(channels); // TODO: Make this dream not a meme
 
 	config.dom = {
 		svg : document.getElementById(config.chartName),
@@ -240,10 +242,10 @@ function PLOT_drawLinePlot(config, channels) {
 	};
 
 	config.scaling = {};
-	config.scaling.x0 = Math.min(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
-	config.scaling.xf = Math.max(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
-	config.scaling.y0 = Math.max(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
-	config.scaling.yf = Math.min(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
+	config.scaling.xL = Math.min(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
+	config.scaling.xH = Math.max(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
+	config.scaling.yL = Math.max(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
+	config.scaling.yH = Math.min(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
 
 	let lines = {};
 	let mins  = {x:[],y:[],z:[]};
@@ -281,6 +283,7 @@ function PLOT_drawLinePlot(config, channels) {
 		config.axes.z.scaling = PLOT_computeScaling(config.axes.z, mins.z, maxs.z);
 	}
 
+
 	// unpack scaling into each dataset config
 	for (axis in config.axes) {
 		let cas = config.axes[axis].scaling;
@@ -299,16 +302,17 @@ function PLOT_drawLinePlot(config, channels) {
 
 	// reap your hard work
 
-	let xScl  = config.axes[dsnames.x[0]].scaling;
-	let xChnl = channels[config.datasets[dsnames.x[0]].channel];
+	let xScl  = config.datasets[dsnames.x[0]].scaling;
+	let xChnl = channels_conv[config.datasets[dsnames.x[0]].channel];
 	for (name in config.datasets) {
 		if (config.datasets[name].axis == 'x') continue;
 
-		let fChnl = channels[config.datasets[name].channel];
+		let fChnl = channels_conv[config.datasets[name].channel];
 		let fScl  = config.datasets[name].scaling
 
-		for (let i in xChnl.length) {
+		for (i in xChnl) {
 			lines[name].points.appendItem(PLOT_makePoint(
+				config.dom.svg,
 				config.scaling,
 				xScl,
 				fScl,
@@ -317,6 +321,52 @@ function PLOT_drawLinePlot(config, channels) {
 			));
 		}
 	}
+
+	/* //don't mess with this yet
+		bg=document.getElementById('chart');
+
+		qline = document.getElementById('chart_query_line');
+		qline.setAttribute('opacity', 0);
+
+		getV('query_time', '-', 3, true);
+		getV('query_d', '-', 3, true);
+		getV('query_v', '-', 3, true);
+		getV('query_cur', '-', 3, true);
+		getV('query_f', '-', 3, true);
+		getV('query_a', '-', 3, true);
+
+		handler = function(event){
+			if(event.buttons != 1) return;
+				xq = event.clientX - bg.getBoundingClientRect().left;
+				yq = event.clientY - bg.getBoundingClientRect().top;
+
+				tq = (t_max-0)/(xf-x0)*(xq-x0);
+				if (tq>Math.max(...t)){
+					tq = Math.max(...t);
+					xq = x0 + (xf-x0)/(t_max-0)*tq;
+				}
+				if (tq<Math.min(...t)) {
+					tq=Math.min(...t); xq=x0;
+				}
+				dq   = linterp(t, d, tq);
+				vq   = linterp(t, v, tq);
+				curq = linterp(t, cur, tq);
+				fq   = linterp(t, f, tq);
+				aq   = linterp(t, a, tq);
+				qline.setAttribute('opacity', 1);
+
+				qline.setAttribute('x1', xq);
+				qline.setAttribute('x2', xq);
+
+				gids('query_time', tq, 3, true);
+				gids('query_d', dq, 3, true);
+				gids('query_v', vq, 3, true);
+				gids('query_cur', curq, 3, true);
+				gids('query_f', fq, 3, true);
+				gids('query_a', aq, 3, true);
+			}
+		bg.addEventListener('mousemove', handler);
+		bg.addEventListener('mousedown', handler);*/
 }
 
 /*
