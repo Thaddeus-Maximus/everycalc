@@ -305,7 +305,7 @@
 			<option value=1 selected="selected">English</option>
 		</select>
 	</div>
-	<div class="topbar_ctr">Belt/Pulley Sizing</div>
+	<div class="topbar_ctr">General Mechanism Calc</div>
 	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
@@ -549,7 +549,7 @@
 <g class="labels y-labels" id='chart_y_axlabels'></g>
 
 <g class="query-line">
-	<line id="chart_querybar" x1=100 x2=100 y1=15 y2=455></line>
+	<line id="chart_querybar" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
 </g>
 <polyline
 	id='chart_d_line'
@@ -581,7 +581,7 @@
 	"/>
 </svg>
 	
-	<div class="output-graph" id='chart_querytable'>
+	<div class="output-graph" id='chart_querytable' style='display:none;'>
 		<table>
 			<tr>
 				<th class="rowlabel">Plot Mode</th>

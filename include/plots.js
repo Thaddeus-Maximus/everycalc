@@ -353,6 +353,10 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	
 	config.dom.svg.addEventListener('mousemove', handler);
 	config.dom.svg.addEventListener('mousedown', handler);
+
+	if(typeof document.getElementById(config.chartName).lastQuery != 'undefined') {
+		handler(document.getElementById(config.chartName).lastQuery);
+	}
 }
 
 function PLOT_focusHandler(chart, event) {
@@ -404,7 +408,7 @@ function PLOT_focusHandler(chart, event) {
 	document.getElementById(`${config.chartName}_querytable`).style.display = '';
 
 	document.getElementById(config.chartName).lastQuery = tq;
-	return xq; // helpful for further processing upstream
+	return tq; // helpful for further processing upstream
 }
 
 /*
