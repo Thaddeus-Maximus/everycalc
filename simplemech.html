@@ -24,20 +24,20 @@
 		"theor_runspd": ["m/s", "ft/s"],
 		"theor_stall_force": ["N", "lbf"],
 
-		"mass_ref": ["lbm", "kg"],
-		"moi_ref": ["lbm in^2", "kg m^2"],
-		"radius_ref": ["in"," m"],
-		"velocity_ref": ["ft/s", "m/s"],
-		"position_ref": ["ft", "m"],
+		"mass_ref": ["kg", "lbm"],
+		"moi_ref": ["kg m^2", "lbm in^2"],
+		"radius_ref": ["m", "in"],
+		"velocity_ref": ["m/s", "ft/s"],
+		"position_ref": ["m", "ft"],
 		"omega_ref": ["RPM", "RPM"],
 		"theta_ref": ["rev", "rev"],
 		"omega_m_ref": ["RPM", "RPM"],
 		"theta_m_ref": ["rev", "rev"],
 
-		"query_d": ["m", "ft"],
-		"query_v": ["m/s", "ft/s"],
-		"query_f": ["N", "lbf"],
-		"query_a": ["m/s^2", "ft/s^2"],
+		"chart_d": ["m", "ft"],
+		"chart_v": ["m/s", "ft/s"],
+		"chart_f": ["N", "lbf"],
+		"chart_a": ["m/s^2", "ft/s^2"],
 
 		"d_label": ["m", "ft"],
 		"v_label": ["m/s", "ft/s"],
@@ -53,15 +53,15 @@
 	function selectPlotMode() {
 		var v = document.getElementById('plot_mode').value;
 		if (v=='linear') {
-			UNIT_MAP["query_d"]=["m", "ft"];
-			UNIT_MAP["query_v"]=["m/s", "ft/s"];
-			UNIT_MAP["query_f"]=["N", "lbf"];
-			UNIT_MAP["query_a"]=["m/s^2", "ft/s^2"];
+			UNIT_MAP["chart_d"]=["m", "ft"];
+			UNIT_MAP["chart_v"]=["m/s", "ft/s"];
+			UNIT_MAP["chart_f"]=["N", "lbf"];
+			UNIT_MAP["chart_a"]=["m/s^2", "ft/s^2"];
 		} else if (v=='rotary') {
-			UNIT_MAP["query_d"]=["rev", "rev"];
-			UNIT_MAP["query_v"]=["RPM", "RPM"];
-			UNIT_MAP["query_f"]=["N-m", "ft-lbf"];
-			UNIT_MAP["query_a"]=["RPM/s", "RPM/s"];
+			UNIT_MAP["chart_d"]=["rev", "rev"];
+			UNIT_MAP["chart_v"]=["RPM", "RPM"];
+			UNIT_MAP["chart_f"]=["N-m", "ft-lbf"];
+			UNIT_MAP["chart_a"]=["RPM/s", "RPM/s"];
 		}
 
 		UNIT_change();
@@ -200,7 +200,7 @@
 			axes: {
 				x: {
 					numTicks: 10,
-					boxEnds: true,
+					boxEnds: false,
 					negativeHandling: 'posonly',
 					margin: 15
 				}, y: {
@@ -234,6 +234,15 @@
 					axis: 'z',
 					channel: 4
 				}
+			},
+			queries: {
+				INDEX: { places: 0 },
+				t: { places: 4 },
+				d: { places: 4 },
+				v: { places: 4 },
+				cur: { places: 4 },
+				a: { places: 4 },
+				f: { places: 4 }
 			}
 		}, channels)
 
@@ -540,7 +549,7 @@
 <g class="labels y-labels" id='chart_y_axlabels'></g>
 
 <g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>
+	<line id="chart_querybar" x1=100 x2=100 y1=15 y2=455></line>
 </g>
 <polyline
 	id='chart_d_line'
@@ -572,8 +581,7 @@
 	"/>
 </svg>
 	
-	<div class="output-graph">
-
+	<div class="output-graph" id='chart_querytable'>
 		<table>
 			<tr>
 				<th class="rowlabel">Plot Mode</th>
@@ -586,28 +594,32 @@
 			</tr>
 			<tr>
 				<th class="rowlabel">Queried Time<span class="ttt">Query a time on the graph by clicking (and optionally dragging) a point. Timepoint represented by a vertical bar.</span></th>
-				<td><input id="query_time" readonly /></td>
+				<td><input id="chart_t" readonly /></td>
 				<td class="unit">[s]</td>
 			</tr><tr>
+				<th class="rowlabel">Timestep</th>
+				<td><input id="chart_INDEX" readonly /></td>
+				<td class="unit"></td>
+			</tr><tr>
 				<th class="rowlabel">Position</th>
-				<td><input id="query_d" readonly /></td>
-				<td class="unit" id="unit_query_d"></td>
+				<td><input id="chart_d" readonly /></td>
+				<td class="unit" id="unit_chart_d"></td>
 			</tr><tr>
 				<th class="rowlabel">Velocity</th>
-				<td><input id="query_v" readonly /></td>
-				<td class="unit" id="unit_query_v"></td>
+				<td><input id="chart_v" readonly /></td>
+				<td class="unit" id="unit_chart_v"></td>
 			</tr><tr>
 				<th class="rowlabel">Current</th>
-				<td><input id="query_cur" readonly /></td>
+				<td><input id="chart_cur" readonly /></td>
 				<td class="unit">[A]</td>
 			</tr><tr>
 				<th class="rowlabel">Acceleration</th>
-				<td><input id="query_a" readonly /></td>
-				<td class="unit" id="unit_query_a"></td>
+				<td><input id="chart_a" readonly /></td>
+				<td class="unit" id="unit_chart_a"></td>
 			</tr><tr>
 				<th class="rowlabel">Actuator Force<span class="ttt">The force the actuator puts out. THIS IS NOT NET FORCE. Subtract off load equation to find net force.</span></th>
-				<td><input id="query_f" readonly /></td>
-				<td class="unit" id="unit_query_f"></td>
+				<td><input id="chart_f" readonly /></td>
+				<td class="unit" id="unit_chart_f"></td>
 			</tr>
 		</div>
 	</div>

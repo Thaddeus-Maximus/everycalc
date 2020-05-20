@@ -83,7 +83,14 @@ function getVE(id, dir) {
 
 // converting between things is for suckers. Just convert to base units, always.
 function convertFrom(number, from_unit) {
-	return number*unit_conversions[from_unit];
+	let uconv = unit_conversions[from_unit];
+	let newnumber = [];
+	if (typeof number == 'object') {
+		for (var i=0;i<number.length;i++)
+			newnumber.push(number[i]*uconv);
+		return newnumber;
+	}
+	return number*uconv;
 }
 
 function convertTo(number, to_unit) {
@@ -125,6 +132,7 @@ var unit_bases = {
 
 var unit_conversions = {
 	'': 1, // bypass
+	'-': 1,
 	's': 1,
 	
 	"m":  1,
@@ -155,7 +163,7 @@ var unit_conversions = {
 	"mm/s": 1e-3,
 
 	"m/s^2": 1,
-	"ft/s^2": .09290,
+	"ft/s^2": 0.3048,
 
 	"c/ft": 3.280,
 	"c/m": 1,

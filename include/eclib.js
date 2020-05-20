@@ -51,6 +51,12 @@ function interp2D(xs, ys, zs, xq, yq) { // x indexes rows, y indexes columns
 	return interp1D([x1,x2], [z1,z2], xq);
 }
 
+function interpIdx(xs, xq) {
+	i;
+	for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+	return i;
+}
+
 function NaNto1(x) {
 	if (isNaN(x))
 		return 1;

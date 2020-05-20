@@ -18,10 +18,6 @@ To use units:
 
 */
 
-// TODO: QUERIES
-
-
-
 function PLOT_computeScaling(config, mins, maxs) {
 	let H = [];
 	let bases = [];
@@ -194,6 +190,7 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 - SVGid_x_grid: a <g>
 - SVGid_y_grid: a <g>
 - SVGid_z_grid: a <g>
+- SVGid_querybar: a <line> spanning from top to bottom
 - <polylines> with ids SVGid_channelName_line for each channel you wish to plot
 
 @var channels = {channelName: [list,of,datapoints], ... }
@@ -231,26 +228,28 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 			axis: 'z'
 		}
 	},
-	queries: [
-		{name: 'x',
+	queries: {
+		INDEX: {}, // this is a special one
+		x: {
 		 number: 3, //set to 0 for single-queries without suffixes
 		 places: 4 }
-	] // if queries is undefined just ignore the query aspect algotether
+	} // if queries is undefined just ignore the query aspect algotether
 	// query boxes of format: `query_${config.chartName}_${name}_${number}`
 }
  */
-function PLOT_drawLinePlot(config, channels) {
+function PLOT_drawLinePlot(config, channels, handler) {
 	channels_conv = {};
 	for (name in channels) {
 		let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
 		if (unit){
-			channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
+			channels_conv[name] = convertFrom(channels[name], unit[UNIT_sys]);
 		}
 		else{
 			channels_conv[name] = channels[name];
 		}
 	}
 
+	// this is silly but whatever
 	config.dom = {
 		svg : document.getElementById(config.chartName),
 		axes : {
@@ -313,6 +312,7 @@ function PLOT_drawLinePlot(config, channels) {
 				fH: cas.intervalHt[i]*cas.maxRem
 			}
 		}
+		config.axes[axis].datasets = dsnames[axis];
 	}
 
 	PLOT_drawTicks(config.chartName, 'x', config.scaling, config.axes.x.scaling, config.axes.x.margin);
@@ -341,53 +341,70 @@ function PLOT_drawLinePlot(config, channels) {
 		}
 	}
 
-	console.log(config);
+	config.dom.svg.PLOT_config = config;
+	config.dom.svg.PLOT_channels = channels;
+	config.dom.svg.PLOT_channelsConv = channels_conv;
 
-	/* //don't mess with this yet
-		bg=document.getElementById('chart');
+	if (!handler) {
+		handler = function(e) {
+			PLOT_focusHandler(config.dom.svg, e);
+		}
+	}
+	
+	config.dom.svg.addEventListener('mousemove', handler);
+	config.dom.svg.addEventListener('mousedown', handler);
+}
 
-		qline = document.getElementById('chart_query_line');
-		qline.setAttribute('opacity', 0);
+function PLOT_focusHandler(chart, event) {
+	let config    = chart.PLOT_config;
+	let channels  = chart.PLOT_channels;
 
-		getV('query_time', '-', 3, true);
-		getV('query_d', '-', 3, true);
-		getV('query_v', '-', 3, true);
-		getV('query_cur', '-', 3, true);
-		getV('query_f', '-', 3, true);
-		getV('query_a', '-', 3, true);
+	let plotScale = config.scaling;
+	let xScale    = config.datasets[config.axes.x.datasets[0]].scaling;
+	let xChannel  = channels[config.axes.x.datasets[0]];
+	let xUnit     = UNIT_MAP ? UNIT_MAP[config.axes.x.datasets[0]] : '-';
+	    xUnit     = xUnit ? xUnit[UNIT_sys] : '-';
 
-		handler = function(event){
-			if(event.buttons != 1) return;
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				yq = event.clientY - bg.getBoundingClientRect().top;
+	let bg        = document.getElementById(config.chartName);
+	let querybar  = document.getElementById(`${config.chartName}_querybar`);
 
-				tq = (t_max-0)/(xf-x0)*(xq-x0);
-				if (tq>Math.max(...t)){
-					tq = Math.max(...t);
-					xq = x0 + (xf-x0)/(t_max-0)*tq;
-				}
-				if (tq<Math.min(...t)) {
-					tq=Math.min(...t); xq=x0;
-				}
-				dq   = linterp(t, d, tq);
-				vq   = linterp(t, v, tq);
-				curq = linterp(t, cur, tq);
-				fq   = linterp(t, f, tq);
-				aq   = linterp(t, a, tq);
-				qline.setAttribute('opacity', 1);
+	let xq=0, tq=0;
+	if (!isNaN(event)) {
+		tq = parseFloat(event);
+		xq = plotScale.xL + (plotScale.xH-plotScale.xL)*(tq - xScale.fL)/(xScale.fH - xScale.fL);
+	} else {
+		if (event.buttons != 1) return;
+		xq = event.clientX - bg.getBoundingClientRect().left;
+		tq = convertFrom(xScale.fL + (xScale.fH-xScale.fL)*(xq - plotScale.xL)/(plotScale.xH-plotScale.xL), xUnit);
+		if (tq < xScale.fL) {
+			tq = xScale.fL;
+			xq = convertFrom(plotScale.xL, xUnit);
+		}
+		if (tq > xScale.fH) {
+			tq = xScale.fH;
+			xq = convertFrom(plotScale.xL, xUnit);
+		}
+	}
+	
+	for (q in config.queries) {
 
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
+		let query_conf = config.queries[q];
 
-				gids('query_time', tq, 3, true);
-				gids('query_d', dq, 3, true);
-				gids('query_v', vq, 3, true);
-				gids('query_cur', curq, 3, true);
-				gids('query_f', fq, 3, true);
-				gids('query_a', aq, 3, true);
-			}
-		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);*/
+		if (q == 'INDEX') {
+			setV(`${config.chartName}_INDEX`, interpIdx(xChannel, tq), query_conf.places);
+		} else {
+			setV(`${config.chartName}_${q}`, interp1D(xChannel, channels[q], tq), query_conf.places);
+		}
+	}
+
+	querybar.setAttribute('opacity', 1);
+	querybar.setAttribute('x1', xq);
+	querybar.setAttribute('x2', xq);
+
+	document.getElementById(`${config.chartName}_querytable`).style.display = '';
+
+	document.getElementById(config.chartName).lastQuery = tq;
+	return xq; // helpful for further processing upstream
 }
 
 /*
