@@ -124,6 +124,7 @@ var unit_bases = {
 };
 
 var unit_conversions = {
+	'': 1, // bypass
 	's': 1,
 	
 	"m":  1,

@@ -1,63 +1,26 @@
 /*
 Plot Module (PLOT).
 
-Please include the following in your onload script:
- PLOT_onload()
+This is trying to be a suckless plotting library. I think I've accomplished that? From an eagle-eye view this is what you do:
+- Make a svg element of the appropriate structure in your HTML file
+- Define all the styles and pretty stuff you want there. This library does NOTHING AESTETHIC. It's all up to you.
+  Which if you ask me is great, because you can easily merge with your css....
+- Pass in a config object (see below for examples) and a channels object to the appropriate PLOT_draw function
+- Achieve plot
  
 Depends on following:
+- General library
+- SVG(s) with elements of appropriate ids
 
-References the following entities:
- unit_select: a <select> element containing
- 	<option> elements with values corresponding to indices of the unit lists in the UNIT_MAP.
+To use units:
+- Include the UNIT library
+- Create UNIT_MAP entries with keys of form chartName_channelName
 
-*/ 
-
-// create chart_name UNIT_MAP entries
-
-// IDEA: Make the chart element contain things for query tool! (Since 'globals' are needed)
-
-/*
-PLOT_example_config = {
-	chartName: "chart_name",
-	axes: {	
-		x: {
-			numTicks: 6,
-			boxEnds: false,
-			negativeHandling: 'posonly' //negonly, symmetric, fitzero
-			margin: 0
-		},
-		y: {
-			numTicks: 6
-			boxEnds: false,
-			negativeHandling: 'posonly'
-		},
-		z: {
-			syncWithY: true // if you set this, doesn't matter what else you put- the zAxis just becomes yAxis. except margin
-			margin: 4
-		},
-	}
-	datasets: {
-		"name": {
-			axis: 'x', // only one can have x
-			channel: 3,
-			transform: Math.abs // optional, function
-		},
-		"name": {
-			axis: '7', // only one can have x
-			channel: 1,
-			transform: Math.abs // optional, function
-			// scaling will be added
-		}
-	},
-	queries: [
-		{name: 'x',
-		 number: 3, //set to 0 for single-queries without suffixes
-		 channel: 0,
-		 places: 4 }
-	] // if queries is undefined just ignore the query aspect algotether
-	// query boxes of format: `query_${config.chartName}_${name}_${number}`
-}
 */
+
+// TODO: QUERIES
+
+
 
 function PLOT_computeScaling(config, mins, maxs) {
 	let H = [];
@@ -221,16 +184,72 @@ function PLOT_makePoint(svg, plotScaling, xScaling, yScaling, xq, yq) {
 /*
  * Draw a line plot
  * Line plots have an x axis, a y axis, and a z axis (the axis opposed to y, not an axis that is orthoganal to both x and y)
- * This actually doesn't handle plot labels at all. That's up to you (to let the UNIT module take care of it)
+ * This actually doesn't handle axis labels at all- just data labels. That's up to you (to let the UNIT module take care of it)
+
+Your SVG element should have an id (herein referred to as SVGid as it will be the prefix of its children) and the following elements:
+- SVGid_background: a <rect> that is the background of the actual chart area
+- SVGid_x_axis: a <line>
+- SVGid_y_axis: a <line>
+- SVGid_z_axis: a <line>
+- SVGid_x_grid: a <g>
+- SVGid_y_grid: a <g>
+- SVGid_z_grid: a <g>
+- <polylines> with ids SVGid_channelName_line for each channel you wish to plot
+
+@var channels = {channelName: [list,of,datapoints], ... }
+
+@var config = {
+	chartName: "chart_name", // corresponds to the id of the svg element
+	axes: {	
+		x: {
+			numTicks: 6, 				// number of ticks on the axis
+			boxEnds: false,				// should the ticks end abruptly, or close out the plot?
+			negativeHandling: 'posonly',// how to place data with respect to zero.
+										// posonly: always show zero, only show positive values (zero on bottom)
+										// negonly: always show zero, only show negative values (zero on top)
+										// symmetric: always show zero, show positive and negative values, but center on zero (zero on center)
+										// fit: (EXPERIMENTAL): fit data. ignore that zero is a special number (???? zero)
+										// fitzero: (EXPERIMENTAL): fit data, but always shown the zero bar (floating zero)
+			margin: 15 					// padding for tick labels
+		},
+		y: {
+			numTicks: 6,
+			boxEnds: false,
+			negativeHandling: 'posonly',
+			margin: 5
+		},
+		z: {
+			margin: 5,
+			syncWithY: true // setting this to true will effectively copy the tick settings of the y axis, and make sure that the ticks line up.
+		},
+	}
+	datasets: {
+		"name": {
+			axis: 'x' // which axis to plot on. Only one dataset can have x
+		},
+		"name": {
+			axis: 'z'
+		}
+	},
+	queries: [
+		{name: 'x',
+		 number: 3, //set to 0 for single-queries without suffixes
+		 places: 4 }
+	] // if queries is undefined just ignore the query aspect algotether
+	// query boxes of format: `query_${config.chartName}_${name}_${number}`
+}
  */
 function PLOT_drawLinePlot(config, channels) {
-	/*[t, v_raw, d_raw, cur, F_raw, a_raw] = channels;
-		d = convertTo(d_raw, UNIT_MAP['query_d'][UNIT_sys]);
-		v = convertTo(v_raw, UNIT_MAP['query_v'][UNIT_sys]);
-		f = convertTo(F_raw, UNIT_MAP['query_f'][UNIT_sys]);
-		a = convertTo(a_raw, UNIT_MAP['query_a'][UNIT_sys]);*/
-
-	let channels_conv = channels; //convertTo(channels); // TODO: Make this dream not a meme
+	channels_conv = {};
+	for (name in channels) {
+		let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
+		if (unit){
+			channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
+		}
+		else{
+			channels_conv[name] = channels[name];
+		}
+	}
 
 	config.dom = {
 		svg : document.getElementById(config.chartName),
@@ -254,9 +273,9 @@ function PLOT_drawLinePlot(config, channels) {
 	for (name in config.datasets) {
 		let axis = config.datasets[name].axis;
 		mins[axis].push(
-			Math.min(...channels_conv[config.datasets[name].channel]) );
+			Math.min(...channels_conv[name]) );
 		maxs[axis].push(
-			Math.max(...channels_conv[config.datasets[name].channel]) );
+			Math.max(...channels_conv[name]) );
 		dsnames[axis].push(name);
 
 		if (config.datasets[name].axis != 'x') {
@@ -273,10 +292,10 @@ function PLOT_drawLinePlot(config, channels) {
 		config.axes.y.scaling = {...scaling};
 		config.axes.z.scaling = {...scaling};
 		// separate out the interval stuff
-		config.axes.y.scaling.labelBases = scaling.labelBases.slice(0,mins.y.length);
-		config.axes.z.scaling.labelBases = scaling.labelBases.slice(mins.y.length);
-		config.axes.y.scaling.intervalHt = scaling.intervalHt.slice(0,mins.y.length);
-		config.axes.z.scaling.intervalHt = scaling.intervalHt.slice(mins.y.length);
+		config.axes.y.scaling.labelBases = config.axes.y.scaling.labelBases.slice(0,mins.y.length);
+		config.axes.z.scaling.labelBases = config.axes.z.scaling.labelBases.slice(mins.y.length);
+		config.axes.y.scaling.intervalHt = config.axes.y.scaling.intervalHt.slice(0,mins.y.length);
+		config.axes.z.scaling.intervalHt = config.axes.z.scaling.intervalHt.slice(mins.y.length);
 	} else {
 		// stay independent and face catastrophe. boooooo-ring.
 		config.axes.y.scaling = PLOT_computeScaling(config.axes.y, mins.y, maxs.y);
@@ -303,11 +322,11 @@ function PLOT_drawLinePlot(config, channels) {
 	// reap your hard work
 
 	let xScl  = config.datasets[dsnames.x[0]].scaling;
-	let xChnl = channels_conv[config.datasets[dsnames.x[0]].channel];
+	let xChnl = channels_conv[dsnames.x[0]];
 	for (name in config.datasets) {
 		if (config.datasets[name].axis == 'x') continue;
 
-		let fChnl = channels_conv[config.datasets[name].channel];
+		let fChnl = channels_conv[name];
 		let fScl  = config.datasets[name].scaling
 
 		for (i in xChnl) {
@@ -321,6 +340,8 @@ function PLOT_drawLinePlot(config, channels) {
 			));
 		}
 	}
+
+	console.log(config);
 
 	/* //don't mess with this yet
 		bg=document.getElementById('chart');

@@ -43,7 +43,11 @@
 		"v_label": ["m/s", "ft/s"],
 		"f_label": ["N", "lbf"],
 
-		"motor_max_rpm_adj": ["RPM","RPM"]
+		"motor_max_rpm_adj": ["RPM","RPM"],
+
+		"chart_d": ["m", "ft"],
+		"chart_v": ["m/s", "ft/s"],
+		"chart_f": ["N", "lbf"]
 	};
 
 	function selectPlotMode() {
@@ -151,7 +155,7 @@
 		Rf = r;
 		if (document.getElementById('plot_mode').value == 'linear') Rf = 1;
 
-		channels = [[],[],[],[],[],[]]; //[[0],[0],[0],[Is],[G*TS/R*Rf],[0]];
+		channels = {t:[],v:[],d:[],cur:[],f:[],a:[]};
       	i=0;
 		while(1) {
 			variables.t 		= t_ar[t_ar.length-1];
@@ -178,14 +182,14 @@
 			cur_cons = cur_cons + dt*cur;
 
 
-			channels[0].push(t_ar[t_ar.length-1]);
-			channels[1].push(omega_ar[omega_ar.length-1]*r / Rf);
-			channels[2].push(theta_ar[theta_ar.length-1]*r / Rf);
-			channels[3].push(cur);
-			channels[4].push(T/r * Rf);
-			channels[5].push(alpha*r / Rf);
+			channels.t.push(t_ar[t_ar.length-1]);
+			channels.v.push(omega_ar[omega_ar.length-1]*r / Rf);
+			channels.d.push(theta_ar[theta_ar.length-1]*r / Rf);
+			channels.cur.push(cur);
+			channels.f.push(T/r * Rf);
+			channels.a.push(alpha*r / Rf);
 
-			dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/30));
+			dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/100));
 			i++;
 		}
 
@@ -196,17 +200,17 @@
 			axes: {
 				x: {
 					numTicks: 10,
-					boxEnds: false,
-					negativeHandling: 'posonly',
-					margin: 15
-				}, y: {
-					numTicks: 6,
 					boxEnds: true,
 					negativeHandling: 'posonly',
 					margin: 15
+				}, y: {
+					numTicks: 7,
+					boxEnds: true,
+					negativeHandling: 'posonly',
+					margin: 5
 				}, z: {
 					syncWithY: true,
-					margin: 15
+					margin: 5
 				}
 			},
 			datasets: {
