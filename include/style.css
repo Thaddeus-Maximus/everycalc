@@ -195,7 +195,9 @@ button {
   stroke: #333;
   stroke-width: 2;
 }
-
+.error {
+  background: #e43 !important;
+}
 
 
 
@@ -217,21 +219,21 @@ button {
   z-index: 5;
   border-bottom: 1px solid #333;
 }
-.topbar_la {
+.topbar-la {
   text-align: left;
   flex-grow: 0;
   padding: 5px;
   margin: 0px;
   border-right: 1px solid #333;
 }
-.topbar_ra {
+.topbar-ra {
   text-align: right;
   flex-grow: 0;
   padding: 5px;
   margin: 0px;
   border-left:  1px solid #333;
 }
-.topbar_ctr {
+.topbar-ctr {
   text-align: center;
   flex-grow: 10;
   padding: 5px;
@@ -247,7 +249,7 @@ button {
   padding: 0px;
 }
 
-.topbar_ra .ttt {
+.topbar-ra .ttt {
   visibility: hidden;
   width: 400px;
   background-color: #ddd;
@@ -264,7 +266,7 @@ button {
   z-index: 1;
 }
 
-.topbar_ra:hover .ttt {
+.topbar-ra:hover .ttt {
   visibility: visible;
   opacity: 1;
 }

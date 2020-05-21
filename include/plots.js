@@ -371,6 +371,8 @@ function PLOT_drawLinePlot(config, channels, handler) {
 }
 
 function PLOT_focusHandler(chart, event) {
+	if (isNaN(event) && event.buttons!=1) return; // optimize; just get out...
+
 	let config    = chart.PLOT_config;
 	let channels  = chart.PLOT_channels;
 
@@ -386,7 +388,7 @@ function PLOT_focusHandler(chart, event) {
 	let xq=0, tq=0;
 	if (!isNaN(event)) {
 		tq = parseFloat(event);
-		xq = plotScale.xL + (plotScale.xH-plotScale.xL)*(tq - xScale.fL)/(xScale.fH - xScale.fL);
+		xq = plotScale.xL + (plotScale.xH-plotScale.xL)*(convertTo(tq,xUnit) - xScale.fL)/(xScale.fH - xScale.fL);
 	} else {
 		if (event.buttons != 1) return;
 		xq = event.clientX - bg.getBoundingClientRect().left;

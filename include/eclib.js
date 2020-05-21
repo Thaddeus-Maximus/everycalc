@@ -79,10 +79,15 @@ DEFAULT_ERR_MSGS = [
 
 function setError(code, msg) {
 	let topbar_box = document.getElementById('topbar_status');
-	if (code) 
+	let topbar_ttl = document.getElementById('topbar_title');
+	if (code) {
 		topbar_box.classList.add('error');
-	else
+		topbar_ttl.classList.add('error');
+	}
+	else{
 		topbar_box.classList.remove('error');
+		topbar_ttl.classList.remove('error');
+	}
 	if (typeof msg === 'undefined')
 		msg = DEFAULT_ERR_MSGS[code];
 	topbar_box.children[0].innerHTML=ERR_CODES[code];

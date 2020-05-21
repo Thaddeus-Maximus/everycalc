@@ -56,7 +56,7 @@
 
 		// custom code to make default inputs
 		// cookies preferred
-		if(!packed_inputs) {
+		if(typeof EXP_inputs == 'undefined') {
 			addLoad({where: 10, amount: 0, type: 0});
 			addLoad({where: 50, amount: 0, type: 0});
 			addLoad({where: 90, amount: 100, type: 2});
@@ -587,8 +587,7 @@
 			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
 		}
 
-		console.log(channels);
-
+		// draw the plot
 		PLOT_drawLinePlot({
 			chartName: "chart",
 			axes: {
@@ -629,9 +628,9 @@
 				m: { places: 4 },
 				s: { places: 4 }
 			}
-		}, channels); /*, function(e) {
-			PLOT_focusHandler(document.getElementById("chart"), e);
-		}*/
+		},
+		channels,
+		plotClickHandler);
 
 		drawBeam();
 
@@ -641,6 +640,25 @@
 			return;
 		}
 		setError(0);
+	}
+
+	function plotClickHandler(e) {
+		let xq = NaN; // pull out a value if the query succeeds
+		if(!isNaN(e)) {
+			xq = PLOT_focusHandler(document.getElementById("chart"), e);
+		} else if (e.buttons==2) {
+		} else if (e.target.classList.contains('beam-shape')) { // if clicked on a beam shape, focus on the shape
+			if(e.buttons==1)
+				xq = PLOT_focusHandler(document.getElementById("chart"), e.target.getAttribute('cp'));
+		} else if (e.buttons==1) {
+			xq = PLOT_focusHandler(document.getElementById("chart"), e);
+		}
+
+		if (!isNaN(xq)) {
+			setV("query_stress_shear",     interp1D(channels.x, channels.s, xq)/getV('area'));
+			setV("query_stress_bend_top", -interp1D(channels.x, channels.m, xq)*getV('rmax')/getV('moi'));
+			setV("query_stress_bend_bot", +interp1D(channels.x, channels.m, xq)*getV('rmin')/getV('moi'));
+		}
 	}
 
 	function drawBeam() {
@@ -665,10 +683,6 @@
 			position = getV(`load_${x}_1`);
 			cp = x0 + (xf-x0)*position/len;
 
-			subhandler = function (event) {
-				focus_handler(event.target.getAttribute('cp'));
-			}
-
 			if (type == 'fix') {
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
 				y2 = y0 + 20;
@@ -677,7 +691,6 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${x2},${y0} ${x1},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'pin') {
@@ -688,7 +701,6 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${cp},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'force') {
@@ -699,7 +711,6 @@
 				shape.setAttribute('points', `${cp},${y0} ${cp},${y2}`);
 				shape.classList.add('beam-arrow');
 				shape.setAttribute('stroke', '#111');
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 
@@ -711,7 +722,6 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'moment') {
@@ -723,171 +733,10 @@
 				shape.setAttribute('cx', cp);
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			}
 		}
-	}
-
-	// todo: this
-	function find_extrema_handler(event) {
-		if (event.buttons != 2) return;
-		query_l_unit = UNIT_MAP['query_l'][unit_sys];
-
-		bg = document.getElementById('chart');
-		xq = event.clientX - bg.getBoundingClientRect().left;
-		//yq = event.clientY - bg.getBoundingClientRect().top;
-
-		lq = (convert(focus_l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
-		if (lq > Math.max(...focus_l) || lq < 0)
-			return;
-
-		// init extremization algorithm
-		idx = linterp_idx(focus_l, lq);
-		direction = -sign(focus_m[idx]) * sign(focus_sl[idx]);
-		if (direction == 0) direction = 1; // can't be indecisive
-		max_or_min = -sign(focus_m[idx]);
-		if (max_or_min == 0) max_or_min = 1;
-
-		while ( idx >= 1 && idx < focus_l.length-1 ) {
-			idx += direction;
-			if (sign(focus_sl[idx+direction]) != max_or_min*direction)
-				break;
-		}
-
-		focus_handler(focus_l[idx]);
-
-		event.preventDefault();
-		return false;
-	}
-</script>
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		packed_inputs.current_load_number = current_load_number;
-		packed_inputs.UNIT_MAP     = UNIT_MAP;
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-			if (input.type == "radio") {
-				packed_inputs[input.id] = input.checked;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		current_load_number = packed_inputs.current_load_number;
-		UNIT_MAP     = packed_inputs.UNIT_MAP;
-		delete packed_inputs.current_load_number;
-		delete packed_inputs.UNIT_MAP;
-		for (key in packed_inputs) {
-			if (typeof packed_inputs[key] == "boolean")
-				document.getElementById(key).checked = packed_inputs[key];
-			else
-				document.getElementById(key).value   = packed_inputs[key];
-		}
-
-		loads = document.getElementsByClassName('load');
-		for (load of loads) {
-			load.identifier = load.firstChild.getAttribute('identifier');
-		}
-		for (btn of document.getElementsByClassName('toggle_button'))
-			btn.innerHTML = "&#9650;";
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'beam_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-	}
-
-	function print_page() {
-		window.print();
 	}
 </script>
 
@@ -898,20 +747,20 @@
 <!-- You can copy the topbar template here -->
 <body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_filename'></div>
-	<div class="topbar_la" id='topbar_unit'>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
 		<!-- Required for unit library. You could also put this in the calculator main body -->
 		<select id="unit_select" onchange="UNIT_change(); compute();">
 			<option value=0 >Metric</option>
 			<option value=1 selected="selected">English</option>
 		</select>
 	</div>
-	<div class="topbar_ctr">Beam Structural Calc</div>
-	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<div class="topbar-ctr" id="topbar_title">Beam Structural Calc</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="print_page();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
 
@@ -1130,7 +979,7 @@
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
-				<td><input id="chart_x" onkeyup="focus_handler(getV('query_l'), true);" /></td>
+				<td><input id="chart_x" onchange="plotClickHandler(getV('chart_x'));" /></td>
 				<td class="unit" id="unit_chart_x"></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>

@@ -291,20 +291,20 @@
 <!-- You can copy the topbar template here -->
 <body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_filename'></div>
-	<div class="topbar_la" id='topbar_unit'>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
 		<!-- Required for unit library. You could also put this in the calculator main body -->
 		<select id="unit_select" onchange="UNIT_change(); compute();">
 			<option value=0 >Metric</option>
 			<option value=1 selected="selected">English</option>
 		</select>
 	</div>
-	<div class="topbar_ctr">General Mechanism Calc</div>
-	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
+	<div class="topbar-ctr" id="topbar_title">General Mechanism Calc</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="download_page();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="print_page();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
 
