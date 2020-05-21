@@ -253,7 +253,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	for (name in channels) {
 		let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
 		if (unit){
-			channels_conv[name] = convertFrom(channels[name], unit[UNIT_sys]);
+			channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
 		}
 		else{
 			channels_conv[name] = channels[name];
@@ -377,7 +377,7 @@ function PLOT_focusHandler(chart, event) {
 	let plotScale = config.scaling;
 	let xScale    = config.datasets[config.axes.x.datasets[0]].scaling;
 	let xChannel  = channels[config.axes.x.datasets[0]];
-	let xUnit     = UNIT_MAP ? UNIT_MAP[config.axes.x.datasets[0]] : '-';
+	let xUnit     = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${config.axes.x.datasets[0]}`] : '-';
 	    xUnit     = xUnit ? xUnit[UNIT_sys] : '-';
 
 	let bg        = document.getElementById(config.chartName);
@@ -390,15 +390,16 @@ function PLOT_focusHandler(chart, event) {
 	} else {
 		if (event.buttons != 1) return;
 		xq = event.clientX - bg.getBoundingClientRect().left;
-		tq = convertFrom(xScale.fL + (xScale.fH-xScale.fL)*(xq - plotScale.xL)/(plotScale.xH-plotScale.xL), xUnit);
+		tq = xScale.fL + (xScale.fH-xScale.fL)*(xq - plotScale.xL)/(plotScale.xH-plotScale.xL);
 		if (tq < xScale.fL) {
 			tq = xScale.fL;
-			xq = convertFrom(plotScale.xL, xUnit);
+			xq = plotScale.xL;
 		}
 		if (tq > xScale.fH) {
 			tq = xScale.fH;
-			xq = convertFrom(plotScale.xL, xUnit);
+			xq = plotScale.xH;
 		}
+		tq = convertFrom(tq, xUnit);
 	}
 	
 	for (q in config.queries) {

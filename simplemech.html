@@ -39,9 +39,9 @@
 		"chart_f": ["N", "lbf"],
 		"chart_a": ["m/s^2", "ft/s^2"],
 
-		"d_label": ["m", "ft"],
-		"v_label": ["m/s", "ft/s"],
-		"f_label": ["N", "lbf"],
+		"label_d": ["m", "ft"],
+		"label_v": ["m/s", "ft/s"],
+		"label_f": ["N", "lbf"],
 
 		"motor_max_rpm_adj": ["RPM","RPM"],
 
@@ -216,24 +216,19 @@
 			},
 			datasets: {
 				t: {
-					axis: 'x',
-					channel: 0
+					axis: 'x'
 				},
 				d: {
-					axis: 'y',
-					channel: 2
+					axis: 'y'
 				},
 				v: {
-					axis: 'y',
-					channel: 1
+					axis: 'y'
 				},
 				cur: {
-					axis: 'z',
-					channel: 3
+					axis: 'z'
 				},
 				f: {
-					axis: 'z',
-					channel: 4
+					axis: 'z'
 				}
 			},
 			queries: {
@@ -512,7 +507,7 @@
 
 <div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
 
-<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img">
+<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:550px; width:800px;">
 	<rect class="plot-background" id="chart_background" x=90 y=20 width=615 height=430 />
 	<g>
 	  <line class="plot-axis" id="chart_x_axis" x1=90  x2=705 y1=450 y2=450></line>
@@ -527,13 +522,13 @@
 	<g class="plot-labels">
 	  <text x="375" y=485 class="plot-titlelabel">Time [s]</text>
 
-	  <text x=-300 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="unit_d_label" fill="#0074d9">Position []</text>
-	  <text x=-180 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="unit_v_label" fill="#d91200">Velocity []</text>
-	  <text x=-240 y=15 class="plot-titlelabel" transform="rotate(270)" id="unit_y1_divider" fill="#111">/</text>
+	  <text x=-300 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_d" fill="#0074d9">Position []</text>
+	  <text x=-180 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_v" fill="#d91200">Velocity []</text>
+	  <text x=-240 y=15 class="plot-titlelabel" transform="rotate(270)" fill="#111">/</text>
 
-	  <text x=-300 y=800 class="plot-titlelabel" transform="rotate(270)" id="chart_cur_label" fill="#444">Current [A]</text>
-	  <text x=-180 y=800 class="plot-titlelabel unit" transform="rotate(270)" id="unit_f_label" fill="#c48900">Force []</text>
-	  <text x=-240 y=800 class="plot-titlelabel" transform="rotate(270)" id="chart_y1_divider" fill="#111">/</text>
+	  <text x=-300 y=800 class="plot-titlelabel" transform="rotate(270)" fill="#444">Current [A]</text>
+	  <text x=-180 y=800 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_f" fill="#c48900">Force []</text>
+	  <text x=-240 y=800 class="plot-titlelabel" transform="rotate(270)" fill="#111">/</text>
 	</g>
 
 	<g class="plot-axlabels" id='chart_x_axlabels'></g>

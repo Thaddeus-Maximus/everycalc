@@ -27,17 +27,22 @@
 		'length':    ['mm', 'in'],
 		'rmax':      ['mm', 'in'],
 		'rmin':      ['mm', 'in'],
-		'query_l':   ['mm', 'in'],
-		'query_q':   ['mm', 'thou'],
-		'query_m':   ['N-m', 'ft-lbf'],
-		'query_sl':  ['deg', 'deg'],
-		'query_sh':  ['N', 'lbf'],
+		'chart_x':   ['mm', 'in'],
+		'chart_q':   ['mm', 'thou'],
+		'chart_m':   ['N-m', 'ft-lbf'],
+		'chart_t':   ['deg', 'deg'],
+		'chart_s':   ['N', 'lbf'],
 		'query_stress_bend_top': ['MPa', 'psi'],
 		'query_stress_bend_bot': ['MPa', 'psi'],
 		'query_stress_shear':    ['MPa', 'psi'],
 		'density': ['g/cm^3', 'lbm/in^3'],
 		'mass':    ['kg',  'lbm'],
-		'Sf':      ['MPa', 'psi']
+		'Sf':      ['MPa', 'psi'],
+
+		'label_q': ['mm', 'thou'],
+		'label_m': ['N-m', 'ft-lbf'],
+		'label_x': ['mm', 'in'],
+		'label_s': ['N', 'lbf']
 	}
 
 	function init() {
@@ -582,13 +587,7 @@
 			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
 		}
 
-		channels = {
-			x : [], // x, position
-			t : [], // theta, angle
-			q : [], // q, deflection
-			m : [], // m, bending moment
-			s : []  // s, shear force
-		}
+		console.log(channels);
 
 		PLOT_drawLinePlot({
 			chartName: "chart",
@@ -610,28 +609,31 @@
 			},
 			datasets: {
 				x: {
-					axis: 'x',
-					channel: 0
-				},
-				t: {
-					axis: 'y',
-					channel: 2
+					axis: 'x'
 				},
 				q: {
-					axis: 'y',
-					channel: 1
+					axis: 'y'
+				},
+				m: {
+					axis: 'z'
+				},
+				s: {
+					axis: 'z'
 				}				
 			},
 			queries: {
-				INDEX: { places: 0 },
+				//INDEX: { places: 0 },
 				x: { places: 4 },
 				t: { places: 4 },
 				q: { places: 4 },
 				m: { places: 4 },
 				s: { places: 4 }
 			}
-		}, channels);
+		}, channels); /*, function(e) {
+			PLOT_focusHandler(document.getElementById("chart"), e);
+		}*/
 
+		drawBeam();
 
 		}catch(err){
 			console.log(err);
@@ -645,10 +647,10 @@
 		beam = document.getElementById('chart_beam');
 		beam_items = document.getElementById('chart_beam_items');
 		while(beam_items.firstChild) beam_items.removeChild(beam_items.firstChild);
-		y_axis = document.getElementById('chart_y_axis');
+		x_axis = document.getElementById('chart_x_axis');
 
-		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		x0 = Math.min(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
+		xf = Math.max(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
 		y0 = beam.y1.baseVal.value;
 		len = getV('length');
 		canv_geo = [x0, xf, y0];
@@ -1050,10 +1052,6 @@
 		stroke: #555;
 		stroke-width: 8px;
 	}
-	.graph {
-		height: 600px !important;
-		width: 700px !important;
-	}
 
 	.beam-shape {
 		stroke: none;
@@ -1068,89 +1066,88 @@
 	}
 </style>
 
-<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
-  <title id="title">Position/Velocity Data</title>
+<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:600px; width:700px;">
+	<rect class="plot-background" id="chart_background" x=70 y=20 width=555 height=430 />
+	<g>
+	  <line id="chart_x_axis" class="plot-axis" x1=70  x2=625 y1=235 y2=235></line>
+	  <line id="chart_y_axis" class="plot-axis" x1=70  x2=70  y1=20  y2=450 ></line>
+	  <line id="chart_z_axis" class="plot-axis" x1=625 x2=625 y1=20  y2=450></line>
+	</g>
 
+	<!-- non-standard beam stuff -->
+	<g class="beam">
+	  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
+	</g>
+	<g id="chart_beam_items"></g>
 
+	<g class="plot-grid" id="chart_x_grid"></g>
+	<g class="plot-grid" id="chart_y_grid"></g>
+	<g class="plot-grid" id="chart_z_grid"></g>
 
-<rect class="background" id="chart_background" x=70 y=20 width=555 height=430 />
-<g class="x-grid">
-  <line id="chart_x_axis" class="axes" x1=70 x2=625 y1=235 y2=235></line>
-</g>
-<g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1=70  x2=70  y1=20 y2=450 ></line>
-  <line id="chart_z_axis" class="axes" x1=625 x2=625 y1=20 y2=450></line>
-</g>
+	<g class="plot-labels">
+	  <text x="325" y=485 class="plot-titlelabel unit" id="unit_label_x" >Position []</text>
 
-<g class="beam">
-  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
-</g>
-<g id="chart_beam_items"></g>
+	  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_q" fill="#0074d9">Deflection []</text>
 
-<g class="x-grid" id="chart_x_grid"></g>
-<g class="y-grid" id="chart_y_grid"></g>
-<g class="z-grid" id="chart_z_grid"></g>
+	  <text x=-120 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_m" fill="#d91200">Bending Moment []</text>
+	  <text x=-240 y=700 class="plot-titlelabel" transform="rotate(270)" fill="#111">/</text>
+	  <text x=-320 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="unit_label_s" fill="#c48900">Shear Force []</text>
+	</g>
 
-<g class="labels x-labels" id='chart_x_labels'>
-  <text x="325" y=485 class="label-title" id="chart_x_label">Position [mm]</text>
-</g>
+	<g class="plot-axlabels" id='chart_x_axlabels'></g>
+	<g class="plot-axlabels" id='chart_z_axlabels'></g>
+	<g class="plot-axlabels" id='chart_y_axlabels'></g>
 
-<g class="labels y-labels" id='chart_y_labels'>
-  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_q_label" fill="#0074d9">Deflection [mm]</text>
-</g>
+	<g>
+		<line class="plot-querybar" id="chart_querybar" x1=100 x2=100 y1=15 y2=555 opacity=0></line>
+	</g>
+	<polyline
+		id='chart_q_line'
+		fill='none'
+		stroke='#0074d9'
+		stroke-width=2
+		points="
+		"/>
+	<polyline
+		id='chart_m_line'
+		fill='none'
+		stroke='#d91200'
+		stroke-width=2
+		points="
+		"/>
+	<polyline
+		id='chart_s_line'
+		fill='none'
+		stroke='#c48900'
+		stroke-width=2
+		points="
+		"/>
 
-<g class="labels z-labels" id='chart_z_labels'>
-  <text x=-240 y=700 class="label-title" transform="rotate(270)" id="chart_m_label" fill="#d91200">Bending Moment [N-m]</text>
-</g>
-
-<g class="labels x-labels" id='chart_x_axis_labels'></g>
-<g class="labels z-labels" id='chart_z_axis_labels'></g>
-<g class="labels y-labels" id='chart_y_axis_labels'></g>
-
-<g class="query-line">
-	<line id="chart_querybar" x1=100 x2=100 y1=15 y2=555></line>
-</g>
-<polyline
-	id='chart_q_line'
-	fill='none'
-	stroke='#0074d9'
-	stroke-width=2
-	points="
-	"/>
-<polyline
-	id='chart_m_line'
-	fill='none'
-	stroke='#d91200'
-	stroke-width=2
-	points="
-	"/>
-
-<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
+	<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
 </svg>
 
-<div class="output-graph">
-
+<div class="output-plot" id ="chart_querytable" style='display:none;'>
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
-				<td><input id="query_l" onkeyup="focus_handler(getV('query_l'), true);" /></td>
-				<td class="unit" id="unit_query_l"></td>
+				<td><input id="chart_x" onkeyup="focus_handler(getV('query_l'), true);" /></td>
+				<td class="unit" id="unit_chart_x"></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>
-				<td><input id="query_q" readonly /></td>
-				<td class="unit" id="unit_query_q"></td>
+				<td><input id="chart_q" readonly /></td>
+				<td class="unit" id="unit_chart_q"></td>
 			</tr><tr>
 				<th class="rowlabel">Slope</th>
-				<td><input id="query_sl" readonly /></td>
-				<td class="unit" id="unit_query_sl"></td>
+				<td><input id="chart_t" readonly /></td>
+				<td class="unit" id="unit_chart_t"></td>
 			</tr><tr>
 				<th class="rowlabel">Bending Moment</th>
-				<td><input id="query_m" readonly /></td>
-				<td class="unit" id="unit_query_m"></td>
+				<td><input id="chart_m" readonly /></td>
+				<td class="unit" id="unit_chart_m"></td>
 			</tr><tr>
 				<th class="rowlabel">Shear Force<span class="ttt">Note: Shear force at a load/constraint is not properly defined. Query before and after.</span></th>
-				<td><input id="query_sh" readonly /></td>
-				<td class="unit" id="unit_query_sh"></td>
+				<td><input id="chart_s" readonly /></td>
+				<td class="unit" id="unit_chart_s"></td>
 			</tr><tr>
 				<th class="rowlabel">Bending Stress @ Top<span class="ttt">Positive is tension</span></th>
 				<td><input id="query_stress_bend_top" readonly /></td>
