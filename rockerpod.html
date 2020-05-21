@@ -1,9 +1,18 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
 <script type="text/javascript">
-	unit_sys = 0;
-	inputs_unit_map = {
+	UNIT_MAP = {
 		"N": ["N","lbf"],
 		"F": ["N","lbf"],
 		"T_clutch": ["N-m", "in-lbf"],
@@ -15,59 +24,14 @@
 		"free_speed": ["m/s", "ft/s"]
 	}
 
-	function switch_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
 
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
-			}
-		}
-		compute();
-	}
+		MOTOR_setupMotorSelect("motortype");
 
-	function gidv(id, default_value) {
-
-		v =  eval(document.getElementById(id).value);
-		if (typeof default_value!=='undefined' && typeof v === 'undefined') v=default_value;
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		return v;
-	}
-
-	function gids(id, value, places) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			value = convert_to(value, inputs_unit_map[id][unit_sys]);
-		document.getElementById(id).value = value.toFixed(places);
-	}
-
-	function thload() {
-		var inputs, index;
-
-		select = document.getElementById("motortype");
-		i=0;
-		for(motor in motor_data) {
-			i++;
-			opt = document.createElement('option');
-			opt.innerHTML = motor_data[motor]["plain_name"];
-			opt.value = motor;
-			select.appendChild(opt);
-		}
-
-		if (packed_inputs) unpack_inputs();
-
-		switch_units();
-
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-		    inputs[index].onkeyup = function(e) {
+		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 
 		    	if (key==13) {
@@ -75,15 +39,13 @@
 		    	} else {
 		    		compute(false);
 		    	}
-		    }
-		}
-		motortype_select(document.getElementById("motortype"));
-		calc_ratio_pre();
-		calc_ratio_pod();
-		document.getElementById('topbar_version').innerHTML = VERSION;
+		    });
+		selectMotorType();
+		computePreRatio();
+		computePodRatio();
 	}
 
-	function motortype_select() {
+	function selectMotorType() {
 		e=document.getElementById("motortype");
 		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
 		props.forEach(function(a) {
@@ -106,7 +68,7 @@
 		return x;
 	}
 
-	function calc_ratio_pre() {
+	function computePreRatio() {
 		var G = 1;
 		G *= NaNto1(gidv("G1B"));
 		G *= NaNto1(gidv("G2B"));
@@ -118,7 +80,7 @@
 		gids("G_pre", G, 4);
 		gids("G_comb", G*gidv("G_pod"), 4);
 	}
-	function calc_ratio_pod() {
+	function computePodRatio() {
 		var G = 1;
 		G *= NaNto1(gidv("G1BP"));
 		G *= NaNto1(gidv("G2BP"));
@@ -165,130 +127,30 @@
 	}
 </script>
 
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		packed_inputs.unit_sys = unit_sys;
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		unit_sys = packed_inputs.unit_sys;
-		delete packed_inputs.unit_sys;
-		document.getElementById('unit_english').checked = unit_sys;
-		document.getElementById('unit_metric') .checked = !unit_sys;
-		for (key in packed_inputs) {
-			document.getElementById(key).value = packed_inputs[key];
-		}
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'rockerpod_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-	}
-
-	function print_page() {
-		window.print();
-	}
-</script>
-
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_ctr">Rocker Pod</div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">English</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Rocker Pod</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
 </div>
 
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 	<div class="odd">
 		<center>
@@ -303,20 +165,20 @@
 		<table>
 		<tr>
 			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
-			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
+			<td><input id="motornum" oninput="selectMotorType()" value=1 /></td>
 		</tr><tr>
 			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
+			<td><input id="op_voltage" oninput="selectMotorType()" value=12 /></td>
 			<td class="unit">[V]</td>
 		</tr><tr>
 			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
+			<td><input id="efficiency" oninput="selectMotorType()" value=85 /></td>
 			<td class="unit">[%]</td>
 		</tr>
 
 		<tr>
 			<th>Motor</th>
-			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
+			<td colspan="2"><select class="doublewide" id="motortype" oninput="selectMotorType()">
 			  
 			  <!--<option value="neo">REV NEO</option>
 			  <option value="neo550">REV NEO550</option>
@@ -371,26 +233,26 @@
 			<td class="tiny"></td>
 			<td><input id="G_pod" readonly/></td>
 		</tr><tr>
-			<td><input id="G1A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G1A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G1AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G1B" oninput="computePreRatio()" /></td>
+			<td><input id="G1AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G1BP" oninput="computePodRatio()" /></td>
 		</tr><tr>
-			<td><input id="G2A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G2A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G2AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G2B" oninput="computePreRatio()" /></td>
+			<td><input id="G2AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G2BP" oninput="computePodRatio()" /></td>
 		</tr><tr>
-			<td><input id="G3A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G3A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G3AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G3B" oninput="computePreRatio()" /></td>
+			<td><input id="G3AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G3BP" oninput="computePodRatio()" /></td>
 		</tr>
 	</table>
 </div><div class="even">

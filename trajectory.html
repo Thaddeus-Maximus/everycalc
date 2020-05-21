@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
 <script type="text/javascript">
 	EXP_FN_BASE = 'trajectory';
 	UNIT_MAP = {
@@ -63,8 +72,6 @@
 		EXP_onload();
 		UNIT_change();
 		selectMode();
-
-		var inputs, index;
 
 		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
