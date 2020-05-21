@@ -248,6 +248,7 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 		 places: 4 }
 	} // if queries is undefined just ignore the query aspect algotether
 	// query boxes of format: `query_${config.chartName}_${name}_${number}`
+	// TODO: equal axis plots
 }
  */
 function PLOT_drawLinePlot(config, channels, handler) {

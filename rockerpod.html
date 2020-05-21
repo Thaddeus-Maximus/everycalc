@@ -12,6 +12,7 @@
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript">
+	EXP_FN_BASE = 'rockerpod';
 	UNIT_MAP = {
 		"N": ["N","lbf"],
 		"F": ["N","lbf"],
@@ -33,16 +34,15 @@
 
 		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
-
+		    	setError(1);
 		    	if (key==13) {
-		    		compute(true);
-		    	} else {
-		    		compute(false);
+		    		compute();
 		    	}
 		    });
 		selectMotorType();
 		computePreRatio();
 		computePodRatio();
+		compute();
 	}
 
 	function selectMotorType() {
@@ -50,59 +50,54 @@
 		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
 		props.forEach(function(a) {
 			
-			gids("motor_"+a, get_motor_data(e.value, a));
-			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
+			setV("motor_"+a, MOTOR_getSpecs(e.value, a));
+			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage")/12;
 			if (a=="stall_torque")
-				adjVal *= gidv("motornum")*gidv("efficiency")/100;
+				adjVal *= getV("motornum")*getV("efficiency")/100;
 			if (a=="free_current" || a=="stall_current" )
-				adjVal *= gidv("motornum");
-			gids("motor_"+a+"_adj", adjVal);
+				adjVal *= getV("motornum");
+			setV("motor_"+a+"_adj", adjVal);
 		});
 
 		compute();
 	}
 
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
 	function computePreRatio() {
 		var G = 1;
-		G *= NaNto1(gidv("G1B"));
-		G *= NaNto1(gidv("G2B"));
-		G *= NaNto1(gidv("G3B"));
-		G /= NaNto1(gidv("G1A"));
-		G /= NaNto1(gidv("G2A"));
-		G /= NaNto1(gidv("G3A"));
+		G *= getV("G1B",1);
+		G *= getV("G2B",1);
+		G *= getV("G3B",1);
+		G /= getV("G1A",1);
+		G /= getV("G2A",1);
+		G /= getV("G3A",1);
 
-		gids("G_pre", G, 4);
-		gids("G_comb", G*gidv("G_pod"), 4);
+		setV("G_pre", G, 4);
+		setV("G_comb", G*getV("G_pod"), 4);
 	}
 	function computePodRatio() {
 		var G = 1;
-		G *= NaNto1(gidv("G1BP"));
-		G *= NaNto1(gidv("G2BP"));
-		G *= NaNto1(gidv("G3BP"));
-		G /= NaNto1(gidv("G1AP"));
-		G /= NaNto1(gidv("G2AP"));
-		G /= NaNto1(gidv("G3AP"));
+		G *= getV("G1BP",1);
+		G *= getV("G2BP",1);
+		G *= getV("G3BP",1);
+		G /= getV("G1AP",1);
+		G /= getV("G2AP",1);
+		G /= getV("G3AP",1);
 
-		gids("G_pod", G, 4);
-		gids("G_comb", G*gidv("G_pre"), 4);
+		setV("G_pod", G, 4);
+		setV("G_comb", G*getV("G_pre"), 4);
 	}
 
 	function compute() {
-		G_pod = gidv("G_pod");
-		G_pre = gidv("G_pre");
-		T_in  = G_pre*gidv("motor_stall_torque_adj");
-		T_clutch = gidv("T_clutch", 0);
-		h_pod = gidv("h_pod");
-		r_pod = gidv("r_pod");
-		r_wheel = gidv("d_wheel")/2;
-		mu = gidv("mu");
-		omega_free = gidv("motor_max_rpm_adj");
+		try{
+		let G_pod = getV("G_pod");
+		let G_pre = getV("G_pre");
+		let T_in  = G_pre*getV("motor_stall_torque_adj");
+		let T_clutch = getV("T_clutch", 0);
+		let h_pod = getV("h_pod");
+		let r_pod = getV("r_pod");
+		let r_wheel = getV("d_wheel")/2;
+		let mu = getV("mu");
+		let omega_free = getV("motor_max_rpm_adj");
 
 		w = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
 		F = G_pod*(T_in-T_clutch) / r_wheel;
@@ -110,10 +105,10 @@
 		mu_ideal = F/N;
 		v = omega_free/60*Math.PI*r_wheel*2/G_pod/G_pre;
 
-		gids("F", F);
-		gids("N", N);
-		gids("mu_ideal", mu_ideal);
-		gids("free_speed", v);
+		setV("F", F);
+		setV("N", N);
+		setV("mu_ideal", mu_ideal);
+		setV("free_speed", v);
 		if (mu < mu_ideal) {
 			document.getElementById("F").classList.add('error');
 			document.getElementById("N").classList.add('error');
@@ -124,6 +119,12 @@
 			document.getElementById("N").classList.remove('error');
 			document.getElementById("mu_ideal").classList.remove('error');
 		}
+	}catch(err){
+		console.log(err);
+		setError(2,err);
+		return;
+	}
+	setError(0);
 	}
 </script>
 
@@ -152,15 +153,6 @@
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
-	<div class="odd">
-		<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
-			  <label for="english">English</label><br>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
-			  <label for="metric">Metric</label><br>
-		</center>
-	</div>
-
 	<div class="even">
 		<table>
 		<tr>
