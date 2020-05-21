@@ -7,6 +7,8 @@
 <script type="text/javascript" src="include/export.js"></script>
 <script type="text/javascript" src="include/motors.js"></script>
 <script type="text/javascript" src="include/plots.js"></script>
+<script type="text/javascript" src="include/math.js"></script>
+<script type="text/javascript" src="include/materials.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -41,9 +43,9 @@
 	function init() {
 		EC_onload();
 		EXP_onload();
-		// UNIT_onload ? should also be in simplemech
+		UNIT_change();
 
-		populate_materials();
+		populateMaterials();
 		document.getElementById('material').value = 'Aluminum';
 		selectMaterial();
 
@@ -60,6 +62,12 @@
 		selectShape();
 		computeMOI();
 
+		registerCallbacks();
+
+		compute();
+	}
+
+	function registerCallbacks() {
 		EC_setOnInputChange(function(e) {
 	    	let key = e.keyCode ? e.keyCode : e.which;
 	    	let input = e.target;
@@ -67,26 +75,10 @@
 
 			if (key == 13) compute();
 	    });
-
-		compute();
 	}
 
-	/* may need to make a collapse_table?
-	function collapse(id) {
-		tbl = document.getElementById('table_'+id);
-
-		btn = document.getElementById('toggle_detail_'+id);
-		if(tbl.rows[1].style['display'] != 'none') {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
-			btn.innerHTML = "&#9660";
-		} else {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
-			btn.innerHTML = "&#9650";
-		}
-	}*/
-
 	function computeMOI() {
-		invalidate_computations();
+		setError(1);
 		shape = document.getElementById('section').value;
 		var moi, area, rmax, rmin;
 		flip = document.getElementById('section_flip').checked;
@@ -164,7 +156,7 @@
 	}
 
 	function selectShape(disable_recompute) {
-		if(!disable_recompute) invalidate_computations();
+		if(!disable_recompute) setError(1);
 		shape = document.getElementById('section').value;
 		document.getElementById('moi').readOnly = true;
 		document.getElementById('area').readOnly = true;
@@ -259,8 +251,8 @@
 		load_div.innerHTML =
 		`<table identifier=${x}>
 			<tr>
-				<td>[${x}] <button onclick="remove_load(${x}); compute();" title="Remove">-</button></td>
-				<td><select id="load_type_${x}" onchange="change_load(${x}); compute();">
+				<td>[${x}] <button onclick="removeLoad(${x}); compute();" title="Remove">-</button></td>
+				<td><select id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
 					<option value="pin" selected='selected' >Pinned</option>
 					<option value="fix">Fixed</option>
 					<option value="force">Force </option>
@@ -269,19 +261,19 @@
 			</tr>
 			<tr id="load_${x}_1_row">
 				<th class="rowlabel" id="load_${x}_1_label">L1</th>
-				<td><input id="load_${x}_1" onchange="drawbeam()"/></td>
+				<td><input id="load_${x}_1" onchange="drawBeam()"/></td>
 				<td class="unit" id="unit_load_${x}_1"></td>
 			</tr><tr id="load_${x}_2_row">
 				<th class="rowlabel" id="load_${x}_2_label">L2</th>
-				<td><input id="load_${x}_2" onchange="drawbeam()" /></td>
+				<td><input id="load_${x}_2" onchange="drawBeam()" /></td>
 				<td class="unit" id="unit_load_${x}_2"></td>
 			</tr><tr id="load_${x}_3_row">
 				<th class="rowlabel" id="load_${x}_3_label">L3</th>
-				<td><input id="load_${x}_3" onchange="drawbeam()" /></td>
+				<td><input id="load_${x}_3" onchange="drawBeam()" /></td>
 				<td class="unit" id="unit_load_${x}_3"></td>
 			</tr><tr id="load_${x}_4_row">
 				<th class="rowlabel" id="load_${x}_4_label">L4</th>
-				<td><input id="load_${x}_4" onchange="drawbeam()" /></td>
+				<td><input id="load_${x}_4" onchange="drawBeam()" /></td>
 				<td class="unit" id="unit_load_${x}_4"></td>
 			</tr>
 		</table>`;
@@ -295,11 +287,11 @@
 			document.getElementById(`load_${x}_2`).value = params.amount;
 			document.getElementById(`load_type_${x}`).selectedIndex = params.type;
 		}
-		change_load(x);
-		register_callbacks();
+		selectLoadType(x);
+		registerCallbacks();
 	}
 
-	function change_load(i) {
+	function selectLoadType(i) {
 		setError(1);
 		type = document.getElementById('load_type_'+i).value;
 		if (type == 'pin' ) { //
@@ -308,8 +300,8 @@
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
 			document.getElementById(`load_${i}_2`).readOnly = true;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
+			UNIT_MAP[`load_${i}_1`] = ['mm', 'in'];
+			UNIT_MAP[`load_${i}_2`] = ['N', 'lbf'];
 			for (j=3;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		} else if (type == 'fix' ) { //
@@ -321,9 +313,9 @@
 			document.getElementById(`load_${i}_3_row`).style.display = '';
 			document.getElementById(`load_${i}_3_label`).innerHTML = 'M=';
 			document.getElementById(`load_${i}_3`).readOnly = true;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
-			inputs_unit_map[`load_${i}_3`] = ['N-m', 'ft-lbf'];
+			UNIT_MAP[`load_${i}_1`] = ['mm', 'in'];
+			UNIT_MAP[`load_${i}_2`] = ['N', 'lbf'];
+			UNIT_MAP[`load_${i}_3`] = ['N-m', 'ft-lbf'];
 			for (j=4;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		} else if (type == 'force' || type == 'moment') {
@@ -332,15 +324,15 @@
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'force' ? 'F=' : 'M=';
 			document.getElementById(`load_${i}_2`).readOnly = false;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = type == 'force' ? ['N', 'lbf'] : ['N-m', 'ft-lbf'];
+			UNIT_MAP[`load_${i}_1`] = ['mm', 'in'];
+			UNIT_MAP[`load_${i}_2`] = type == 'force' ? ['N', 'lbf'] : ['N-m', 'ft-lbf'];
 			for (j=3;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		}
-		switch_units();
+		UNIT_change();
 	}
 
-	function remove_load(load_no) {
+	function removeLoad(load_no) {
 		loads = document.getElementById('loads');
 		for(i=0; i<loads.children.length-1; i++) {
 			if (loads.children[i].identifier == load_no) {
@@ -353,14 +345,14 @@
 			}
 		}
 
-		delete inputs_unit_map[`load_${load_no}_1`];
-		delete inputs_unit_map[`load_${load_no}_2`];
-		delete inputs_unit_map[`load_${load_no}_3`];
-		delete inputs_unit_map[`load_${load_no}_4`];
+		delete UNIT_MAP[`load_${load_no}_1`];
+		delete UNIT_MAP[`load_${load_no}_2`];
+		delete UNIT_MAP[`load_${load_no}_3`];
+		delete UNIT_MAP[`load_${load_no}_4`];
 		compute();
 	}
 
-	function populate_materials() {
+	function populateMaterials() {
 		select = document.getElementById('material');
 
 		i=0;
@@ -381,10 +373,10 @@
 		document.getElementById('density').readOnly 		= matl != 'custom';
 
 		if (matl != 'custom') {
-			gids('elastic_modulus', materials[matl]['Ef']);
-			gids('density', materials[matl]['density']);
-			gids('mass', materials[matl]['density']*gidv('area')*gidv('length'));
-			gids('Sf', materials[matl]['Sf'] ? materials[matl]['Sf'] : '-');
+			setV('elastic_modulus', materials[matl]['Ef']);
+			setV('density', materials[matl]['density']);
+			setV('mass', materials[matl]['density']*getV('area')*getV('length'));
+			setV('Sf', materials[matl]['Sf'] ? materials[matl]['Sf'] : '-');
 		}
 
 	}
@@ -392,7 +384,7 @@
 
 <script type="text/javascript">
 	//la = linearAlgebra();
-	function make_stiffness_matrix(EI, L) {
+	function computeStiffnessMatrix(EI, L) {
 		var m = math.matrix([ [12,  6*L,   -12,  6*L   ],
 							  [6*L, 4*L*L, -6*L, 2*L*L ],
 							  [-12, -6*L,  12,   -6*L  ],
@@ -400,7 +392,7 @@
 		return math.multiply(m, EI/L/L/L);
 	}
 
-	function run_fe(E, I, order, poses, forces, moments, pinned, fixed) {
+	function computeFE(E, I, order, poses, forces, moments, pinned, fixed) {
 		numel = order.length-1;
 
 		numnode = (numel+1)*2;
@@ -425,7 +417,7 @@
 		for (i=0;i<numel;i++) {
 			idx = math.index(math.range(i*2, i*2+4), math.range(i*2, i*2+4));
 			ss = K.subset(idx);
-			Ks = make_stiffness_matrix(E*I, poses[order[i+1]]-poses[order[i]]);
+			Ks = computeStiffnessMatrix(E*I, poses[order[i+1]]-poses[order[i]]);
 			K.subset(idx,
 				math.add(ss, Ks));
 		}
@@ -445,32 +437,34 @@
 			else fq.push(q._data[i-offs][0]);
 		}
 
-		xp = []; // x; position
-		tp = []; // theta; angle
-		qp = []; // q; deflection
-		mp = []; // m; bending moment
-		sp = []; // s; shear force
+		channels = {
+			x : [], // x, position
+			t : [], // theta, angle
+			q : [], // q, deflection
+			m : [], // m, bending moment
+			s : []  // s, shear force
+		}
 		for (i=0;i<numel;i++) {
 			q_seg = fq.slice(i*2, i*2+4);
 			dl = poses[order[i+1]] - poses[order[i]];
 			for (zeta=-1; zeta<1; zeta+=0.05) {
-				xp.push(poses[order[i]] + (zeta+1)/2*dl);
-				tp.push(beamShapeFunctionSlope(q_seg, zeta, dl));
-				qp.push(beamShapeFunction(q_seg, zeta, dl));
-				mp.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
-				sp.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
+				channels.x.push(poses[order[i]] + (zeta+1)/2*dl);
+				channels.t.push(beamShapeFunctionSlope(q_seg, zeta, dl));
+				channels.q.push(beamShapeFunction(q_seg, zeta, dl));
+				channels.m.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
+				channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 			}
 			zeta = 1;
-			xp.push(poses[order[i]] + (zeta+1)/2*dl);
-			tp.push(beamShapeFunctionSlope(q_seg, zeta, dl));
-			qp.push(beamShapeFunction(q_seg, zeta, dl));
-			mp.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
-			sp.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
+			channels.x.push(poses[order[i]] + (zeta+1)/2*dl);
+			channels.t.push(beamShapeFunctionSlope(q_seg, zeta, dl));
+			channels.q.push(beamShapeFunction(q_seg, zeta, dl));
+			channels.m.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
+			channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 		}
 
 		rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
 
-		return [xp, qp, tp, mp, sp, rxns];
+		return [channels, rxns];
 	}
 
 	function beamShapeFunction(arr, zeta, dl) {
@@ -517,7 +511,7 @@
 		try{
 		selectShape();
 
-		L = gidv('length');
+		L = getV('length');
 
 		order   = [0,   1]; // node ids, in order (sort later)
 		poses   = {0:0, 1:L}; // positions
@@ -532,15 +526,15 @@
 			type = document.getElementById(`load_type_${x}`).value;
 
 			order.push(i);
-			poses[i] = gidv(`load_${x}_1`);
+			poses[i] = getV(`load_${x}_1`);
 			if (type == 'fix') {
 				fixed[i] = x;
 			} else if (type == 'pin') {
 				pinned[i] = x;
 			} else if (type == 'force') {
-				forces[i] = gidv(`load_${x}_2`);
+				forces[i] = getV(`load_${x}_2`);
 			} else if (type == 'moment') {
-				moments[i] = gidv(`load_${x}_2`);
+				moments[i] = getV(`load_${x}_2`);
 			}
 		}
 
@@ -575,20 +569,70 @@
 			}
 		}
 
-		[xp, qp, tp, mp, sp, rxns] = run_fe(gidv('moi'), gidv('elastic_modulus'),
+		[channels, rxns] = computeFE(getV('moi'), getV('elastic_modulus'),
 			order, poses, forces, moments, pinned, fixed);
 
 		for (pin in pinned) {
 			noden = order.indexOf(parseInt(pin));
-			gids(`load_${pinned[pin]}_2`, rxns[noden*2]);
+			setV(`load_${pinned[pin]}_2`, rxns[noden*2]);
 		}
 		for (fix in fixed) {
 			noden = order.indexOf(parseInt(fix));
-			gids(`load_${fixed[fix]}_2`, rxns[noden*2]);
-			gids(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
+			setV(`load_${fixed[fix]}_2`, rxns[noden*2]);
+			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
 		}
 
-		drawchart([xp, qp, tp, mp, sp], [poses, forces, moments, pinned, fixed]);
+		channels = {
+			x : [], // x, position
+			t : [], // theta, angle
+			q : [], // q, deflection
+			m : [], // m, bending moment
+			s : []  // s, shear force
+		}
+
+		PLOT_drawLinePlot({
+			chartName: "chart",
+			axes: {
+				x: {
+					numTicks: 10,
+					boxEnds: false,
+					negativeHandling: 'posonly',
+					margin: 15
+				}, y: {
+					numTicks: 7,
+					boxEnds: true,
+					negativeHandling: 'symmetric',
+					margin: 5
+				}, z: {
+					syncWithY: true,
+					margin: 5
+				}
+			},
+			datasets: {
+				x: {
+					axis: 'x',
+					channel: 0
+				},
+				t: {
+					axis: 'y',
+					channel: 2
+				},
+				q: {
+					axis: 'y',
+					channel: 1
+				}				
+			},
+			queries: {
+				INDEX: { places: 0 },
+				x: { places: 4 },
+				t: { places: 4 },
+				q: { places: 4 },
+				m: { places: 4 },
+				s: { places: 4 }
+			}
+		}, channels);
+
+
 		}catch(err){
 			console.log(err);
 			setError(2, err);
@@ -597,8 +641,7 @@
 		setError(0);
 	}
 
-  //todo: this
-	function drawbeam() {
+	function drawBeam() {
 		beam = document.getElementById('chart_beam');
 		beam_items = document.getElementById('chart_beam_items');
 		while(beam_items.firstChild) beam_items.removeChild(beam_items.firstChild);
@@ -607,7 +650,7 @@
 		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
 		y0 = beam.y1.baseVal.value;
-		len = gidv('length');
+		len = getV('length');
 		canv_geo = [x0, xf, y0];
 
 		loads = document.getElementById('loads');
@@ -617,7 +660,7 @@
 			type = document.getElementById(`load_type_${x}`).value;
 
 
-			position = gidv(`load_${x}_1`);
+			position = getV(`load_${x}_1`);
 			cp = x0 + (xf-x0)*position/len;
 
 			subhandler = function (event) {
@@ -647,7 +690,7 @@
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'force') {
-				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
 				y2 = y0 - 25*sgn;
@@ -670,7 +713,7 @@
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'moment') {
-				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','circle');
 				shape.classList.add('beam-shape');
@@ -688,7 +731,7 @@
 	// todo: this
 	function find_extrema_handler(event) {
 		if (event.buttons != 2) return;
-		query_l_unit = inputs_unit_map['query_l'][unit_sys];
+		query_l_unit = UNIT_MAP['query_l'][unit_sys];
 
 		bg = document.getElementById('chart');
 		xq = event.clientX - bg.getBoundingClientRect().left;
@@ -727,7 +770,7 @@
 	function pack_inputs() {
 		packed_inputs = {};
 		packed_inputs.current_load_number = current_load_number;
-		packed_inputs.inputs_unit_map     = inputs_unit_map;
+		packed_inputs.UNIT_MAP     = UNIT_MAP;
 		for (input of document.getElementsByTagName('input')) {
 			if (input.type == "text") {
 				packed_inputs[input.id] = input.value;
@@ -745,9 +788,9 @@
 
 	function unpack_inputs() {
 		current_load_number = packed_inputs.current_load_number;
-		inputs_unit_map     = packed_inputs.inputs_unit_map;
+		UNIT_MAP     = packed_inputs.UNIT_MAP;
 		delete packed_inputs.current_load_number;
-		delete packed_inputs.inputs_unit_map;
+		delete packed_inputs.UNIT_MAP;
 		for (key in packed_inputs) {
 			if (typeof packed_inputs[key] == "boolean")
 				document.getElementById(key).checked = packed_inputs[key];
@@ -848,24 +891,31 @@
 
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
 	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
 	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_fname'></div>
-	<div class="topbar_ctr">Beam Calculator</div>
+	<div class="topbar_la" id='topbar_filename'></div>
+	<div class="topbar_la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">English</option>
+		</select>
+	</div>
+	<div class="topbar_ctr">Beam Structural Calc</div>
+	<div class="topbar_ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
 	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<a id="download_frame" hidden></a>
 </div>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 275px; float: left;" class="container">
 		<div class="even">
-			<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units(); compute();">
-			  <label for="english">English</label>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units(); compute();" checked>
-			  <label for="metric">Metric</label>
-			</center>
 			<table>
 				<tr>
 					<th class='rowlabel'>Length</th>
@@ -1025,10 +1075,10 @@
 
 <rect class="background" id="chart_background" x=70 y=20 width=555 height=430 />
 <g class="x-grid">
-  <line id="chart_x_axis" class="axes" x1=70 x2=70 y1=20 y2=450 ></line>
+  <line id="chart_x_axis" class="axes" x1=70 x2=625 y1=235 y2=235></line>
 </g>
 <g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1=70 x2=625 y1=235 y2=235></line>
+  <line id="chart_y_axis" class="axes" x1=70  x2=70  y1=20 y2=450 ></line>
   <line id="chart_z_axis" class="axes" x1=625 x2=625 y1=20 y2=450></line>
 </g>
 
@@ -1058,7 +1108,7 @@
 <g class="labels y-labels" id='chart_y_axis_labels'></g>
 
 <g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=555></line>
+	<line id="chart_querybar" x1=100 x2=100 y1=15 y2=555></line>
 </g>
 <polyline
 	id='chart_q_line'
@@ -1083,7 +1133,7 @@
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
-				<td><input id="query_l" onkeyup="focus_handler(gidv('query_l'), true);" /></td>
+				<td><input id="query_l" onkeyup="focus_handler(getV('query_l'), true);" /></td>
 				<td class="unit" id="unit_query_l"></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>

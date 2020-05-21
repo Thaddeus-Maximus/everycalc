@@ -166,6 +166,17 @@ function PLOT_drawTicks(chartName, axis, plotScaling, axisScaling, margin) {
 		label.setAttribute(altaxis,  g);
 		label.setAttribute(realaxis, f);
 		label.innerHTML = labelstr;
+		switch(axis) {
+			case 'x':
+				label.style.textAnchor = 'middle';
+				break;
+			case 'y':
+				label.style.textAnchor = 'end';
+				break;
+			case 'z':
+				label.style.textAnchor = 'start';
+				break;
+		}
 		labels.append(label);
 	}
 }
@@ -260,10 +271,10 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	};
 
 	config.scaling = {};
-	config.scaling.xL = Math.min(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
-	config.scaling.xH = Math.max(config.dom.axes.y.x1.baseVal.value, config.dom.axes.y.x2.baseVal.value);
-	config.scaling.yL = Math.max(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
-	config.scaling.yH = Math.min(config.dom.axes.x.y1.baseVal.value, config.dom.axes.x.y2.baseVal.value);
+	config.scaling.xL = Math.min(config.dom.axes.x.x1.baseVal.value, config.dom.axes.x.x2.baseVal.value);
+	config.scaling.xH = Math.max(config.dom.axes.x.x1.baseVal.value, config.dom.axes.x.x2.baseVal.value);
+	config.scaling.yL = Math.max(config.dom.axes.y.y1.baseVal.value, config.dom.axes.y.y2.baseVal.value);
+	config.scaling.yH = Math.min(config.dom.axes.y.y1.baseVal.value, config.dom.axes.y.y2.baseVal.value);
 
 	let lines = {};
 	let mins  = {x:[],y:[],z:[]};

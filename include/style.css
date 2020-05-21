@@ -148,67 +148,58 @@ button {
 .graph .labels.z-labels {
   text-anchor: start;
 }
+.output-plot {
+  background-color: #b5e0a0;
+}
 
 
-.graph {
+.plot {
   height: 550px;
   width: 800px;
   margin: 10px;
 }
 
-.graph .background {
+.plot-background {
   fill: #e5f0e0;
 }
-.output-graph {
-  background-color: #b5e0a0;
-}
 
-.graph .axes {
+.plot-axis {
   stroke: #333;
   stroke-dasharray: 0;
   stroke-width: 1.5;
 }
 
-.graph .grid {
+.plot-grid {
   stroke: #ccc;
   stroke-dasharray: 0;
   stroke-width: 1;
 }
 
-.labels {
+.plot-labels {
   font-size: 13px;
 }
+.plot-axlabels {
+  font-size: 10px;
+}
 
-.label-title {
+.plot-titlelabel {
   font-weight: bold;
   font-size: 12px;
   text-anchor: middle;
 }
 
-.query-line line {
+.plot-querybar {
   stroke: #55a040;
   stroke-width: 2;
 }
 
-.marker-line line {
+.plot-markerbar {
   stroke: #333;
   stroke-width: 2;
 }
 
-.qline-hidden {
-  opacity: 0;
-}
 
-.error {
-  background: #d99 !important;
-}
-.uncomputed {
-  background: #fd6 !important;
-}
 
-#compute_btn {
-  background-color: #55a040;
-}
 
 .hovered {
   background-color: #55a040;

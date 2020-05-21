@@ -107,6 +107,19 @@ function collapseDiv(id) {
 	}
 }
 
+function collapseTable(id) {
+	tbl = document.getElementById('table_'+id);
+
+	btn = document.getElementById('toggle_detail_'+id);
+	if(tbl.rows[1].style['display'] != 'none') {
+		for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
+		btn.innerHTML = "&#9660";
+	} else {
+		for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
+		btn.innerHTML = "&#9650";
+	}
+}
+
 function parseMath(expr, variables) {
 	for (variable in variables) {
 		expr = expr.replace(variable, variables[variable]);
