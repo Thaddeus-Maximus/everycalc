@@ -51,7 +51,7 @@ function getV(id, default_value, pct_err_en) {
 	let unit = document.getElementById(id).dataset.unit;
 	let v =  document.getElementById(id).value;
 	if (pct_err_en && typeof v === 'string' && v.slice(-1) == '%') {
-		return newGetV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
+		return getV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
 	} else if (v=='') {
 		v = default_value;
 	} else {

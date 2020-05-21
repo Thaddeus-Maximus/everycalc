@@ -15,30 +15,7 @@
 <script type="text/javascript">
 	EXP_FN_BASE = 'oring';
 	UNIT_MAP = {
-		'd1': ['mm', 'in'],
-		'd2': ['mm', 'in'],
-		'd3': ['mm', 'in'],
-		'd4': ['mm', 'in'],
-		'd5': ['mm', 'in'],
-		'rw': ['mm', 'in'],
-		'rid':['mm', 'in'],
-		'rod':['mm', 'in'],
-
-		'd1_err': ['mm', 'in'],
-		'd2_err': ['mm', 'in'],
-		'd3_err': ['mm', 'in'],
-		'd4_err': ['mm', 'in'],
-		'd5_err': ['mm', 'in'],
-		'rw_err': ['mm', 'in'],
-		'rid_err':['mm', 'in'],
-		'rod_err':['mm', 'in'],
-
-
-		'clr_min': ['mm', 'in'],
-		'clr_max': ['mm', 'in'],
-
-		'clrm_min': ['mm', 'in'],
-		'clrm_max': ['mm', 'in']
+		'dimension': ['mm', 'in'] // ezpz
 	}
 
 	function init() {
@@ -404,34 +381,34 @@ input {
 			</tr>
 			<tr id="d1_row">
 				<th class="rowlabel" id="d1_label"></th>
-				<td><input id="d1"></td>
+				<td><input class="unit" id="d1" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="d1_err"></td>
-				<td class="unit" id="unit_d1"></td>
+				<td><input class="unit" id="d1_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_d1" data-unit="dimension" ></td>
 			</tr><tr id="d2_row">
 				<th class="rowlabel" id="d2_label"></th>
-				<td><input id="d2"></td>
+				<td><input class="unit" id="d2" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="d2_err"></td>
-				<td class="unit" id="unit_d2"></td>
+				<td><input class="unit" id="d2_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_d2" data-unit="dimension" ></td>
 			</tr><tr id="d3_row">
 				<th class="rowlabel" id="d3_label"></th>
-				<td><input id="d3"></td>
+				<td><input class="unit" id="d3" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="d3_err"></td>
-				<td class="unit" id="unit_d3"></td>
+				<td><input class="unit" id="d3_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_d3" data-unit="dimension" ></td>
 			</tr><tr id="d4_row">
 				<th class="rowlabel" id="d4_label"></th>
-				<td><input id="d4"></td>
+				<td><input class="unit" id="d4" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="d4_err"></td>
-				<td class="unit" id="unit_d4"></td>
+				<td><input class="unit" id="d4_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_d4" data-unit="dimension" ></td>
 			</tr><tr id="d5_row">
 				<th class="rowlabel" id="d5_label"></th>
-				<td><input id="d5"></td>
+				<td><input class="unit" id="d5" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="d5_err"></td>
-				<td class="unit" id="unit_d5"></td>
+				<td><input class="unit" id="d5_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_d5" data-unit="dimension" ></td>
 			</tr>
 
 			<tr>
@@ -442,22 +419,22 @@ input {
 			</tr>
 			<tr>
 				<th class="rowlabel">Ring Width</th>
-				<td><input id="rw" onkeyup="clearDashSize()"></td>
+				<td><input class="unit" id="rw"  data-unit="dimension" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="rw_err"></td>
-				<td class="unit" id="unit_rw"></td>
+				<td><input class="unit" id="rw_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_rw" data-unit="dimension" ></td>
 			</tr><tr>
 				<th class="rowlabel">Ring ID</th>
-				<td><input id="rid" onkeyup="clearDashSize()"></td>
+				<td><input class="unit" id="rid"  data-unit="dimension" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="rid_err"></td>
-				<td class="unit" id="unit_rid"></td>
+				<td><input class="unit" id="rid_err" data-unit="dimension" ></td>
+				<td class="unit" id="unit_rid" data-unit="dimension" ></td>
 			</tr><tr>
 				<th class="rowlabel">Ring OD</th>
-				<td><input id="rod" readonly></td>
+				<td><input class="unit" id="rod"  data-unit="dimension" readonly></td>
 				<td class="tiny">&#177;</td>
-				<td><input id="rod_err" readonly></td>
-				<td class="unit" id="unit_rod"></td>
+				<td><input class="unit" id="rod_err"  data-unit="dimension" readonly></td>
+				<td class="unit" id="unit_rod" data-unit="dimension" ></td>
 			</tr>
 		</table>
 	</div>
