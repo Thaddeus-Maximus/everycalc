@@ -42,7 +42,10 @@
 		'm_ball':     		 ['kg', 'lbm', 'lbm'],
 		'm_ball_err': 		 ['kg', 'lbm', 'deg'],
 		'omega_initial': 	 ['RPM', 'RPM', 'RPM'],
-		'omega_initial_err': ['RPM', 'RPM', 'RPM']
+		'omega_initial_err': ['RPM', 'RPM', 'RPM'],
+
+		'chart_y': ['m',   'ft',  'in'],
+		'chart_x': ['m',   'ft',  'in']
 	};
 
     function selectMode() {
@@ -75,13 +78,14 @@
 
 		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	setError(1);
 
 		    	if (key==13) {
-		    		compute(true);
-		    	} else {
-		    		compute(false);
+		    		compute();
 		    	}
 			});
+
+		compute();
 	}
 
 	function interp1D(xs, ys, xq) {
@@ -96,21 +100,21 @@
 		return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
 	}
 
-	/*function convert_to_array(xyn, to) {
+	function convert_to_array(xyn, to) {
 		newxyn = [];
 		for(i=0;i<xyn.length;i++) {
 			l = [];
 			if (typeof xyn[i] === 'object') {
 				for(j=0;j<xyn[i].length;j++) {
-					l.push(convert_to(xyn[i][j], to));
+					l.push(convertTo(xyn[i][j], to));
 				}
 				newxyn.push(l);
 			} else {
-				newxyn.push(convert_to(xyn[i], to));
+				newxyn.push(convertTo(xyn[i], to));
 			}
 		}
 		return newxyn;
-	}*/
+	}
 
 	function computeTrajectory(params_pack) {
 		[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = params_pack;
@@ -131,9 +135,9 @@
 		xl=x; xh=x;
 
 		dt = xtarg/v/100;
-		res_ctr = [[x],[y]];
-		res_low = [[],[]];
-		res_high = [[],[]];
+		res_ctr = {x:[x], y:[y]};
+		res_low = {x:[], y:[]};
+		res_high = {x:[], y:[]};
 
 		y_low=0;
 		y_high=0;
@@ -168,21 +172,21 @@
 				tof = t;
 			}
 
-			res_ctr[0] .push(x);
-			res_ctr[1] .push(y);
-			res_low[0] .push(xl);
-			res_low[1] .push(yl);
-			res_high[0].push(xh);
-			res_high[1].push(yh);
+			res_ctr.x.push(x);
+			res_ctr.y.push(y);
+			res_low.x.push(xl);
+			res_low.y.push(yl);
+			res_high.x.push(xh);
+			res_high.y.push(yh);
 
 			i+=1;
 		}
 
 		stats = {
-			'y_low':  interp1D(res_low[0],res_low[1], 0),
-			'y_high': interp1D(res_high[0],res_high[1], 0),
-			'y_ctr':  interp1D(res_ctr[0],res_ctr[1], 0),
-			'ang':    Math.atan(interp1DSlope(res_ctr[0],res_ctr[1], 0)),
+			'y_low':  interp1D(res_low.x,  res_low.y, 0),
+			'y_high': interp1D(res_high.x, res_high.y, 0),
+			'y_ctr':  interp1D(res_ctr.x,  res_ctr.y, 0),
+			'ang':    Math.atan(interp1DSlope(res_ctr.x,res_ctr.y, 0)),
 			'tof':    tof,
 			'sv':     v 
 		}
@@ -192,25 +196,26 @@
 
 	let g = 9.81; // acceleration due to gravity
 
-	function compute(simulate) {
+	function compute() {
+		try{
 		params_list = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
 		params_pack = [];
 		for (j=0; j<params_list.length; j++) {
-			params_pack.push(gidv(params_list[j]));
+			params_pack.push(getV(params_list[j]));
 		}
 
 		mode = document.getElementById('mode').value;
 		var x,y,v,theta;
 		if (mode=='raw') {
     		// nothing special
-    		x = gidv('x_target');
-    		y = gidv('y_target');
-    		theta = gidv('theta');
-    		v = gidv('v_initial');
+    		x = getV('x_target');
+    		y = getV('y_target');
+    		theta = getV('theta');
+    		v = getV('v_initial');
     	} else if (mode=='find_theta') {
-    		x = gidv('x_target');
-    		y = gidv('y_target') - gidv('y_initial');
-    		v = gidv('v_initial');
+    		x = getV('x_target');
+    		y = getV('y_target') - getV('y_initial');
+    		v = getV('v_initial');
 
     		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
     		// take ballistic target, spread it open
@@ -220,14 +225,14 @@
     			ya = 0;
     			yb = 45*Math.PI/180;
     		}
-    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
-    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
     		// use bisection to solve
     		while(j<100) {
 				yc = (ya+yb)/2;
-    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-				if (Math.abs(fc)<gidv('h_target')/100) break;
+				if (Math.abs(fc)<getV('h_target')/100) break;
 
 				if (sign(fc) == sign(fa)){
 					fa = fc;
@@ -240,11 +245,11 @@
 			}
 			theta = yc;
     		
-    		gids('theta', theta);
+    		setV('theta', theta);
     	} else if (mode=='find_v') {
-    		x = gidv('x_target');
-    		y = gidv('y_target') - gidv('y_initial');
-    		theta = gidv('theta');
+    		x = getV('x_target');
+    		y = getV('y_target') - getV('y_initial');
+    		theta = getV('theta');
 
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
     		
@@ -252,14 +257,14 @@
     			// take ballistic target, spread it open
 	    		ya = v*0.5;
 	    		yb = v*1.5;
-	    		params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-					if (Math.abs(fc)<gidv('h_target')/100) break;
+					if (Math.abs(fc)<getV('h_target')/100) break;
 
 					if (sign(fc) == sign(fa)){
 						fa = fc;
@@ -272,21 +277,21 @@
 				}
 				v = yc;
     		}
-    		gids('v_initial', v);
+    		setV('v_initial', v);
     	} else if (mode=='find_min_v') {
-    		x = gidv('x_target');
-    		y = gidv('y_target') - gidv('y_initial');
+    		x = getV('x_target');
+    		y = getV('y_target') - getV('y_initial');
 
     		theta = Math.atan(y/x + Math.sqrt(y*y/x/x+1));
     		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
 
-    		gids('theta', theta);
-    		gids('v_initial', v);
+    		setV('theta', theta);
+    		setV('v_initial', v);
     	} else if (mode=='find_distance_far') {
     		// There are two positions...
-    		theta = gidv('theta');
-    		v     = gidv('v_initial');
-    		y     = gidv('y_target') - gidv('y_initial');
+    		theta = getV('theta');
+    		v     = getV('v_initial');
+    		y     = getV('y_target') - getV('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
 
@@ -294,14 +299,14 @@
     			// take ballistic target, spread it open
 	    		ya = x*0.5;
 	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-					if (Math.abs(fc)<gidv('h_target')/100) break;
+					if (Math.abs(fc)<getV('h_target')/100) break;
 
 					if (sign(fc) == sign(fa)){
 						fa = fc;
@@ -315,12 +320,12 @@
 				x = yc;
     		}
 
-    		gids('x_target', x);
+    		setV('x_target', x);
     	} else if (mode=='find_distance_near') {
     		// There are two positions...
-    		theta = gidv('theta');
-    		v     = gidv('v_initial');
-    		y     = gidv('y_target') - gidv('y_initial');
+    		theta = getV('theta');
+    		v     = getV('v_initial');
+    		y     = getV('y_target') - getV('y_initial');
 
     		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
 
@@ -328,14 +333,14 @@
     			// take ballistic target, spread it open
 	    		ya = x*0.5;
 	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-					if (Math.abs(fc)<gidv('h_target')/100) break;
+					if (Math.abs(fc)<getV('h_target')/100) break;
 
 					if (sign(fc) == sign(fa)){
 						fa = fc;
@@ -349,7 +354,7 @@
 				x = yc;
     		}
 
-    		gids('x_target', x);
+    		setV('x_target', x);
     	}
 
     	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'strike_v', 'strike_v_err', 'time_of_flight', 'time_of_flight_err']
@@ -359,20 +364,16 @@
 	    	document.getElementById(id).classList.add(isNaN(v)||isNaN(x)||isNaN(y)||isNaN(theta) ? 'error':'uncomputed');
     	}
 
-
-		simulate = typeof simulate !== 'undefined' ? simulate : true;
-		if(!simulate) return; // lol you gotta simulate this
-
 		max_low       = +Infinity;
 		max_low_stat  = {};
-		max_low_run   = [];
+		max_low_run   = {};
 		max_high      = -Infinity;
 		max_high_stat = {};
-		max_high_run  = [];
+		max_high_run  = {};
 		params_var_list  = [];
 		params_var_count = 0;
 		for (param of params_list) {
-			if (gidv(param+'_err')) {
+			if (getV(param+'_err')) {
 				params_var_list.push(true);
 				params_var_count++;
 			} else {
@@ -386,10 +387,10 @@
 			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
 				if (params_var_list[j]) {
-					params.push(gidv(params_list[j]) + (bitTest(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					params.push(getV(params_list[j]) + (bitTest(i,pvc) ? 1:-1)*getV(params_list[j]+'_err'));
 					pvc ++;
 				} else {
-					params.push(gidv(params_list[j]));
+					params.push(getV(params_list[j]));
 				}
 			}
 			run = computeTrajectory(params);
@@ -404,27 +405,31 @@
 				max_high_stat = run[3];
 			}
 		}
-		
-		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
-		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
-		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target'), gidv('x_obstacle'), gidv('h_obstacle')], inputs_unit_map['y_target'][unit_sys] ) ;
+
+		targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP['y_target'][UNIT_sys] ) ;
       	drawPlot(max_low_run, max_high_run, targetstuff, 
-      		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
+      		(max_high_stat.y_high > getV('y_target')+getV('h_target')/2) || (max_low_stat.y_low < getV('y_target')-getV('h_target')/2));
 
 		for (id of computable_ids){
 			document.getElementById(id).classList.remove('error');    
 	    	document.getElementById(id).classList.remove('uncomputed');    	
 		}
-      	gids('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
-      	gids('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
-      	gids('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
-      	gids('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
-      	gids('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
-      	gids('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
-      	gids('strike_v',      (max_high_stat['sv']   +max_low_stat['sv'])/2);
-      	gids('strike_v_err',  Math.abs(max_high_stat['sv']-max_low_stat['sv'])/2);
-      	gids('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
-      	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
+      	setV('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
+      	setV('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
+      	setV('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
+      	setV('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
+      	setV('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
+      	setV('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
+      	setV('strike_v',      (max_high_stat['sv']   +max_low_stat['sv'])/2);
+      	setV('strike_v_err',  Math.abs(max_high_stat['sv']-max_low_stat['sv'])/2);
+      	setV('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
+      	setV('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
+      }catch(err){
+		console.log(err);
+		setError(2, err);
+		return;      	
+      }
+      setError(0);
 	}
 
 	/*function cleanRun(run) {
@@ -440,12 +445,43 @@
 
 	function drawPlot(low_run, high_run, targetstuff, missed) {
 		PLOT_drawLinePlot({
-
+			multiChannelBehavior: "merge2",
+			chartName: "chart",
+			axes: {
+				x: {
+					numTicks: 10,
+					boxEnds: false,
+					negativeHandling: 'fitzero',
+					margin: 15
+				},
+				y: {
+					numTicks: 6,
+					boxEnds: true,
+					negativeHandling: 'posonly',
+					margin: 5
+				}
+			},
+			datasets: {
+				x: {
+					axis: 'x'
+				},
+				y: {
+					axis: 'y'
+				}
+			},
+			queries: {}
 		},
 		[low_run, high_run],
 		function(e){} );
 
-		shot_area = document.getElementById('chart_shot_area');
+		[target_x, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
+
+		let svg = document.getElementById("chart");
+		let plotScaling = svg.PLOT_config.scaling;
+		let xScaling    = svg.PLOT_config.datasets.x.scaling;
+		let yScaling    = svg.PLOT_config.datasets.y.scaling;
+
+		shot_area = document.getElementById('chart_y_line');
 
 		target_low  = document.getElementById('chart_target_low');
 		target_high = document.getElementById('chart_target_high');
@@ -459,23 +495,21 @@
 		target_high.setAttribute("points","");
 		obstacle   .setAttribute("points","");
 
-		scaling = [x0, y0, xf, yf, d_min, d_max, h_max];
-		// TODO: use PLOT_makePoint 
-		target_low.points.appendItem(makept(scaling,      0, 			0));
-		target_low.points.appendItem(makept(scaling,      0, 			target_h-target_diam/2));
-		target_low.points.appendItem(makept(scaling,      0+target_h/5,  target_h-target_diam/2));
-		target_low.points.appendItem(makept(scaling,      0+target_h/5,  0));
+		target_low.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,      0, 			0));
+		target_low.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,      0, 			target_h-target_diam/2));
+		target_low.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,      0+target_h/5,  target_h-target_diam/2));
+		target_low.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,      0+target_h/5,  0));
 
-		target_high.points.appendItem(makept(scaling,     0,				target_h+target_diam));
-		target_high.points.appendItem(makept(scaling,     0, 			target_h+target_diam/2));
-		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam/2));
-		target_high.points.appendItem(makept(scaling,     0+target_h/5,  target_h+target_diam));
+		target_high.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,     0,				target_h+target_diam));
+		target_high.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,     0, 			target_h+target_diam/2));
+		target_high.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,     0+target_h/5,  target_h+target_diam/2));
+		target_high.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling,     0+target_h/5,  target_h+target_diam));
 
-		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
-		obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, 0));
-		//obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
-		obstacle.points.appendItem(makept(scaling, x_obstacle, h_obstacle));
-		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
+		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle, 0));
+		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle+h_obstacle/7, 0));
+		//obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle+h_obstacle/7, h_obstacle));
+		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle, h_obstacle));
+		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle, 0));
 	}
 
 </script>
@@ -509,17 +543,10 @@
 		<div class="even" style=''>
 			<table>
 				<tr>
-					<td>
-					  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()" checked> English
-					</td><td>
-					  <input type="radio" id="unit_inches" name="unit" value="inches" onclick="switch_units()">
-					  Inches
-					</td><td>
-					  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()"> Metric
-					</td><td class="rowlabel">
+					<td class="rowlabel">
 						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
 					</td><td>
-						<select id="mode" onchange="selectMode(); compute();">
+						<select id="mode" onchange="selectMode(); compute();" class="doublewide">
 							<option value="raw" selected='selected'>Blind Adjustment</option>
 							<option value="find_theta">Find Angle</option>
 							<option value="find_v">Find Velocity</option>
@@ -605,7 +632,7 @@
 			</table>
 		</div><div class="output" style='display:table-cell'>
 			<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
-			<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>
+			<!--<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>-->
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
@@ -640,7 +667,7 @@
 				<tr>
 					<th class='rowlabel' colspan=2 class="toggle_button">Pro-Tips</th>
 					<td>
-						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
+						<button type="button" onclick="collapseTable('protips');" id='toggle_detail_protips'>&#9650;</button>
 					</td>
 				</tr>
 				<tr>
@@ -695,7 +722,7 @@
 		opacity=1.0
 		points=""/>
 	<polyline
-		id='chart_y'
+		id='chart_y_line'
 		fill='#3a6a30'
 		stroke='#3a6a30'
 		stroke-width=2

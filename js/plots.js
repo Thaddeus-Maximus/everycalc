@@ -272,20 +272,22 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	} else if (config.multiChannelBehavior == 'merge2') {
 		channels_conv = [];
 		for (run of channels) {
+			let cconv = {};
 			for (name in run) {
 				let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
 				if (unit){
-					channels_conv[name] = convertTo(run[name], unit[UNIT_sys]);
+					cconv[name] = convertTo(run[name], unit[UNIT_sys]);
 				}
 				else{
-					channels_conv[name] = run[name];
+					cconv[name] = run[name];
 				}
 			}
+			channels_conv.push(cconv);
 		}
 		// build channels_stitched
 		channels_stitched = {};
-		for (name in run[0]) {
-			channels_conv[0][name].concat(channels_conv[1][name].reverse());
+		for (name in channels_conv[0]) {
+			channels_stitched[name] = channels_conv[0][name].concat(channels_conv[1][name].reverse());
 		}
 	}
 
@@ -325,7 +327,9 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	}
 
 	config.axes.x.scaling = PLOT_computeScaling(config.axes.x, mins.x, maxs.x);
-	if (config.axes.z.syncWithY) {
+	if (typeof config.axes.z == 'undefined') {
+		config.axes.y.scaling = PLOT_computeScaling(config.axes.y, mins.y, maxs.y);
+	} else if (config.axes.z.syncWithY) {
 		let scaling = PLOT_computeScaling(config.axes.y, mins.y.concat(mins.z), maxs.y.concat(maxs.z));
 		// deep copy
 		config.axes.y.scaling = {...scaling};
@@ -353,11 +357,8 @@ function PLOT_drawLinePlot(config, channels, handler) {
 			}
 		}
 		config.axes[axis].datasets = dsnames[axis];
+		PLOT_drawTicks(config.chartName, axis, config.scaling, config.axes[axis].scaling, config.axes[axis].margin);
 	}
-
-	PLOT_drawTicks(config.chartName, 'x', config.scaling, config.axes.x.scaling, config.axes.x.margin);
-	PLOT_drawTicks(config.chartName, 'y', config.scaling, config.axes.y.scaling, config.axes.y.margin);
-	PLOT_drawTicks(config.chartName, 'z', config.scaling, config.axes.z.scaling, config.axes.z.margin);
 
 	// reap your hard work
 
