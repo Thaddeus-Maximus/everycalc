@@ -15,7 +15,10 @@ function MOTOR_setupMotorSelect(select_id) {
 }
 
 function MOTOR_getSpecs(motor,key){
-	return MOTOR_specs[motor][key];
+	if (key=="max_rpm")
+		return convertFrom(MOTOR_specs[motor][key], 'RPM');
+	else
+		return MOTOR_specs[motor][key];
 }
 
 var MOTOR_specs = {
