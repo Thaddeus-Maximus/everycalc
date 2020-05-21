@@ -57,10 +57,20 @@ function interpIdx(xs, xq) {
 	return i;
 }
 
+function interp1DSlope(xs, ys, xq) {
+	i;
+	for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
+	return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
+}
+
 function NaNto1(x) {
 	if (isNaN(x))
 		return 1;
 	return x;
+}
+
+function bitTest(num, bit){
+    return ((num>>bit) % 2 != 0)
 }
 
 /*

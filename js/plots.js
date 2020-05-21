@@ -205,8 +205,10 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 - <polylines> with ids SVGid_channelName_line for each channel you wish to plot
 
 @var channels = {channelName: [list,of,datapoints], ... }
+	OR: [list, of, {channelName: [list,of,datapoints], ... }] (see trajectory for example)
 
 @var config = {
+	multiChannelBehavior: "merge2",
 	chartName: "chart_name", // corresponds to the id of the svg element
 	axes: {	
 		x: {
@@ -249,14 +251,41 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 }
  */
 function PLOT_drawLinePlot(config, channels, handler) {
-	channels_conv = {};
-	for (name in channels) {
-		let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
-		if (unit){
-			channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
+	// check based on config.multiChannelBehavior; undefined means simple lineplot
+	// merge2 means take the two channel sets (they should be in a list) and stitch them back-to-back
+	// channels_conv should be just a converted version of channels
+	// channels_stitched should be channels that are ready for plotting
+	let channels_conv = null;
+	let channels_stitched = null;
+	if (typeof config.multiChannelBehavior == 'undefined'){
+		channels_conv = {};
+		for (name in channels) {
+			let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
+			if (unit){
+				channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
+			}
+			else{
+				channels_conv[name] = channels[name];
+			}
 		}
-		else{
-			channels_conv[name] = channels[name];
+		channels_stitched = channels_conv;
+	} else if (config.multiChannelBehavior == 'merge2') {
+		channels_conv = [];
+		for (run of channels) {
+			for (name in run) {
+				let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
+				if (unit){
+					channels_conv[name] = convertTo(run[name], unit[UNIT_sys]);
+				}
+				else{
+					channels_conv[name] = run[name];
+				}
+			}
+		}
+		// build channels_stitched
+		channels_stitched = {};
+		for (name in run[0]) {
+			channels_conv[0][name].concat(channels_conv[1][name].reverse());
 		}
 	}
 
@@ -283,9 +312,9 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	for (name in config.datasets) {
 		let axis = config.datasets[name].axis;
 		mins[axis].push(
-			Math.min(...channels_conv[name]) );
+			Math.min(...channels_stitched[name]) );
 		maxs[axis].push(
-			Math.max(...channels_conv[name]) );
+			Math.max(...channels_stitched[name]) );
 		dsnames[axis].push(name);
 
 		if (config.datasets[name].axis != 'x') {
@@ -333,11 +362,11 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	// reap your hard work
 
 	let xScl  = config.datasets[dsnames.x[0]].scaling;
-	let xChnl = channels_conv[dsnames.x[0]];
+	let xChnl = channels_stitched[dsnames.x[0]];
 	for (name in config.datasets) {
 		if (config.datasets[name].axis == 'x') continue;
 
-		let fChnl = channels_conv[name];
+		let fChnl = channels_stitched[name];
 		let fScl  = config.datasets[name].scaling
 
 		for (i in xChnl) {
@@ -355,6 +384,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	config.dom.svg.PLOT_config = config;
 	config.dom.svg.PLOT_channels = channels;
 	config.dom.svg.PLOT_channelsConv = channels_conv;
+	config.dom.svg.PLOT_channelsStitched = channels_stitched;
 
 	if (!handler) {
 		handler = function(e) {
@@ -423,14 +453,4 @@ function PLOT_focusHandler(chart, event) {
 
 	document.getElementById(config.chartName).lastQuery = tq;
 	return tq; // helpful for further processing upstream
-}
-
-/*
- * Draw an area plot
- * Area plots have an x axis, a y axis, and a z axis (the axis opposed to y, not an axis that is orthoganal to both x and y)
- * Area plots are closed; they fill in the zone between channels_a and channels_b
- * This actually doesn't handle plot labels at all. That's up to you (to let the UNIT module take care of it)
- */
-function PLOT_drawAreaPlot(config, channels_a, channels_b) {
-	// probably just process the channels and hand it off to drawLinePlot to have fun
 }

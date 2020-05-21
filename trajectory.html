@@ -2,9 +2,8 @@
 <link rel="stylesheet" href="include/style.css"> 
 <script type="text/javascript" src="include/specs.js"></script>
 <script type="text/javascript">
-
-	unit_sys = 1;
-	inputs_unit_map = {
+	EXP_FN_BASE = 'trajectory';
+	UNIT_MAP = {
 		'theta': 			['deg', 'deg', 'deg'],
 		'theta_err': 		['deg', 'deg', 'deg'],
 		'v_initial':     	['m/s', 'ft/s','in/s'],
@@ -37,34 +36,7 @@
 		'omega_initial_err': ['RPM', 'RPM', 'RPM']
 	};
 
-	function populate_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else if (document.getElementById('unit_english').checked)
-			unit_sys = 1;
-		else
-			unit_sys = 2;
-
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
-			}
-		}
-
-
-
-		document.getElementById(chart_name+'_x_label').innerHTML = 'Distance ['+inputs_unit_map['y_target'][unit_sys]+']';
-		document.getElementById(chart_name+'_y_label').innerHTML = 'Height ['+inputs_unit_map['y_target'][unit_sys]+']';
-	}
-
-	function switch_units() {
-		populate_units();
-		compute();
-	}
-
-    function mode_select() {
+    function selectMode() {
     	var mode = document.getElementById('mode').value;
     	document.getElementById('x_target').readOnly = false;
     	if (mode=='raw') {
@@ -86,49 +58,15 @@
     	}
     }
 
-	function gidv(id) {
-		var v =  document.getElementById(id).value;
-		if (typeof v === 'string' && v.slice(-1) == '%') {
-			v = eval(document.getElementById(id.slice(0,-4)).value)*eval(v.slice(0,-1)/100);
-		} else if (v=='') {
-			v = 0;
-		
-		} else {
-			v = eval(v);
-		}
-		
-		if (typeof inputs_unit_map[id] !== 'undefined') {
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		}
-		return v;
-	}
-
-	function gids(id, value, places) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof value === 'string') {
-			document.getElementById(id).value = value;
-		} else {
-			if (typeof inputs_unit_map[id] !== 'undefined'){
-
-				
-				value = convert_to(value, inputs_unit_map[id][unit_sys]);
-			}
-			document.getElementById(id).value = value.toFixed(places);
-		}
-	}
-
-	function thload() {
-		document.getElementById('topbar_version').innerHTML = VERSION;
-		if(packed_inputs) unpack_inputs();
-		populate_units();
-		mode_select();
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
+		selectMode();
 
 		var inputs, index;
 
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-		    inputs[index].onkeyup = function(e) {
+		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 
 		    	if (key==13) {
@@ -136,46 +74,22 @@
 		    	} else {
 		    		compute(false);
 		    	}
-		    }
-		}
-
-		compute(true);
+			});
 	}
 
-	function collapse(id) {
-		tbl = document.getElementById('table_'+id);
-
-		btn = document.getElementById('toggle_detail_'+id);
-		if(tbl.rows[1].style['display'] != 'none') {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
-			btn.innerHTML = "&#9660";
-		} else {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
-			btn.innerHTML = "&#9650";
-		}
-	}
-		
-	function sign(x) {
-		if (x>0) return 1;
-		if (x<0) return -1;
-		return 0;
-	}
-
-	en_vm = true;
-
-	function linterp(xs, ys, xq) {
+	function interp1D(xs, ys, xq) {
 		i;
 		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
 		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
 	}
 
-	function linterpder(xs, ys, xq) {
+	function interp1Dder(xs, ys, xq) {
 		i;
 		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
 		return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
 	}
 
-	function convert_to_array(xyn, to) {
+	/*function convert_to_array(xyn, to) {
 		newxyn = [];
 		for(i=0;i<xyn.length;i++) {
 			l = [];
@@ -189,9 +103,9 @@
 			}
 		}
 		return newxyn;
-	}
+	}*/
 
-	function run_sim(params_pack) {
+	function computeTrajectory(params_pack) {
 		[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = params_pack;
 		
 		rho = 1.1839; // kg/m^3
@@ -258,10 +172,10 @@
 		}
 
 		stats = {
-			'y_low':  linterp(res_low[0],res_low[1], 0),
-			'y_high': linterp(res_high[0],res_high[1], 0),
-			'y_ctr':  linterp(res_ctr[0],res_ctr[1], 0),
-			'ang':    Math.atan(linterpder(res_ctr[0],res_ctr[1], 0)),
+			'y_low':  interp1D(res_low[0],res_low[1], 0),
+			'y_high': interp1D(res_high[0],res_high[1], 0),
+			'y_ctr':  interp1D(res_ctr[0],res_ctr[1], 0),
+			'ang':    Math.atan(interp1DSlope(res_ctr[0],res_ctr[1], 0)),
 			'tof':    tof,
 			'sv':     v 
 		}
@@ -269,11 +183,7 @@
 		return [res_low, res_ctr, res_high, stats];
 	}
 
-	function bit_test(num, bit){
-	    return ((num>>bit) % 2 != 0)
-	}
-
-	g = 9.81;
+	let g = 9.81; // acceleration due to gravity
 
 	function compute(simulate) {
 		params_list = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
@@ -303,12 +213,12 @@
     			ya = 0;
     			yb = 45*Math.PI/180;
     		}
-    		params_pack[1] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
-    		params_pack[1] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
     		// use bisection to solve
     		while(j<100) {
 				yc = (ya+yb)/2;
-    			params_pack[1] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 
 				if (Math.abs(fc)<gidv('h_target')/100) break;
 
@@ -335,12 +245,12 @@
     			// take ballistic target, spread it open
 	    		ya = v*0.5;
 	    		yb = v*1.5;
-	    		params_pack[0] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[0] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[0] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 
 					if (Math.abs(fc)<gidv('h_target')/100) break;
 
@@ -377,12 +287,12 @@
     			// take ballistic target, spread it open
 	    		ya = x*0.5;
 	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 
 					if (Math.abs(fc)<gidv('h_target')/100) break;
 
@@ -411,12 +321,12 @@
     			// take ballistic target, spread it open
 	    		ya = x*0.5;
 	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = run_sim(params_pack)[3].y_ctr - gidv('y_target');
-	    		params_pack[3] = yb; fb = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
+	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
 					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = run_sim(params_pack)[3].y_ctr - gidv('y_target');
+	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - gidv('y_target');
 
 					if (Math.abs(fc)<gidv('h_target')/100) break;
 
@@ -469,13 +379,13 @@
 			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
 				if (params_var_list[j]) {
-					params.push(gidv(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
+					params.push(gidv(params_list[j]) + (bitTest(i,pvc) ? 1:-1)*gidv(params_list[j]+'_err'));
 					pvc ++;
 				} else {
 					params.push(gidv(params_list[j]));
 				}
 			}
-			run = run_sim(params);
+			run = computeTrajectory(params);
 			if (run[3]['y_low'] < max_low)   {
 				max_low      = run[3]['y_low'];
 				max_low_run  = run[0];
@@ -491,7 +401,7 @@
 		max_low_run  = convert_to_array(max_low_run,  inputs_unit_map['y_target'][unit_sys]);
 		max_high_run = convert_to_array(max_high_run, inputs_unit_map['y_target'][unit_sys]);
 		targetstuff  = convert_to_array([gidv('x_target'), gidv('y_target'), gidv('h_target'), gidv('x_obstacle'), gidv('h_obstacle')], inputs_unit_map['y_target'][unit_sys] ) ;
-      	drawchart(max_low_run, max_high_run, targetstuff, 
+      	drawPlot(max_low_run, max_high_run, targetstuff, 
       		(max_high_stat.y_high > gidv('y_target')+gidv('h_target')/2) || (max_low_stat.y_low < gidv('y_target')-gidv('h_target')/2));
 
 		for (id of computable_ids){
@@ -510,156 +420,25 @@
       	gids('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
 	}
 
-	function NaNtoerr(x) {
-		if (isNaN(x)) return '-'; return x;
-	}
-
-
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-</script>
-
-<script type="text/javascript">
-	function makeTicks(start_at, go_to, num_to_print, n) {
-		//if (Math.min(maxes) < 0) return [0];
-
-		
-		if(start_at < 0) { //  thats not very general purpose of u
-			h = (-start_at)/n;
-			base = Math.floor(Math.log10(h)-Math.log10(5));
-			H = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
-
-			ticks = [];
-			ticksstr = [];
-			for(var i=-1; i<n+1; i++) {
-				ticks.unshift(-H*i);
-				labelstr = (-H*i).toFixed(base > 0 ? 0:-base);
-				ticksstr.unshift(labelstr);
-			}
-		} else {
-			h = (go_to)/n;
-			base = Math.floor(Math.log10(h)-Math.log10(5));
-			H = Math.round(h/Math.pow(10, base))*Math.pow(10, base);
-
-			ticks = [];
-			ticksstr = [];
-			for(var i=0; i<n+1; i++) {
-				ticks.push(H*i);
-				labelstr = (H*i).toFixed(base > 0 ? 0:-base);
-				ticksstr.push(labelstr);
-			}
-		}
-		return [ticks, ticksstr];
-	}
-
-	function sign(x) {
-		if(x>0) return 1;
-		if(x<0) return -1;
-		return 0;
-	}
-
-	chart_name = 'chart';
-
-	function drawTicks(axis, ticklabels, ff, f0, gf, g0, marg) {
-		altaxis = axis == 'x' ? 'y':'x';
-		realaxis = axis == 'z' ? 'y':axis;
-		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
-		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
-
-		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
-		while(labels.firstChild) labels.removeChild(labels.firstChild);
-
-		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
-
-		for (i in ticklabels) {
-			line = document.createElementNS('http://www.w3.org/2000/svg','line');
-			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(i/(ticklabels.length-1));
-			line.setAttribute(realaxis+'1', fp);
-			line.setAttribute(realaxis+'2', fp);
-			line.setAttribute('class', 'grid');
-			xgrid.append(line);
-
-			label = document.createElementNS('http://www.w3.org/2000/svg','text');
-			label.setAttribute(altaxis, gfl);
-			label.setAttribute(realaxis, fp);
-			label.innerHTML = ticklabels[i];
-			labels.append(label);
-		}
-	}
-
-	function clean_run(run) {
+	/*function cleanRun(run) {
 		for (var i=run[0].length-1; i>0; i--) {
 			if (run[0][i] < 0) {
-				yint = linterp(run[0], run[1], 0);
+				yint = interp1D(run[0], run[1], 0);
 				arr = [run[0].slice(0,i-1).concat(0), run[1].slice(0,i-1).concat(yint)];
 
 				return arr;
 			}
 		} 
-		
-	}
+	}*/
 
+	function drawPlot(low_run, high_run, targetstuff, missed) {
+		PLOT_drawLinePlot({
 
-	function makept(scaling, xq, yq) {
-		[x0, y0, xf, yf, xl, xm, ym] = scaling;
-		var pt = svg.createSVGPoint();
-		pt.x = x0 + (xf-x0)/(xm-xl)*(xq-xl);
-		pt.y = y0 + (yf-y0)/(ym-0)*yq;
-		return pt;
-	}
-
-	function drawchart(low_run, high_run, targetstuff, missed) {
-		[target_d, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
-		low_run = clean_run(low_run);
-		high_run = clean_run(high_run);
-
-		var d = low_run[0].concat(high_run[0].reverse());
-		var h = low_run[1].concat(high_run[1].reverse());
-
-		svg = document.getElementById('chart');
-		x_axis = document.getElementById('chart_x_axis');
-		y_axis = document.getElementById('chart_y_axis');
-
-		x0 = Math.min(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
-		xf = Math.max(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
-		y0 = Math.max(y_axis.y1.baseVal.value, y_axis.y2.baseVal.value);
-		yf = Math.min(y_axis.y1.baseVal.value, y_axis.y2.baseVal.value);
+		},
+		[low_run, high_run],
+		function(e){} );
 
 		shot_area = document.getElementById('chart_shot_area');
-		shot_area.setAttribute("points","");
-
-		maxht = Math.max(Math.max(...h), target_h+target_diam);
-		mindist = Math.min(...d);
-
-		[d_ticks, d_ticklabels] = makeTicks(mindist, 0, 1, 6);
-		[h_ticks, h_ticklabels] = makeTicks(0,    maxht, 1, 6);
-
-
-		d_max = d_ticks[d_ticks.length-1];
-		d_min = d_ticks[0];
-		h_max = h_ticks[h_ticks.length-1];
-
-		if (document.getElementById('equal_axes').checked) {
-			ideal_yf = y0 - (xf-x0)/(d_max-d_min) * h_max;
-			ideal_xf = x0 - (yf-y0)/(h_max) * (d_max-d_min);
-			if 		(ideal_yf > yf) yf = ideal_yf;
-			else if (ideal_xf < xf) xf = ideal_xf;
-		}
-
-		drawTicks('x', d_ticklabels, xf, x0, yf, y0, 15);
-		drawTicks('y', h_ticklabels, yf, y0, xf, x0, 5);
-		
-		for (i in d) {
-			//if(isNaN(d[i]) || isNaN(h[i])) continue;
-			var pt = svg.createSVGPoint();
-			pt.x = x0 + (xf-x0)/(d_max-d_min)*(d[i]-d_min);
-			pt.y = y0 + (yf-y0)/(h_max-0)*h[i];
-			chart_shot_area.points.appendItem(pt);
-		}
 
 		target_low  = document.getElementById('chart_target_low');
 		target_high = document.getElementById('chart_target_high');
@@ -674,6 +453,7 @@
 		obstacle   .setAttribute("points","");
 
 		scaling = [x0, y0, xf, yf, d_min, d_max, h_max];
+		// TODO: use PLOT_makePoint 
 		target_low.points.appendItem(makept(scaling,      0, 			0));
 		target_low.points.appendItem(makept(scaling,      0, 			target_h-target_diam/2));
 		target_low.points.appendItem(makept(scaling,      0+target_h/5,  target_h-target_diam/2));
@@ -689,200 +469,35 @@
 		//obstacle.points.appendItem(makept(scaling, x_obstacle+h_obstacle/7, h_obstacle));
 		obstacle.points.appendItem(makept(scaling, x_obstacle, h_obstacle));
 		obstacle.points.appendItem(makept(scaling, x_obstacle, 0));
-
-		/*
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = 0; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h-target_diam/2; target_low.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = 0; target_low.points.appendItem(pt);
-
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam/2; target_high.points.appendItem(pt);
-		var pt = svg.createSVGPoint(); pt.x = target_d+target_h/5; pt.y = target_h+target_diam; target_high.points.appendItem(pt);
-		*/
-
-		/*bg=document.getElementById('chart');
-
-		qline = document.getElementById('chart_query_line');
-		qline.setAttribute('opacity', 0);
-
-		gids('query_time', '-');
-		gids('query_d', '-');
-		gids('query_v', '-');
-		gids('query_cur', '-');
-		gids('query_f', '-');
-
-		handler = function(event){
-			if(event.buttons != 1) return;
-				xq = event.clientX - bg.getBoundingClientRect().left;
-				yq = event.clientY - bg.getBoundingClientRect().top;
-
-				tq = (t_max-0)/(xf-x0)*(xq-x0);
-				if (tq>Math.max(...t)){
-					tq = Math.max(...t);
-					xq = x0 + (xf-x0)/(t_max-0)*tq;
-				}
-				if (tq<0) {
-					tq=0; xq=x0;
-				}
-				dq   = linterp(t, d, tq);
-				vq   = linterp(t, v, tq);
-				curq = linterp(t, cur, tq);
-				fq   = linterp(t, f, tq);
-				qline.setAttribute('opacity', 1);
-
-				qline.setAttribute('x1', xq);
-				qline.setAttribute('x2', xq);
-
-				gids('query_time', tq);
-				gids('query_d', dq);
-				gids('query_v', vq);
-				gids('query_cur', curq);
-				gids('query_f', fq);
-			}
-		bg.addEventListener('mousemove', handler);
-		bg.addEventListener('mousedown', handler);*/
 	}
 
-</script>
-</script>
-
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-			if (input.type == "checkbox" || input.type == "radio") {
-				packed_inputs[input.id] = input.checked;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		for (key in packed_inputs) {
-			if (typeof packed_inputs[key] == "boolean")
-				document.getElementById(key).checked = packed_inputs[key];
-			else
-				document.getElementById(key).value   = packed_inputs[key];
-		}
-
-		loads = document.getElementsByClassName('load');
-		for (load of loads) {
-			load.identifier = load.firstChild.getAttribute('identifier');
-		}
-		for (btn of document.getElementsByClassName('toggle_button'))
-			btn.innerHTML = "&#9650;";
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&')
-	               .replace(/â–¼/g, '&#9650;');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'trajectory_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-	}
-
-	function print_page() {
-		window.print();
-	}
 </script>
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_fname'></div>
-	<div class="topbar_ctr">Trajectory Calculator</div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">Feet/Inches</option>
+			<option value=2>Inches</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Trajectory Calc</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
 </div>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 100%; float: left;" class="container">
 		<div class="even" style=''>
 			<table>
@@ -897,7 +512,7 @@
 					</td><td class="rowlabel">
 						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
 					</td><td>
-						<select id="mode" onchange="mode_select(); compute();">
+						<select id="mode" onchange="selectMode(); compute();">
 							<option value="raw" selected='selected'>Blind Adjustment</option>
 							<option value="find_theta">Find Angle</option>
 							<option value="find_v">Find Velocity</option>
@@ -1032,37 +647,27 @@
 			</table>
 		</div>
 	</div>
-	
+
 <div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
-<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
-  <title id="title">Position Chart</title>
-
-
-	<rect class="background" id="chart_background" x=70 y=20 width=710 height=430 />
-	<g class="x-grid">
-	  <line id="chart_x_axis" class="axes" x1="70" x2="780" y1="450" y2="450"></line>
-	</g>
-	<g class="y-grid">
-	  <line id="chart_y_axis" class="axes" x1="70" x2="70" y1="20" y2=450></line>
+<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:550px; width:800px;">
+	<rect class="plot-background" id="chart_background" x=70 y=20 width=710 height=430 />
+	<g>
+	  <line id="chart_x_axis" class="plot-axis" x1=70 x2=780 y1=450 y2=450></line>
+	  <line id="chart_y_axis" class="plot-axis" x1=70 x2=70  y1=20  y2=450></line>
 	</g>
 
-	<g class="x-grid" id="chart_x_grid"></g>
-	<g class="y-grid" id="chart_y_grid"></g>
+	<g class="plot-grid" id="chart_x_grid"></g>
+	<g class="plot-grid" id="chart_y_grid"></g>
 
-	<g class="labels x-labels" id='chart_x_labels'>
-	  <text x=375 y=485 class="label-title" id="chart_x_label">Distance [ft]</text>
+	<g class="plot-labels">
+	  <text x=375 y=485 class="plot-titlelabel" id="unit_label_x">Distance [ft]</text>
+
+	  <text x=-360 y=20 class="plot-titlelabel" transform="rotate(270)" id="unit_label_y">Height [ft]</text>
 	</g>
 
-	<g class="labels y-labels" id='chart_y_labels'>
-	  <text x=-360 y=20 class="label-title" transform="rotate(270)" id="chart_y_label">Height [ft]</text>
-	</g>
+	<g class="plot-axlabels" id='chart_x_axlabels'></g>
+	<g class="plot-axlabels" id='chart_y_axlabels'></g>
 
-	<g class="labels x-labels" id='chart_x_axis_labels'></g>
-	<g class="labels y-labels" id='chart_y_axis_labels'></g>
-
-	<g class="query-line">
-		<!--<line id="chart_query_line" x1=100 x2=100 y1=15 y2=455></line>-->
-	</g>
 	<polyline
 		id='chart_target_low'
 		fill="#444"
@@ -1083,7 +688,7 @@
 		opacity=1.0
 		points=""/>
 	<polyline
-		id='chart_shot_area'
+		id='chart_y'
 		fill='#3a6a30'
 		stroke='#3a6a30'
 		stroke-width=2
@@ -1091,8 +696,6 @@
 		points="
 		"/>
 </svg>			
-
-		</div>
-	</div>
+</div>
 </body>
 </html>
