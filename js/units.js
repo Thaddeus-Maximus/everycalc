@@ -27,16 +27,16 @@ function UNIT_change() {
 	UNIT_sys = document.getElementById('unit_select').value;
 
 	labels = document.getElementsByClassName('unit');
-	for (unit in labels) {
-		if (labels[unit].id && UNIT_MAP[labels[unit].id.substring(5)] ){
-			let varname = labels[unit].id.substring(5);
+	for (label of labels) {
+		let varname = label.dataset.unit;
+		if (varname && UNIT_MAP[varname] ){
 			let brktunit = '['+UNIT_MAP[varname][UNIT_sys]+']';
-			let oldstr = document.getElementById('unit_'+varname).innerHTML;
+			let oldstr = label.innerHTML;
 			let start = oldstr.indexOf('[');
 			if (start < 0)
-				document.getElementById('unit_'+varname).innerHTML = brktunit;
+				label.innerHTML = brktunit;
 			else
-				document.getElementById('unit_'+varname).innerHTML = oldstr.substring(0, start) + brktunit;
+				label.innerHTML = oldstr.substring(0, start) + brktunit;
 		}
 	}
 }

@@ -17,7 +17,7 @@
 	UNIT_MAP = {
 		'torque':     	['N-m', 'in-lbf'],
 		'pitch': 		['mm', 'mm'], // always metric pitches...
-		'dimensions': 	['mm', 'in'],
+		'dimension': 	['mm', 'in'],
 		// 'driver_val': 	['mm', 'in'], // this may make more sense to just handle with a computeFrom later on since it changes from teeth to length
 		'dval': 		['mm', 'in']
 	};
@@ -389,14 +389,14 @@
 			</tr><tr>
 				<th class="rowlabel">OD<span class="ttt">Outer diameter of the pulley / belt. Only valid for 5mm HTD belts currently.</span></th>
 				<!-- specify outputs as readonly. This can also be done dynamically in javascript with the .readOnly property. -->
-				<th><input id="p1_od" readonly /></th>
-				<th><input id="p2_od" readonly /></th>
+				<th><input id="p1_od" data-unit="dimension" readonly /></th>
+				<th><input id="p2_od" data-unit="dimension" readonly /></th>
 				<th id="center_add_label" class="rowlabel">Center Add<span class="ttt">Center to add. When using 'desired C-C' mode with polybelt, the additional extra is removed from the belt, not added to the center value.</span></th>
 				<th><input id="center_add" value=0.000  /></th>
 			</tr><tr>
 				<th class="rowlabel">PD</th>
-				<th><input id="p1_pd" readonly /></th>
-				<th><input id="p2_pd" readonly /></th>
+				<th><input id="p1_pd" data-unit="dimension" readonly /></th>
+				<th><input id="p2_pd" data-unit="dimension" readonly /></th>
 				<th class="rowlabel">Ratio</th>
 				<th><input id="ratio" readonly /></th>
 			</tr><tr id="src_label">
@@ -423,12 +423,12 @@
 				<td><input id="n_teeth_l" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel">Length</th>
-				<td><input id="l_s" readonly /></td>
-				<td><input id="l_l" readonly /></td>
+				<td><input id="l_s" data-unit="dimension" readonly /></td>
+				<td><input id="l_l" data-unit="dimension" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel">Center-Center</th>
-				<td><input id="cc_s" readonly /></td>
-				<td><input id="cc_l" readonly /></td>
+				<td><input id="cc_s" data-unit="dimension" readonly /></td>
+				<td><input id="cc_l" data-unit="dimension" readonly /></td>
 			</tr><tr>
 				<th class="rowlabel" id="p1_mesh">P1 Teeth In Mesh</th>
 				<td><input id="p1_s" readonly /></td>
@@ -464,14 +464,14 @@
 				<td>[RPM]</td>
 			</tr><tr>
 				<th class='rowlabel'>Torque</th>
-				<td><input id='torque_1' ></td>
-				<td><input id='torque_2' ></td>
-				<td class="unit" id="unit_torque"></td>
+				<td><input id='torque_1' data-unit="torque" ></td>
+				<td><input id='torque_2' data-unit="torque" ></td>
+				<td class="unit" data-unit="torque"></td>
 			</tr><tr>
 				<th class='rowlabel'>Torque Capacity</th>
-				<td ><input id='torque_cap_1' readonly></td>
-				<td><input id='torque_cap_2' readonly></td>
-				<td class="unit" id="unit_torque_cap" ></td>
+				<td ><input id='torque_cap_1' data-unit="torque" readonly></td>
+				<td><input id='torque_cap_2' data-unit="torque" readonly></td>
+				<td class="unit" data-unit="torque"></td>
 			</tr><tr>
 				<th class='rowlabel'>Factor of Safety</th>
 				<td ><input id='fos_1' readonly ></td>
