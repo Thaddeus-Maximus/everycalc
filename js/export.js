@@ -127,6 +127,14 @@ function downloadPage() {
 			link.parentElement.removeChild(link);
 		}
 	}
+	/*imgs = document.getElementsByTagName('img');
+	for (img of imgs) {
+		if (img.src) {
+			scr = readTextFile(img.src);
+			img.innerHTML = scr;
+			img.removeAttribute('src');
+		}
+	}*/
 
 	// Create the download
 	var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
@@ -138,7 +146,7 @@ function downloadPage() {
 	document.getElementById('download_frame').click();
 }
 
-function print_page() {
+function printPage() {
 	/* Page print
 	   Currently just a passthrough for builtin system page printing */
 	window.print();

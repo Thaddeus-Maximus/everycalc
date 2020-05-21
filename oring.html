@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/orings.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
 <script type="text/javascript">
-	unit_sys = 0;
-	inputs_unit_map = {
+	EXP_FN_BASE = 'oring';
+	UNIT_MAP = {
 		'd1': ['mm', 'in'],
 		'd2': ['mm', 'in'],
 		'd3': ['mm', 'in'],
@@ -24,71 +35,27 @@
 
 
 		'clr_min': ['mm', 'in'],
-		'clr_max':['mm', 'in'],
+		'clr_max': ['mm', 'in'],
 
 		'clrm_min': ['mm', 'in'],
-		'clrm_max':['mm', 'in']
+		'clrm_max': ['mm', 'in']
 	}
 
-	function switch_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
 
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
-			}
-		}
-		select_dash_size();
-		compute();
-	}
-
-	function gidv(id, default_value) {
-
-		v =  eval(document.getElementById(id).value);
-		if (typeof default_value!=='undefined' && typeof v === 'undefined') v=default_value;
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		return v;
-	}
-
-	function gidve(idxy, dir) {
-		return gidv(idxy) + dir*gidv(idxy+'_err', 0);
-	}
-
-	function gids(idx, value, places) {
-		if (typeof places === 'undefined') {
-			places = 2;
-			if (typeof inputs_unit_map[idx] !== 'undefined')
-				places = unit_sys ? 4 : 3;
-		}
-		if (typeof inputs_unit_map[idx] !== 'undefined')
-			value = convert_to(value, inputs_unit_map[idx][unit_sys]);
-		document.getElementById(idx).value = value.toFixed(places);
-	}
-
-	function thload() {
-		var inputs, index;
-
-		if (packed_inputs) unpack_inputs();
-
-		switch_units();
-
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-		    inputs[index].onkeyup = function(e) {
+		EC_setOnInputChange(
+			function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 		    	if (e.target.id == 'dashsize')
-		    		select_dash_size();
+		    		selectDashSize();
 		    	if (e.target.id == 'rw' || e.target.id == 'rid')
-		    		invalidate_dash_size();
+		    		clearDashSize();
 
 		    	if (e.target.id.startsWith('d')) {
-		    		illustration_highlight(e.target.id.substring(1,2));
+		    		illustrationHighlight(e.target.id.substring(1,2));
 		    	}
 
 		    	if (key==13) {
@@ -96,25 +63,33 @@
 		    	} else {
 		    		compute();
 		    	}
-		    }
+		    });
+
+
+		let inputs = document.getElementsByTagName('input');
+		for (index = 0; index < inputs.length; ++index) {
 		    inputs[index].onmouseover = function(e) {
 		    	if (e.target.id.startsWith('d')) {
-		    		illustration_highlight(e.target.id.substring(1,2));
+		    		illustrationHighlight(e.target.id.substring(1,2));
 		    	}
-		    }
+		    };
 		}
+	    
 
-		select_type();
+		selectGlandType();
 		document.getElementById('topbar_version').innerHTML = VERSION;
 	}
 
-	function select_dash_size() {
+	function selectDashSize() {
 		inp = document.getElementById('dashsize');
 		size = inp.value.toString();
-		dims = dash_sizes[size]; // in width, in ID, mm width, mm ID
+		dims = ORING_DASH_SIZES[size]; // in width, in ID, mm width, mm ID
 		inp.classList.add('error');
-		if (!dims) return;
-		if (unit_sys == 0) { // mm
+		if (!dims) {
+			setError(2, "Dash size is invalid.");
+			return;
+		}
+		if (UNIT_sys == 0) { // mm
 			document.getElementById('rw').value  = dims[2];
 			document.getElementById('rid').value = dims[3];
 
@@ -125,18 +100,18 @@
 		inp.classList.remove('error');
 	}
 
-	function invalidate_dash_size() {
+	function clearDashSize() {
 		document.getElementById('dashsize').value = '';
 	}
 
-	function select_application() {
+	function selectUseCase() {
 		app = document.getElementById('application').value;
 		for (id in targets[app]) {
 			document.getElementById(id).value = targets[app][id];
 		}
 	}
 
-	function select_type() {
+	function selectGlandType() {
 		type = document.getElementById('type').value;
 		for (i of [1,2,3,4,5]) {
 			document.getElementById(`d${i}_row`).style.display = 'table-row';
@@ -186,33 +161,33 @@
 			`;
 		}
 
-		select_application();
+		selectUseCase();
 	}
 
-	function illustration_hover (x) {
+	function illustrationHover (x) {
 		for (el of document.getElementsByClassName('hovered')) {
 			el.classList.remove('hovered');
 		}
-		for (el of document.getElementsByClassName('hovered_ill')) {
-			el.classList.remove('hovered_ill');
+		for (el of document.getElementsByClassName('field')) {
+			el.style.fill = "#fff";
 		}
 		if (!x) return;
 		inp = document.getElementById('d'+x);
-		inp.classList.add('hovered');
+		inp.classList.add('hovered'); 
 		inp.focus();
 		inp.select();
 	}
 
-	function illustration_highlight (x) {
+	function illustrationHighlight (x) {
 		for (el of document.getElementsByClassName('hovered')) {
 			el.classList.remove('hovered');
 		}
-		for (el of document.getElementsByClassName('hovered_ill')) {
-			el.classList.remove('hovered_ill');
+		for (el of document.getElementsByClassName('field')) {
+			el.style.fill = "#fff";
 		}
 		if (!x) return;
 		for (el of document.getElementsByClassName(`d${x}_label`)) {
-			el.classList.add('hovered_ill');
+			el.style.fill = "#55a040";
 		}
 	}
 
@@ -251,7 +226,7 @@
 		}
 	}
 
-	function face_str(id, od, rid, rw) {
+	function commputeFaceStretch(id, od, rid, rw) {
 		rod = rid+rw*2;
 		if(rid < id) {
 			// stretched around inside
@@ -265,178 +240,69 @@
 	}
 
 	function compute() {
-		//com_opt_min, str, sqe, vol
-		select_application();
+		try{
+		selectUseCase();
 		type = document.getElementById('type').value;
 
-		gids('rod', gidv('rid')+2*gidv('rw'));
-		gids('rod_err', gidv('rid_err',0)+2*gidv('rw_err',0));
+		setV('rod', getV('rid')+2*getV('rw'));
+		setV('rod_err', getV('rid_err',0)+2*getV('rw_err',0));
 
 		if (type=='rad_h') {
-			gids('com_min', (1+(gidve('d1',-1)-gidve('d3',+1))/2/gidve('rw',-1))*100);
-			gids('com_max', (1+(gidve('d1',+1)-gidve('d3',-1))/2/gidve('rw',+1))*100);
-			gids('vol_min', ( Math.PI/4*gidve('rw',-1)*gidve('rw',-1) ) / ( (gidve('d3',+1)-gidve('d1',-1))/2*gidve('d5',+1) )* 100 );
-			gids('vol_max', ( Math.PI/4*gidve('rw',+1)*gidve('rw',+1) ) / ( (gidve('d3',-1)-gidve('d1',+1))/2*gidve('d5',-1) )* 100 );
-			gids('str_max', (gidve('d1', +1) / gidve('rid', -1) - 1) * 100);
-			gids('str_min', (gidve('d1', -1) / gidve('rid', +1) - 1) * 100);
-			gids('clr_min', (gidve('d4',-1)-gidve('d1',+1))/2);
-			gids('clr_max', (gidve('d4',+1)-gidve('d1',-1))/2);
-			gids('clrm_min', (gidve('d3',-1)-gidve('d2',+1))/2);
-			gids('clrm_max', (gidve('d3',+1)-gidve('d2',-1))/2);
+			setV('com_min', (1+(getVE('d1',-1)-getVE('d3',+1))/2/getVE('rw',-1))*100);
+			setV('com_max', (1+(getVE('d1',+1)-getVE('d3',-1))/2/getVE('rw',+1))*100);
+			setV('vol_min', ( Math.PI/4*getVE('rw',-1)*getVE('rw',-1) ) / ( (getVE('d3',+1)-getVE('d1',-1))/2*getVE('d5',+1) )* 100 );
+			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
+			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
+			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
+			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2);
+			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2);
+			setV('clrm_min', (getVE('d3',-1)-getVE('d2',+1))/2);
+			setV('clrm_max', (getVE('d3',+1)-getVE('d2',-1))/2);
 		} else if (type=='rad_f') {
-			gids('com_min', (1+(gidve('d1',-1)-gidve('d3',+1))/2/gidve('rw',-1))*100);
-			gids('com_max', (1+(gidve('d1',+1)-gidve('d3',-1))/2/gidve('rw',+1))*100);
-			gids('vol_min', ( Math.PI/4*gidve('rw',-1)*gidve('rw',-1) ) / ( (gidve('d3',+1)-gidve('d1',-1))/2*gidve('d5',+1) )* 100 );
-			gids('vol_max', ( Math.PI/4*gidve('rw',+1)*gidve('rw',+1) ) / ( (gidve('d3',-1)-gidve('d1',+1))/2*gidve('d5',-1) )* 100 );
-			gids('str_max', (gidve('d1', +1) / gidve('rid', -1) - 1) * 100);
-			gids('str_min', (gidve('d1', -1) / gidve('rid', +1) - 1) * 100);
-			gids('clr_min', (gidve('d4',-1)-gidve('d1',+1))/2);
-			gids('clr_max', (gidve('d4',+1)-gidve('d1',-1))/2);
+			setV('com_min', (1+(getVE('d1',-1)-getVE('d3',+1))/2/getVE('rw',-1))*100);
+			setV('com_max', (1+(getVE('d1',+1)-getVE('d3',-1))/2/getVE('rw',+1))*100);
+			setV('vol_min', ( Math.PI/4*getVE('rw',-1)*getVE('rw',-1) ) / ( (getVE('d3',+1)-getVE('d1',-1))/2*getVE('d5',+1) )* 100 );
+			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
+			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
+			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
+			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2);
+			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2);
 		} else if (type=='rad_m') {
-			gids('com_min', (1+(gidve('d1',-1)-gidve('d3',+1))/2/gidve('rw',-1))*100);
-			gids('com_max', (1+(gidve('d1',+1)-gidve('d3',-1))/2/gidve('rw',+1))*100);
-			gids('vol_min', ( Math.PI/4*gidve('rw',-1)*gidve('rw',-1) ) / ( (gidve('d3',+1)-gidve('d1',-1))/2*gidve('d5',+1) )* 100 );
-			gids('vol_max', ( Math.PI/4*gidve('rw',+1)*gidve('rw',+1) ) / ( (gidve('d3',-1)-gidve('d1',+1))/2*gidve('d5',-1) )* 100 );
-			gids('str_max', (gidve('d1', +1) / gidve('rid', -1) - 1) * 100);
-			gids('str_min', (gidve('d1', -1) / gidve('rid', +1) - 1) * 100);
-			gids('clr_min', (gidve('d3',-1)-gidve('d2',+1))/2);
-			gids('clr_max', (gidve('d3',+1)-gidve('d2',-1))/2);
+			setV('com_min', (1+(getVE('d1',-1)-getVE('d3',+1))/2/getVE('rw',-1))*100);
+			setV('com_max', (1+(getVE('d1',+1)-getVE('d3',-1))/2/getVE('rw',+1))*100);
+			setV('vol_min', ( Math.PI/4*getVE('rw',-1)*getVE('rw',-1) ) / ( (getVE('d3',+1)-getVE('d1',-1))/2*getVE('d5',+1) )* 100 );
+			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
+			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
+			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
+			setV('clr_min', (getVE('d3',-1)-getVE('d2',+1))/2);
+			setV('clr_max', (getVE('d3',+1)-getVE('d2',-1))/2);
 		} else if (type=='face') {
-			gids('com_min', (gidve('rw',-1)-gidve('d5',+1))/gidve('rw',-1)*100);
-			gids('com_max', (gidve('rw',+1)-gidve('d5',-1))/gidve('rw',+1)*100);
-			gids('vol_min', ( Math.PI/4*gidve('rw',-1)*gidve('rw',-1) ) / ( gidve('d3',+1)*gidve('d5',+1) )* 100 );
-			gids('vol_max', ( Math.PI/4*gidve('rw',+1)*gidve('rw',+1) ) / ( gidve('d3',-1)*gidve('d5',-1) )* 100 );
+			setV('com_min', (getVE('rw',-1)-getVE('d5',+1))/getVE('rw',-1)*100);
+			setV('com_max', (getVE('rw',+1)-getVE('d5',-1))/getVE('rw',+1)*100);
+			setV('vol_min', ( Math.PI/4*getVE('rw',-1)*getVE('rw',-1) ) / ( getVE('d3',+1)*getVE('d5',+1) )* 100 );
+			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( getVE('d3',-1)*getVE('d5',-1) )* 100 );
 			strs = [
-				face_str(gidve('d1',+1)-2*gidve('d3',-1), gidve('d1', +1), gidve('rid', -1), gidve('rw', +1) ),
-				face_str(gidve('d1',+1)-2*gidve('d3',-1), gidve('d1', +1), gidve('rid', +1), gidve('rw', -1) ),
-				face_str(gidve('d1',-1)-2*gidve('d3',+1), gidve('d1', -1), gidve('rid', -1), gidve('rw', +1) ),
-				face_str(gidve('d1',-1)-2*gidve('d3',+1), gidve('d1', -1), gidve('rid', +1), gidve('rw', -1) ),
-				face_str(gidve('d1',+1)-2*gidve('d3',-1), gidve('d1', +1), gidve('rid', +1), gidve('rw', +1) ),
-				face_str(gidve('d1',+1)-2*gidve('d3',-1), gidve('d1', +1), gidve('rid', -1), gidve('rw', -1) ),
-				face_str(gidve('d1',-1)-2*gidve('d3',+1), gidve('d1', -1), gidve('rid', +1), gidve('rw', +1) ),
-				face_str(gidve('d1',-1)-2*gidve('d3',+1), gidve('d1', -1), gidve('rid', -1), gidve('rw', -1) )
+				commputeFaceStretch(getVE('d1',+1)-2*getVE('d3',-1), getVE('d1', +1), getVE('rid', -1), getVE('rw', +1) ),
+				commputeFaceStretch(getVE('d1',+1)-2*getVE('d3',-1), getVE('d1', +1), getVE('rid', +1), getVE('rw', -1) ),
+				commputeFaceStretch(getVE('d1',-1)-2*getVE('d3',+1), getVE('d1', -1), getVE('rid', -1), getVE('rw', +1) ),
+				commputeFaceStretch(getVE('d1',-1)-2*getVE('d3',+1), getVE('d1', -1), getVE('rid', +1), getVE('rw', -1) ),
+				commputeFaceStretch(getVE('d1',+1)-2*getVE('d3',-1), getVE('d1', +1), getVE('rid', +1), getVE('rw', +1) ),
+				commputeFaceStretch(getVE('d1',+1)-2*getVE('d3',-1), getVE('d1', +1), getVE('rid', -1), getVE('rw', -1) ),
+				commputeFaceStretch(getVE('d1',-1)-2*getVE('d3',+1), getVE('d1', -1), getVE('rid', +1), getVE('rw', +1) ),
+				commputeFaceStretch(getVE('d1',-1)-2*getVE('d3',+1), getVE('d1', -1), getVE('rid', -1), getVE('rw', -1) )
 			];
 
-			gids('str_max', Math.max(...strs));
-			gids('str_min', Math.min(...strs));
-			gids('clr_min', '');
-			gids('clr_max', '')
+			setV('str_max', Math.max(...strs));
+			setV('str_min', Math.min(...strs));
+			setV('clr_min', '');
+			setV('clr_max', '')
 		}
+	}catch(err){
+		console.log(err);
+		setError(2, err);
+		return;
 	}
-</script>
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		packed_inputs.unit_sys = unit_sys;
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		unit_sys = packed_inputs.unit_sys;
-		delete packed_inputs.unit_sys;
-		document.getElementById('unit_english').checked = unit_sys;
-		document.getElementById('unit_metric') .checked = !unit_sys;
-		for (key in packed_inputs) {
-			document.getElementById(key).value = packed_inputs[key];
-		}
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'oring_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
-	}
-
-	function print_page() {
-		window.print();
+	setError(0);
 	}
 </script>
 
@@ -488,9 +354,6 @@
 		font-size: 12px;
 		transform: translateY(5px);
 	}
-	.hovered_ill {
-		fill: #55a040;
-	}
 
 .doublewide {
   width: 160px;
@@ -501,15 +364,29 @@ input {
 </style>
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_ctr">O-Ring Gland</div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Millimeters</option>
+			<option value=1 selected="selected">Inches</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">O-Ring Gland Calculator</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
 </div>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 
 <div style='display:table-row'>
@@ -517,16 +394,12 @@ input {
 		<table>
 			<tr>
 				<td colspan=5 style="text-align:center;">
-					<select id="type" onchange="select_type(); compute();" class="doublewide" >
+					<select id="type" onchange="selectGlandType(); compute();" class="doublewide" >
 					<option value="rad_m">Radial, Male Groove</option>
 					<option value="rad_f">Radial, Female Groove</option>
 					<option value="rad_h">Radial, No Groove</option>
 					<option value="face">Face</option>
 					</select>
-				  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
-				  <label for="english">in</label>
-				  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
-				  <label for="metric">mm</label>
 				</td>
 			</tr>
 			<tr id="d1_row">
@@ -564,18 +437,18 @@ input {
 			<tr>
 				<th class="rowlabel">Dash Size</th>
 				<td colspan=3>
-					- <input id="dashsize" onkeyup="select_dash_size()" class="narrow">
+					- <input id="dashsize" onkeyup="selectDashSize()" class="narrow">
 				</td>
 			</tr>
 			<tr>
 				<th class="rowlabel">Ring Width</th>
-				<td><input id="rw" onkeyup="invalidate_dash_size()"></td>
+				<td><input id="rw" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
 				<td><input id="rw_err"></td>
 				<td class="unit" id="unit_rw"></td>
 			</tr><tr>
 				<th class="rowlabel">Ring ID</th>
-				<td><input id="rid" onkeyup="invalidate_dash_size()"></td>
+				<td><input id="rid" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
 				<td><input id="rid_err"></td>
 				<td class="unit" id="unit_rid"></td>
@@ -617,28 +490,28 @@ input {
 
 			<line x1=90  x2=100 y1=40 y2=40 class='arrow'/>
 			<line x1=230 x2=200 y1=40 y2=40 class='arrow'/>
-			<g onmouseover="illustration_hover(1)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(1)" onmouseout="illustrationHover()" >
 				<rect class="d1_label field" x=220 y=30 width=20 height=20 />
 				<text class="text"  x=230 y=40 >A</text>
 			</g>
 
 			<line x1=70  x2=80  y1=260 y2=260 class='arrow'/>
 			<line x1=240 x2=220 y1=260 y2=260 class='arrow'/>
-			<g onmouseover="illustration_hover(2)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(2)" onmouseout="illustrationHover()">
 				<rect class="d2_label field" x=230 y=250 width=20 height=20 />
 				<text class="text"  x=240 y=260 >B</text>
 			</g>
 
 			<line x1=60  x2=70  y1=190 y2=190 class='arrow'/>
 			<line x1=250 x2=230 y1=190 y2=190 class='arrow'/>
-			<g onmouseover="illustration_hover(3)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(3)" onmouseout="illustrationHover()">
 				<rect class="d3_label field" x=250 y=180 width=20 height=20 />
 				<text class="text"  x=260 y=190 >C</text>
 			</g>
 
 			<line x1=80  x2=90  y1=80 y2=80 class='arrow'/>
 			<line x1=250 x2=210 y1=80 y2=80 class='arrow'/>
-			<g onmouseover="illustration_hover(4)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(4)" onmouseout="illustrationHover()">
 				<rect class="d4_label field" x=250 y=70  width=20 height=20 />
 				<text class="text"  x=260 y=80 >D</text>
 			</g>
@@ -647,7 +520,7 @@ input {
 			<line x1=50 x2=50 y1=180 y2=170 class='arrow'/>
 			<line x1=40 x2=85 y1=150 y2=150 class='line'/>
 			<line x1=40 x2=85 y1=110 y2=110 class='line'/>
-			<g onmouseover="illustration_hover(5)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(5)" onmouseout="illustrationHover()">
 				<rect class="d5_label field" x=40 y=120  width=20 height=20 />
 				<text class="text"  x=50 y=130 >E</text>
 			</g>
@@ -692,21 +565,21 @@ input {
 			<line x1=140 x2=160 y1=170 y2=170 class='arrow_de'/>
 			<line x1=120 x2=120 y1=155 y2=180 class='line'/>
 			<line x1=180 x2=180 y1=155 y2=180 class='line'/>
-			<g onmouseover="illustration_hover(1)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(1)" onmouseout="illustrationHover()" >
 				<rect class="d1_label field" x=140 y=180 width=20 height=20 />
 				<text class="text"  x=150 y=190 >A</text>
 			</g>
 
 			<line x1=70  x2=80  y1=260 y2=260 class='arrow_2'/>
 			<line x1=240 x2=220 y1=260 y2=260 class='arrow_2'/>
-			<g onmouseover="illustration_hover(2)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(2)" onmouseout="illustrationHover()">
 				<rect class="d2_label field" x=230 y=250 width=20 height=20 />
 				<text class="text"  x=240 y=260 >B</text>
 			</g>
 
 			<line x1=60  x2=70  y1=80 y2=80 class='arrow_2'/>
 			<line x1=250 x2=230 y1=80 y2=80 class='arrow_2'/>
-			<g onmouseover="illustration_hover(3)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(3)" onmouseout="illustrationHover()">
 				<rect class="d3_label field" x=250 y=70 width=20 height=20 />
 				<text class="text"  x=260 y=80 >C</text>
 			</g>
@@ -715,7 +588,7 @@ input {
 			<line x1=50 x2=50 y1=180 y2=170 class='arrow_2'/>
 			<line x1=40 x2=85 y1=150 y2=150 class='line'/>
 			<line x1=40 x2=85 y1=110 y2=110 class='line'/>
-			<g onmouseover="illustration_hover(5)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(5)" onmouseout="illustrationHover()">
 				<rect class="d5_label field" x=40 y=120  width=20 height=20 />
 				<text class="text"  x=50 y=130 >D</text>
 			</g>
@@ -746,21 +619,21 @@ input {
 
 			<line x1=90  x2=100 y1=40 y2=40 class='arrow_3'/>
 			<line x1=230 x2=200 y1=40 y2=40 class='arrow_3'/>
-			<g onmouseover="illustration_hover(1)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(1)" onmouseout="illustrationHover()" >
 				<rect class="d1_label field" x=220 y=30 width=20 height=20 />
 				<text class="text"  x=230 y=40 >A</text>
 			</g>
 
 			<line x1=60  x2=70  y1=130 y2=130 class='arrow_3'/>
 			<line x1=250 x2=230 y1=130 y2=130 class='arrow_3'/>
-			<g onmouseover="illustration_hover(3)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(3)" onmouseout="illustrationHover()">
 				<rect class="d3_label field" x=250 y=120 width=20 height=20 />
 				<text class="text"  x=260 y=130 >B</text>
 			</g>
 
 			<line x1=80  x2=90  y1=200 y2=200 class='arrow_3'/>
 			<line x1=220 x2=210 y1=200 y2=200 class='arrow_3'/>
-			<g onmouseover="illustration_hover(4)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(4)" onmouseout="illustrationHover()">
 				<rect class="d4_label field" x=220 y=190 width=20 height=20 />
 				<text class="text"  x=230 y=200 >C</text>
 			</g>
@@ -769,7 +642,7 @@ input {
 			<line x1=40 x2=40 y1=180 y2=170 class='arrow_3'/>
 			<line x1=30 x2=85 y1=150 y2=150 class='line'/>
 			<line x1=30 x2=85 y1=110 y2=110 class='line'/>
-			<g onmouseover="illustration_hover(5)" onmouseout="illustration_hover()">
+			<g onmouseover="illustrationHover(5)" onmouseout="illustrationHover()">
 				<rect class="d5_label field" x=30 y=120  width=20 height=20 />
 				<text class="text"  x=40 y=130 >D</text>
 			</g>
@@ -819,14 +692,14 @@ input {
 
 			<line x1=130 x2=70  y1=30 y2=30 class='arrow_4'/>
 			<line x1=170 x2=230 y1=30 y2=30 class='arrow_4'/>
-			<g onmouseover="illustration_hover(1)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(1)" onmouseout="illustrationHover()" >
 				<rect class="d1_label field" x=140 y=20 width=20 height=20 />
 				<text class="text"  x=150 y=30 >A</text>
 			</g>
 
 			<line x1=20  x2=30  y1=60 y2=60 class='arrow_4'/>
 			<line x1=120 x2=110 y1=60 y2=60 class='arrow_4'/>
-			<g onmouseover="illustration_hover(3)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(3)" onmouseout="illustrationHover()" >
 				<rect class="d3_label field" x=60 y=50 width=20 height=20 />
 				<text class="text"  x=70 y=60 >B</text>
 			</g>
@@ -834,7 +707,7 @@ input {
 			<line x1=180 x2=200 y1=150 y2=150 class='line' />
 			<line x1=190 x2=190 y1=80  y2=95  class='arrow_4'/>
 			<line x1=190 x2=190 y1=180 y2=170 class='arrow_4'/>
-			<g onmouseover="illustration_hover(5)" onmouseout="illustration_hover()" >
+			<g onmouseover="illustrationHover(5)" onmouseout="illustrationHover()" >
 				<rect class="d5_label field" x=180 y=60 width=20 height=20 />
 				<text class="text"  x=190 y=70 >C</text>
 			</g>
@@ -845,7 +718,7 @@ input {
 			<tr>
 				<th class="rowlabel">Application</th>
 				<td colspan=4>
-					<select id="application" onchange="select_application()" class="doublewide">
+					<select id="application" onchange="selectUseCase()" class="doublewide">
 						<option value="s">Static</option>
 						<option value="d">Dynamic</option>
 					</select>

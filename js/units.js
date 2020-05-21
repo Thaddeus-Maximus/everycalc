@@ -78,7 +78,7 @@ function setV(id, value, places) {
 
 function getVE(id, dir) {
 	// Get the value, with error in the specified direction (+1 or -1).
-	return gidv(id, NaN, false) + dir*gidv(id+'_err', 0, true);
+	return getV(id, NaN, false) + dir*getV(id+'_err', 0, true);
 }
 
 // converting between things is for suckers. Just convert to base units, always.
