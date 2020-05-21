@@ -73,6 +73,18 @@ function bitTest(num, bit){
     return ((num>>bit) % 2 != 0)
 }
 
+function posatan2(X,Y) {
+	atn = Math.atan2(X,Y);
+	if (atn < 0) atn += Math.PI*2;
+	return atn;
+}
+
+function avg(arr) {
+	sum = 0;
+	for (X of arr) { sum+=X; }
+	return sum/arr.length;
+}
+
 /*
 Status Module (STAT).
 
