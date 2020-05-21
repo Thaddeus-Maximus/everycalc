@@ -13,39 +13,13 @@
 <script type="text/javascript">
 	EXP_FN_BASE = 'trajectory';
 	UNIT_MAP = {
-		'theta': 			['deg', 'deg', 'deg'],
-		'theta_err': 		['deg', 'deg', 'deg'],
-		'v_initial':     	['m/s', 'ft/s','in/s'],
-		'v_initial_err': 	['m/s', 'ft/s','in/s'],
-		'x_target':      	['m',   'ft',  'in'],
-		'x_target_err':  	['m',   'ft',  'in'],
-		'y_target':      	['m',   'ft',  'in'],
-		'y_target_err':  	['m',   'ft',  'in'],
-		'y_initial':     	['m',   'ft',  'in'],
-		'y_initial_err': 	['m',   'ft',  'in'],
-		'x_obstacle':     	['m',   'ft',  'in'],
-		'x_obstacle_err': 	['m',   'ft',  'in'],
-		'h_obstacle':     	['m',   'ft',  'in'],
-		'h_obstacle_err': 	['m',   'ft',  'in'],
-		'h_target':      	['mm',  'in',  'in'],
-		'h_target_err':  	['mm',  'in',  'in'],
-		'd_ball':        	['mm',  'in',  'in'],
-		'd_ball_err':    	['mm',  'in',  'in'],
-		'strike_height':    ['m',   'ft',  'in'],
-		'strike_height_err':['m',   'ft',  'in'],
-		'sweep_height':     ['m',   'ft',  'in'],
-		'sweep_height_err': ['m',   'ft',  'in'],
-		'strike_angle':     ['deg', 'deg', 'deg'],
-		'strike_angle_err': ['deg', 'deg', 'deg'],
-		'strike_v':    		['m/s', 'ft/s', 'in/s'],
-		'strike_v_err': 	['deg', 'deg', 'deg'],
-		'm_ball':     		 ['kg', 'lbm', 'lbm'],
-		'm_ball_err': 		 ['kg', 'lbm', 'deg'],
-		'omega_initial': 	 ['RPM', 'RPM', 'RPM'],
-		'omega_initial_err': ['RPM', 'RPM', 'RPM'],
+		'theta': 		['deg', 'deg', 'deg'],
+		'v':     		['m/s', 'ft/s','in/s'],
+		'bigdim':  		['m',   'ft',  'in'],
+		'smalldim':    	['mm',  'in',  'in'],
 
-		'chart_y': ['m',   'ft',  'in'],
-		'chart_x': ['m',   'ft',  'in']
+		'mass': 	['kg', 'lbm', 'lbm'],
+		'omega': 	['RPM', 'RPM', 'RPM']
 	};
 
     function selectMode() {
@@ -122,9 +96,10 @@
 		rho = 1.1839; // kg/m^3
 		A   = d*d*Math.PI/4;
 
-		mu_d = 1/2*rho*A*Cd;
-		mu_l = 1/2*rho*A*Cl;
-		mu_m = Math.PI/3*rho*d*d*d*Cm;
+		mu_d = NaNTo(0, 1/2*rho*A*Cd);
+		mu_l = NaNTo(0, 1/2*rho*A*Cl);
+		mu_m = NaNTo(0, Math.PI/3*rho*d*d*d*Cm);
+		omega = NaNTo(0, omega);
 
 		x=-xtarg;
 		y=y0;
@@ -406,7 +381,7 @@
 			}
 		}
 
-		targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP['y_target'][UNIT_sys] ) ;
+		targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP.bigdim[UNIT_sys] ) ;
       	drawPlot(max_low_run, max_high_run, targetstuff, 
       		(max_high_stat.y_high > getV('y_target')+getV('h_target')/2) || (max_low_stat.y_low < getV('y_target')-getV('h_target')/2));
 
@@ -444,6 +419,8 @@
 	}*/
 
 	function drawPlot(low_run, high_run, targetstuff, missed) {
+		[target_x, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
+
 		PLOT_drawLinePlot({
 			multiChannelBehavior: "merge2",
 			chartName: "chart",
@@ -466,15 +443,14 @@
 					axis: 'x'
 				},
 				y: {
-					axis: 'y'
+					axis: 'y',
+					overrideMax: Math.max(...low_run.y, ...high_run.y, target_h+target_diam)
 				}
 			},
 			queries: {}
 		},
 		[low_run, high_run],
 		function(e){} );
-
-		[target_x, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
 
 		let svg = document.getElementById("chart");
 		let plotScaling = svg.PLOT_config.scaling;
@@ -564,39 +540,39 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Launch Angle</th>
-					<td><input id='theta' value=30><td class="tiny">+/-</td>
-					<td><input id='theta_err' value=''></td>
-					<td class='unit' id='unit_theta'></td>
+					<td><input class='unit' data-unit='theta' id='theta' value=30><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='theta' id='theta_err' value=''></td>
+					<td class='unit' data-unit='theta' id='unit_theta'></td>
 				</tr><tr>
 					<th class="rowlabel">Launch Velocity</th>
-					<td><input id="v_initial" value=45></td><td class="tiny">+/-</td>
-					<td><input id="v_initial_err" value=''></td>
-					<td class="unit" id='unit_v_initial'></td>
+					<td><input class='unit' data-unit='v' id="v_initial" value=45></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='v' id="v_initial_err" value=''></td>
+					<td class='unit' data-unit='v' id='unit_v_initial'></td>
 				</tr><tr>
 					<th class="rowlabel">Backspin</th>
-					<td><input id="omega_initial" value=''></td><td class="tiny">+/-</td>
-					<td><input id="omega_initial_err" value=''></td>
-					<td class="unit" id='unit_omega_initial'></td>
+					<td><input class='unit' data-unit='omega' id="omega_initial" value=''></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id="omega_initial_err" value=''></td>
+					<td class='unit' data-unit='omega' id='unit_omega_initial'></td>
 				</tr><tr>
 					<th class='rowlabel'>Distance to Target</th>
-					<td><input id='x_target' value=15></td><td class="tiny">+/-</td>
-					<td><input id="x_target_err" value=''></td>
-					<td class="unit" id='unit_x_target'></td>
+					<td><input class='unit' data-unit='bigdim' id='x_target' value=15></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='bigdim' id="x_target_err" value=''></td>
+					<td class='unit' data-unit='bigdim' id='unit_x_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Launch Height</th>
-					<td><input id="y_initial" value=1.5></td><td class="tiny">+/-</td>
-					<td><input id="y_initial_err" value=''></td>
-					<td class="unit" id='unit_y_initial'></td>
+					<td><input class='unit' data-unit='bigdim' id="y_initial" value=1.5></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='bigdim' id="y_initial_err" value=''></td>
+					<td class='unit' data-unit='bigdim' id='unit_y_initial'></td>
 				</tr><tr>
 					<th class='rowlabel'>Projectile Diameter</th>
-					<td><input id='d_ball' value=7></td><td class="tiny">+/-</td>
-					<td><input id='d_ball_err' value=''></td>
-					<td class='unit' id='unit_d_ball'></td>
+					<td><input class='unit' data-unit='smalldim' id='d_ball' value=7></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='smalldim' id='d_ball_err' value=''></td>
+					<td class='unit' data-unit='smalldim' id='unit_d_ball'></td>
 				</tr><tr>
 					<th class='rowlabel'>Projectile Mass</th>
-					<td><input id='m_ball' value=0.5></td><td class="tiny">+/-</td>
-					<td><input id='m_ball_err' value=''></td>
-					<td class='unit' id='unit_m_ball'></td>
+					<td><input class='unit' data-unit='mass' id='m_ball' value=0.5></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='mass' id='m_ball_err' value=''></td>
+					<td class='unit' data-unit='mass' id='unit_m_ball'></td>
 				</tr><tr>
 					<th class="rowlabel">Drag Coefficient<span class="ttt">Lift coefficient, used to compute drag as Fdrag = 1/2*rho*A*Cd*v^2 (refer to documentation for more info)</span></th>
 					<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
@@ -614,20 +590,20 @@
 					<td class='unit' id='unit_Cm'></td>
 				</tr><tr>
 					<th class="rowlabel">Target Center Height</th>
-					<td><input id="y_target" value=8></td>
-					<td class="unit" id='unit_y_target'></td>
+					<td><input class='unit' data-unit='bigdim' id="y_target" value=8></td>
+					<td class='unit' data-unit='bigdim' id='unit_y_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Target Opening</th>
-					<td><input id="h_target" value=30></td>
-					<td class="unit" id='unit_h_target'></td>
+					<td><input class='unit' data-unit='smalldim' id="h_target" value=30></td>
+					<td class='unit' data-unit='smalldim' id='unit_h_target'></td>
 				</tr><tr>
 					<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
-					<td><input id="x_obstacle" value="-3"></td>
-					<td class="unit" id='unit_x_obstacle'></td>
+					<td><input class='unit' data-unit='bigdim' id="x_obstacle" value="-3"></td>
+					<td class='unit' data-unit='bigdim' id='unit_x_obstacle'></td>
 				</tr><tr>
 					<th class="rowlabel">Obstacle Height</th>
-					<td><input id="h_obstacle" value="45/12"></td>
-					<td class="unit" id='unit_h_obstacle'></td>
+					<td><input class='unit' data-unit='bigdim' id="h_obstacle" value="45/12"></td>
+					<td class='unit' data-unit='bigdim' id='unit_h_obstacle'></td>
 				</tr>
 			</table>
 		</div><div class="output" style='display:table-cell'>
@@ -636,24 +612,24 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
-					<td><input id='strike_height' readOnly></td><td class="tiny">+/-</td>
-					<td><input id='strike_height_err' readOnly></td>
-					<td class='unit' id='unit_strike_height'></td>
+					<td><input class='unit' data-unit='bigdim' id='strike_height' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='bigdim' id='strike_height_err' readOnly></td>
+					<td class='unit' data-unit='bigdim' id='unit_strike_height'></td>
 				</tr><tr>
 					<th class='rowlabel'>Swept Zone</th>
-					<td><input id='sweep_height' readOnly></td><td class="tiny">+/-</td>
-					<td><input id='sweep_height_err' readOnly></td>
-					<td class='unit' id='unit_sweep_height'></td>
+					<td><input class='unit' data-unit='smalldim' id='sweep_height' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='smalldim' id='sweep_height_err' readOnly></td>
+					<td class='unit' data-unit='smalldim' id='unit_sweep_height'></td>
 				</tr><tr>
 					<th class="rowlabel">Angle of Strike</th>
-					<td><input id="strike_angle" readOnly></td><td class="tiny">+/-</td>
-					<td><input id="strike_angle_err" readOnly></td>
-					<td class="unit" id='unit_strike_angle'></td>
+					<td><input class='unit' data-unit='theta' id="strike_angle" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='theta' id="strike_angle_err" readOnly></td>
+					<td class='unit' data-unit='theta' id='unit_strike_angle'></td>
 				</tr><tr>
 					<th class="rowlabel">Stike Velocity</th>
-					<td><input id="strike_v" readOnly></td><td class="tiny">+/-</td>
-					<td><input id="strike_v_err" readOnly></td>
-					<td class="unit" id='unit_strike_v'>[s]</td>
+					<td><input class='unit' data-unit='v' id="strike_v" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='v' id="strike_v_err" readOnly></td>
+					<td class='unit' data-unit='v' id='unit_strike_v'>[s]</td>
 				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
 					<td><input id="time_of_flight" readOnly></td><td class="tiny">+/-</td>
@@ -694,9 +670,9 @@
 	<g class="plot-grid" id="chart_y_grid"></g>
 
 	<g class="plot-labels">
-	  <text x=375 y=485 class="plot-titlelabel" id="unit_label_x">Distance [ft]</text>
+	  <text x=375 y=485 class="plot-titlelabel unit" data-unit='bigdim' id="chart_x_label">Distance [ft]</text>
 
-	  <text x=-360 y=20 class="plot-titlelabel" transform="rotate(270)" id="unit_label_y">Height [ft]</text>
+	  <text x=-360 y=20 class="plot-titlelabel unit" transform="rotate(270)" data-unit='bigdim' id="chart_y_label">Height [ft]</text>
 	</g>
 
 	<g class="plot-axlabels" id='chart_x_axlabels'></g>

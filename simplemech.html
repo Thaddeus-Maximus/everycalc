@@ -101,7 +101,7 @@
 				enc_els[i].style.display = 'table-row';
 			}
 
-			cpx = getV('encoder_cpr')/NaNto1(getV('encoder_reduction'))/(r*2*Math.PI);
+			cpx = getV('encoder_cpr')/NaNTo(1,getV('encoder_reduction'))/(r*2*Math.PI);
 			if(enc_plc == 'motor') cpx *= G;
 
 			setV('encoder_cpx', cpx);

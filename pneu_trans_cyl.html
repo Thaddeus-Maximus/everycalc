@@ -238,24 +238,12 @@
       	document.getElementById('v_endstop').classList.remove('uncomputed');
       	document.getElementById('E_endstop').classList.remove('uncomputed');
       	document.getElementById('air_cons').classList.remove('uncomputed');
-      	gids('t_endstop', NaNtoerr(t_endstop));
-      	gids('t_steady',  NaNtoerr(t_ss));
-      	gids('v_endstop', NaNtoerr(v_endstop));
-      	gids('E_endstop', NaNtoerr(E_endstop));
+      	gids('t_endstop', NaNToerr(t_endstop));
+      	gids('t_steady',  NaNToerr(t_ss));
+      	gids('v_endstop', NaNToerr(v_endstop));
+      	gids('E_endstop', NaNToerr(E_endstop));
       	gids('air_cons',  air_cons);
 	}
-
-	function NaNtoerr(x) {
-		if (isNaN(x)) return '-'; return x;
-	}
-
-
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
 
 </script>
 

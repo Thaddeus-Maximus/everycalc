@@ -63,9 +63,9 @@ function interp1DSlope(xs, ys, xq) {
 	return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
 }
 
-function NaNto1(x) {
+function NaNTo(to, x) {
 	if (isNaN(x))
-		return 1;
+		return to;
 	return x;
 }
 

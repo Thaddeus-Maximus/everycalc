@@ -61,7 +61,7 @@ function PLOT_computeScaling(config, mins, maxs) {
 		min_scaling.push(mins[i]/H[i]);
 		max_scaling.push(maxs[i]/H[i]);
 	}
-
+	// FIXME: posonly + boxEnds + nonzero lower data bound = bad time??
 	// how many intervals to the end? (may be a float with non-boxed ends)
 	let min_rem = Math.min(...min_scaling);
 	let max_rem = Math.max(...max_scaling);
@@ -238,7 +238,8 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 			axis: 'x' // which axis to plot on. Only one dataset can have x
 		},
 		"name": {
-			axis: 'z'
+			axis: 'z',
+			overrideMax: 14
 		}
 	},
 	queries: {
@@ -316,10 +317,19 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	let dsnames = {x:[],y:[],z:[]};
 	for (name in config.datasets) {
 		let axis = config.datasets[name].axis;
-		mins[axis].push(
-			Math.min(...channels_stitched[name]) );
-		maxs[axis].push(
-			Math.max(...channels_stitched[name]) );
+
+		if (typeof config.datasets[name].overrideMin == 'undefined')
+			mins[axis].push(
+				Math.min(...channels_stitched[name]) );
+		else
+			mins[axis].push(config.datasets[name].overrideMin);
+
+		if (typeof config.datasets[name].overrideMax == 'undefined')
+			maxs[axis].push(
+				Math.max(...channels_stitched[name]) );
+		else
+			maxs[axis].push(config.datasets[name].overrideMax);
+		
 		dsnames[axis].push(name);
 
 		if (config.datasets[name].axis != 'x') {
