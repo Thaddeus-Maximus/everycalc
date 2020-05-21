@@ -14,7 +14,7 @@ Depends on following:
 
 To use units:
 - Include the UNIT library
-- Create UNIT_MAP entries with keys of form chartName_channelName
+- Make sure the axis labels are unit-ed appropriately
 
 */
 
@@ -261,7 +261,8 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	if (typeof config.multiChannelBehavior == 'undefined'){
 		channels_conv = {};
 		for (name in channels) {
-			let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
+			let label = document.getElementById(`${config.chartName}_${name}_label`);
+			let unit  = label && UNIT_MAP ? UNIT_MAP[label.dataset.unit] : undefined;
 			if (unit){
 				channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
 			}
@@ -275,7 +276,8 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		for (run of channels) {
 			let cconv = {};
 			for (name in run) {
-				let unit = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${name}`] : undefined;
+				let label = document.getElementById(`${config.chartName}_${name}_label`);
+				let unit  = label && UNIT_MAP ? UNIT_MAP[label.dataset.unit] : undefined;
 				if (unit){
 					cconv[name] = convertTo(run[name], unit[UNIT_sys]);
 				}
@@ -411,7 +413,9 @@ function PLOT_focusHandler(chart, event) {
 	let plotScale = config.scaling;
 	let xScale    = config.datasets[config.axes.x.datasets[0]].scaling;
 	let xChannel  = channels[config.axes.x.datasets[0]];
-	let xUnit     = UNIT_MAP ? UNIT_MAP[`${config.chartName}_${config.axes.x.datasets[0]}`] : '-';
+
+	let xLabel = document.getElementById(`${config.chartName}_${config.axes.x.datasets[0]}_label`);
+	let xUnit  = xLabel && UNIT_MAP ? UNIT_MAP[xLabel.dataset.unit] : undefined;
 	    xUnit     = xUnit ? xUnit[UNIT_sys] : '-';
 
 	let bg        = document.getElementById(config.chartName);
