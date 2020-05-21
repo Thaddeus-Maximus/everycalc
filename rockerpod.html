@@ -14,15 +14,10 @@
 <script type="text/javascript">
 	EXP_FN_BASE = 'rockerpod';
 	UNIT_MAP = {
-		"N": ["N","lbf"],
-		"F": ["N","lbf"],
-		"T_clutch": ["N-m", "in-lbf"],
-		"r_pod": ["mm", "in"],
-		"h_pod": ["mm", "in"],
-		"d_wheel": ["mm", "in"],
-		"motor_stall_torque": ["N-m", "N-m"],
-		"motor_stall_torque_adj": ["N-m", "N-m"],
-		"free_speed": ["m/s", "ft/s"]
+		"force": 		["N","lbf"],
+		"torque": 		["N-m", "in-lbf"],
+		"dimension": 	["mm", "in"],
+		"speed": 		["m/s", "ft/s"]
 	}
 
 	function init() {
@@ -194,12 +189,12 @@
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
 			<td><input id="motor_max_rpm" readonly /></td>
 			<td><input id="motor_max_rpm_adj" readonly /></td>
-			<td class="unit">[RPM]</td>
+			<td class="unit" >[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input id="motor_stall_torque" readonly /></td>
-			<td><input id="motor_stall_torque_adj" readonly /></td>
-			<td class="unit" id="unit_motor_stall_torque"></td>
+			<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly /></td>
+			<td><input class="unit" data-unit="torque" id="motor_stall_torque_adj" readonly /></td>
+			<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 			<td><input id="motor_free_current" readonly /></td>
@@ -251,16 +246,20 @@
 	<table>
 		<tr>
 			<th class="rowlabel">Clutch Torque<span class="ttt">The torque of the clutch/brake on the rocker pod (linking the input torque more directly to the pod), providing additional resistance and thus dig-in at the cost of propulsive force. <i>Leave blank if no such clutch.</i></span></th>
-				<td><input id="T_clutch" oninput="compute()" /></td><td class="unit" id="unit_T_clutch"></td>
+				<td><input class="unit" data-unit="torque" id="T_clutch" oninput="compute()" /></td>
+				<td class="unit" data-unit="torque" ></td>
 		</tr><tr>
 			<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
-				<td><input id="r_pod" oninput="compute()" /></td><td class="unit" id="unit_r_pod"></td>
+				<td><input class="unit" data-unit="dimension" id="r_pod" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_r_pod"></td>
 		</tr><tr>
 			<th class="rowlabel">Pod Pivot Height<span class="ttt">Distance from ground to pod's pivot point</span></th>
-				<td><input id="h_pod" oninput="compute()" /></td><td class="unit"  id="unit_h_pod"></td>
+				<td><input class="unit" data-unit="dimension" id="h_pod" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_h_pod"></td>
 		</tr><tr>
 			<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
-				<td><input id="d_wheel" oninput="compute()" /></td><td class="unit" id="unit_d_wheel"></td>
+				<td><input class="unit" data-unit="dimension" id="d_wheel" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_d_wheel"></td>
 		</tr><tr>
 			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction</span></th>
 				<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
@@ -272,16 +271,19 @@
 	<table>
 		<tr>
 			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
-				<td><input id="F" readonly /></td></td><td class="unit" id="unit_F"></td>
+				<td><input class="unit" data-unit="force" id="F" readonly /></td></td>
+				<td class="unit" data-unit="force" id="unit_F"></td>
 		</tr><tr>
 			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
-				<td><input id="N" readonly /></td></td><td class="unit" id="unit_N"></td>
+				<td><input class="unit" data-unit="force" id="N" readonly /></td></td>
+				<td class="unit" data-unit="force" id="unit_N"></td>
 		</tr><tr>
 			<th class="rowlabel">F/N<span class="ttt">Ratio of F to N; the effective frictional coefficient of the pod. If this is larger than the actual coefficient of friction, the pod will slip rather than dig in (cells will highlight orange to display this)</span></th>
 				<td><input id="mu_ideal" readonly /></td></td><td class="unit">[-]</td>
 		</tr><tr>
 			<th class="rowlabel">Free Speed<span class="ttt">Free speed of module</span></th>
-				<td><input id="free_speed" readonly /></td></td><td class="unit" id="unit_free_speed"></td>
+				<td><input class="unit" data-unit="speed" id="free_speed" readonly /></td></td>
+				<td class="unit" data-unit="speed" id="unit_free_speed"></td>
 		</tr>
 	</table>
 </div>
