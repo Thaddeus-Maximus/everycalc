@@ -16,19 +16,10 @@
 	EXP_FN_BASE = 'beltsize';
 	UNIT_MAP = {
 		'torque':     	['N-m', 'in-lbf'],
-		'torque_cap': 	['N-m', 'in-lbf'],
 		'pitch': 		['mm', 'mm'], // always metric pitches...
-		'center_add': 	['mm', 'in'],
-		'p1_od': 		['mm', 'in'],
-		'p2_od': 		['mm', 'in'],
-		'p1_pd': 		['mm', 'in'],
-		'p2_pd': 		['mm', 'in'],
+		'dimensions': 	['mm', 'in'],
 		// 'driver_val': 	['mm', 'in'], // this may make more sense to just handle with a computeFrom later on since it changes from teeth to length
-		'dval': 		['mm', 'in'],
-		'l_s': 			['mm', 'in'],
-		'l_l': 			['mm', 'in'],
-		'cc_s': 		['mm', 'in'],
-		'cc_l': 		['mm', 'in']
+		'dval': 		['mm', 'in']
 	};
 
 	// initialization function; hooked to onload
@@ -371,7 +362,7 @@
 				<th class="rowlabel">Pitch: <span class="ttt">Pitch of the timing belt; the distance from one tooth to the next.</span></th>
 				<!-- note the <td class="unit" id="unit_pitch">. This td is where units will be autopopulated by the unit library.
 					 	Just make sure you set the class type and id properly and you don't need to do anything else. -->
-				<td><input id="pitch" value=5 /></td><td class="unit" id='unit_pitch'></td>
+				<td><input id="pitch" data-unit="pitch" value=5 /></td><td class="unit" data-unit="pitch"></td>
 			</tr><tr id="th_stretch">
 				<th class="rowlabel">Stretch: <span class="ttt">How much stretch to add to the belt. Polycord (round belt) should be 5-20%, polybelt (flat belt) should be 1-3%.</span></th>
 				<!-- if you don't use the unit library for an input (because it's a ratio or percentage), don't worry about setting an id. It won't hurt or help. -->

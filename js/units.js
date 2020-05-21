@@ -48,29 +48,34 @@ function getV(id, default_value, pct_err_en) {
 		pct_err_en: enable processing of percentage errors.
 			If enabled, will presume that the queried id ends in _err, strip off the _err, query the element, and return getV(non_errored_entry) times the percentage.
 	*/
+	let unit = document.getElementById(id).dataset.unit;
 	let v =  document.getElementById(id).value;
 	if (pct_err_en && typeof v === 'string' && v.slice(-1) == '%') {
-		return getV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
+		return newGetV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
 	} else if (v=='') {
 		v = default_value;
 	} else {
 		v = eval(v); // I trust you to not abuse this power.
 	}
 	
-	if (typeof UNIT_MAP[id] !== 'undefined') {
-		v = convertFrom(v, UNIT_MAP[id][UNIT_sys]);
+	if (typeof UNIT_MAP[unit] !== 'undefined') {
+		v = convertFrom(v, UNIT_MAP[unit][UNIT_sys]);
 	}
 	return v;
 }
 
+// IDEA: Associate variables not by element id but by associated dimension/unit
+// This would cut down drastically on the unit sprawl phenomenon.... not sure if it makes the DOM bigger... does increase flexibility... some impact to plotting... no efficiency impacts
+
 function setV(id, value, places) {
+	let unit = document.getElementById(id).dataset.unit;
 	if (typeof places === 'undefined')
 		places = (typeof UNIT_PLACES ==='undefined') ? 3:UNIT_PLACES;
 	if (typeof value === 'string') {
 		document.getElementById(id).value = value;
 	} else {
-		if (typeof UNIT_MAP[id] !== 'undefined'){
-			value = convertTo(value, UNIT_MAP[id][UNIT_sys]);
+		if (typeof UNIT_MAP[unit] !== 'undefined'){
+			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
 		document.getElementById(id).value = value.toFixed(places);
 	}
