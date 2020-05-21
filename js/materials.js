@@ -1,4 +1,4 @@
-var materials = { // 1 g/cm^3 = 1000 kg/m^3
+var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 	'Aluminum': { // 6061
 		'Ef': 69e9,
 		'E':  69e9,

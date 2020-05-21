@@ -370,7 +370,7 @@
 		select = document.getElementById('material');
 
 		i=0;
-		for(matl in materials) {
+		for(matl in MATERIAL_DATA) {
 			i++;
 			opt = document.createElement('option');
 			opt.innerHTML = matl;
@@ -387,10 +387,10 @@
 		document.getElementById('density').readOnly 		= matl != 'custom';
 
 		if (matl != 'custom') {
-			setV('elastic_modulus', materials[matl]['Ef']);
-			setV('density', materials[matl]['density']);
-			setV('mass', materials[matl]['density']*getV('area')*getV('length'));
-			setV('Sf', materials[matl]['Sf'] ? materials[matl]['Sf'] : '-');
+			setV('elastic_modulus', MATERIAL_DATA[matl]['Ef']);
+			setV('density', MATERIAL_DATA[matl]['density']);
+			setV('mass', MATERIAL_DATA[matl]['density']*getV('area')*getV('length'));
+			setV('Sf', MATERIAL_DATA[matl]['Sf'] ? MATERIAL_DATA[matl]['Sf'] : '-');
 		}
 
 	}

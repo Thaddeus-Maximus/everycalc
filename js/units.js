@@ -83,7 +83,7 @@ function getVE(id, dir) {
 
 // converting between things is for suckers. Just convert to base units, always.
 function convertFrom(number, from_unit) {
-	let uconv = unit_conversions[from_unit];
+	let uconv = UNIT_CONVERSIONS[from_unit];
 	let newnumber = [];
 	if (typeof number == 'object') {
 		for (var i=0;i<number.length;i++)
@@ -94,7 +94,7 @@ function convertFrom(number, from_unit) {
 }
 
 function convertTo(number, to_unit) {
-	let uconv = unit_conversions[to_unit];
+	let uconv = UNIT_CONVERSIONS[to_unit];
 	let newnumber = [];
 	if (typeof number == 'object') {
 		for (var i=0;i<number.length;i++)
@@ -109,7 +109,7 @@ function convertFromTo(number, from_unit, to_unit) {
 }
 
 // '1 of this unit to <base unit>'
-var unit_bases = {
+var UNIT_BASES = {
 	'm': ['m', 'mm', 'in', 'ft'],
 	'N-m': ['ft-lbf', 'in-lbf', 'ozf-in', 'N-m', 'N-mm'],
 	'N': ['N', 'lbf', 'kgf', 'ozf'],
@@ -130,7 +130,7 @@ var unit_bases = {
 	'N/m': ['lbf/in']
 };
 
-var unit_conversions = {
+var UNIT_CONVERSIONS = {
 	'': 1, // bypass
 	'-': 1,
 	's': 1,
