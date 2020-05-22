@@ -7,8 +7,6 @@
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
-<script type="text/javascript" src="js/math.js"></script>
-<script type="text/javascript" src="js/materials.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -259,7 +257,7 @@
 			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
 				if (params_var_list[j]) {
-					params.push(getV(params_list[j]) + (bit_test(i,pvc) ? 1:-1)*getV(params_list[j]+'_err'));
+					params.push(getVE(params_list[j], bit_test(i,pvc) ? 1:-1));
 					pvc ++;
 				} else {
 					params.push(getV(params_list[j]));
@@ -298,12 +296,6 @@
 			getV('omega_w_0'),
 			getV('kM'),
 			low_omega_w, '0']);
-
-		// TODO: draw charts for real
-
-      	//drawchart_launch(max_low_run, max_high_run, max_low_stat, max_high_stat);
-
-      	console.log(max_high_run, max_low_run);
 
       	PLOT_drawLinePlot({
       		chartName: "chart_launch",
@@ -401,6 +393,7 @@
 	}
 
 	function calcRatio() {
+		setError(1);
 		var G = 1;
 		G *= getV("G1B", 1);
 		G *= getV("G2B", 1);

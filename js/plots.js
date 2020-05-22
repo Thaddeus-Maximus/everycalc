@@ -341,6 +341,8 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		}
 	}
 
+	console.log(maxs, mins);
+
 	config.axes.x.scaling = PLOT_computeScaling(config.axes.x, mins.x, maxs.x);
 	if (typeof config.axes.z == 'undefined') {
 		config.axes.y.scaling = PLOT_computeScaling(config.axes.y, mins.y, maxs.y);
@@ -366,6 +368,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		let cas = config.axes[axis].scaling;
 		for (let i in dsnames[axis]) {
 			let set = dsnames[axis][i];
+			console.log(set, cas);
 			config.datasets[set].scaling = {
 				fL: cas.intervalHt[i]*cas.minRem,
 				fH: cas.intervalHt[i]*cas.maxRem
@@ -386,6 +389,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		let fScl  = config.datasets[name].scaling
 
 		for (i in xChnl) {
+			console.log(name, i, xChnl[i], fChnl[i], xScl, fScl);
 			lines[name].points.appendItem(PLOT_makePoint(
 				config.dom.svg,
 				config.scaling,
