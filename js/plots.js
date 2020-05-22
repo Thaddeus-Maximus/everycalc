@@ -422,7 +422,6 @@ function PLOT_focusHandler(chart, event) {
 
 	let plotScale = config.scaling;
 	let xScale    = config.datasets[config.axes.x.datasets[0]].scaling;
-	let xChannel  = channels[config.axes.x.datasets[0]];
 
 	let xLabel = document.getElementById(`${config.chartName}_${config.axes.x.datasets[0]}_label`);
 	let xUnit  = xLabel && UNIT_MAP ? UNIT_MAP[xLabel.dataset.unit] : undefined;
@@ -448,18 +447,38 @@ function PLOT_focusHandler(chart, event) {
 			xq = plotScale.xH;
 		}
 		tq = convertFrom(tq, xUnit);
-	}
+	} // ok up to here for multi
 	
-	for (q in config.queries) {
+	if (channels instanceof Array) {
+		// multi- case
+		for (let chi in channels) {
+			// take the red pill, and I show you how deep the rabbit hole goes
+			let xChannel  = channels[chi][config.axes.x.datasets[0]];
 
-		let query_conf = config.queries[q];
+			for (q in config.queries) {
+				let query_conf = config.queries[q];
 
-		if (q == 'INDEX') {
-			setV(`${config.chartName}_INDEX`, interpIdx(xChannel, tq), query_conf.places);
-		} else {
-			setV(`${config.chartName}_${q}`, interp1D(xChannel, channels[q], tq), query_conf.places);
+				if (q == 'INDEX') {
+					setV(`${config.chartName}_INDEX_${parseInt(chi)+1}`, interpIdx(xChannel, tq), query_conf.places);
+				} else {
+					setV(`${config.chartName}_${q}_${parseInt(chi)+1}`, interp1D(xChannel, channels[chi][q], tq), query_conf.places);
+				}
+			}
+		}
+	} else {
+		let xChannel  = channels[config.axes.x.datasets[0]];
+
+		for (q in config.queries) {
+			let query_conf = config.queries[q];
+
+			if (q == 'INDEX') {
+				setV(`${config.chartName}_INDEX`, interpIdx(xChannel, tq), query_conf.places);
+			} else {
+				setV(`${config.chartName}_${q}`, interp1D(xChannel, channels[q], tq), query_conf.places);
+			}
 		}
 	}
+	
 
 	querybar.setAttribute('opacity', 1);
 	querybar.setAttribute('x1', xq);
