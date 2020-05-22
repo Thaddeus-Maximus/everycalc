@@ -268,7 +268,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 				channels_conv[name] = convertTo(channels[name], unit[UNIT_sys]);
 			}
 			else{
-				channels_conv[name] = channels[name];
+				channels_conv[name] = channels[name].slice(); // slice creates a copy
 			}
 		}
 		channels_stitched = channels_conv;
@@ -283,7 +283,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 					cconv[name] = convertTo(run[name], unit[UNIT_sys]);
 				}
 				else{
-					cconv[name] = run[name];
+					cconv[name] = run[name].slice(); // slice creates a copy
 				}
 			}
 			channels_conv.push(cconv);
@@ -291,7 +291,9 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		// build channels_stitched
 		channels_stitched = {};
 		for (name in channels_conv[0]) {
-			channels_stitched[name] = channels_conv[0][name].concat(channels_conv[1][name].reverse());
+			// take one array, reverse it, switch them together
+			channels_stitched[name] = channels_conv[0][name].concat(channels_conv[1][name].slice().reverse()); // slice creates a copy
+			channels_stitched[name].push(channels_stitched[name][0]); // close the loop
 		}
 	}
 

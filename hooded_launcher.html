@@ -343,11 +343,7 @@
       			F_h: {places: 3},
       			F_w: {places: 3}
       		}
-      	}, [max_low_run, max_high_run]);
-
-		//drawchart_rev(rev_run, rev_stats);
-
-		console.log(rev_run);
+      	}, [max_high_run, max_low_run]);
 
 		PLOT_drawLinePlot({
       		chartName: "chart_rev",
@@ -469,9 +465,9 @@
 					<td class='unit' data-unit='dim' id='unit_d_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball Mass</th>
-					<td><input class='unit' data-unit='dim' id='m_b' value=0.3><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id='m_b_err' value=''></td>
-					<td class='unit' data-unit='dim' id='unit_m_b'></td>
+					<td><input class='unit' data-unit='mass' id='m_b' value=0.3><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='mass' id='m_b_err' value=''></td>
+					<td class='unit' data-unit='mass' id='unit_m_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball MOI Ratio<span class="ttt">Ratio of MOI to mass times radius squared.<br/>2/5 for a solid sphere, 2/3 for a hollow sphere, 1/2 for a solid cylinder, 1 for a hollow cylinder.</span></th>
 					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">+/-</td>
