@@ -257,7 +257,7 @@
 			pvc = 0;
 			for (j=0; j<params_list.length; j++) {
 				if (params_var_list[j]) {
-					params.push(getVE(params_list[j], bit_test(i,pvc) ? 1:-1));
+					params.push(getVE(params_list[j], bitTest(i,pvc) ? 1:-1));
 					pvc ++;
 				} else {
 					params.push(getV(params_list[j]));

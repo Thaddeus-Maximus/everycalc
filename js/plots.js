@@ -23,7 +23,6 @@ function PLOT_computeScaling(config, mins, maxs) {
 	let bases = [];
 	let neg_mode = config.negativeHandling;
 	let box_end = config.boxEnds;
-	let ticks = [];
 	let min_idx = 0;
 	let max_idx = 0;
 	let min_scaling = [];
@@ -32,34 +31,45 @@ function PLOT_computeScaling(config, mins, maxs) {
 	// generate bases
 	for(i in mins) {
 		let h = 0;
+		let noshow = true;
 		switch(neg_mode) {
 			case 'posonly':
 				h = maxs[i]/config.numTicks;
+				if (maxs[i] > 1e-5) noshow = false;
 				break;
 			case 'negonly':
 				h = -mins[i]/config.numTicks;
+				if (-mins[i] > 1e-5) noshow = false;
 				break;
 			case 'symmetric':
 				h = Math.max(
 					+maxs[i]/config.numTicks*2,
 					-mins[i]/config.numTicks*2
 				);
+				if ( maxs[i] > 1e-5) noshow = false;
+				if (-mins[i] > 1e-5) noshow = false;
 				break;
 			case 'fit':
 				h    = (maxs[i] - mins[i])/config.numTicks;
 				break;
 			case 'fitzero':
 				h    = (Math.max(0, maxs[i]) - Math.min(0, mins[i]))/config.numTicks;
+				if ( maxs[i] > 1e-5) noshow = false;
+				if (-mins[i] > 1e-5) noshow = false;
 				break;
 		}
 
-		let base = Math.floor(Math.log10(h)-Math.log10(5));
-		bases.push(base);
-		H.push(Math.round(h/Math.pow(10,base))*Math.pow(10,base));
-		ticks.push([]);
+		if(!noshow) {
+			let base = Math.floor(Math.log10(h)-Math.log10(5));
+			bases.push(base);
+			H.push(Math.round(h/Math.pow(10,base))*Math.pow(10,base));
 
-		min_scaling.push(mins[i]/H[i]);
-		max_scaling.push(maxs[i]/H[i]);
+			min_scaling.push(mins[i]/H[i]);
+			max_scaling.push(maxs[i]/H[i]);
+		} else {
+			bases.push(0);
+			H.push(1);
+		}
 	}
 	// FIXME: posonly + boxEnds + nonzero lower data bound = bad time??
 	// how many intervals to the end? (may be a float with non-boxed ends)
@@ -341,8 +351,6 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		}
 	}
 
-	console.log(maxs, mins);
-
 	config.axes.x.scaling = PLOT_computeScaling(config.axes.x, mins.x, maxs.x);
 	if (typeof config.axes.z == 'undefined') {
 		config.axes.y.scaling = PLOT_computeScaling(config.axes.y, mins.y, maxs.y);
@@ -368,7 +376,6 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		let cas = config.axes[axis].scaling;
 		for (let i in dsnames[axis]) {
 			let set = dsnames[axis][i];
-			console.log(set, cas);
 			config.datasets[set].scaling = {
 				fL: cas.intervalHt[i]*cas.minRem,
 				fH: cas.intervalHt[i]*cas.maxRem
@@ -389,7 +396,6 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		let fScl  = config.datasets[name].scaling
 
 		for (i in xChnl) {
-			console.log(name, i, xChnl[i], fChnl[i], xScl, fScl);
 			lines[name].points.appendItem(PLOT_makePoint(
 				config.dom.svg,
 				config.scaling,
@@ -463,7 +469,6 @@ function PLOT_focusHandler(chart, event) {
 
 			for (q in config.queries) {
 				let query_conf = config.queries[q];
-
 				if (q == 'INDEX') {
 					setV(`${config.chartName}_INDEX_${parseInt(chi)+1}`, interpIdx(xChannel, tq), query_conf.places);
 				} else {
