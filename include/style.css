@@ -198,7 +198,9 @@ button {
 .error {
   background: #e43 !important;
 }
-
+.warning {
+  background: #eb3 !important;
+}
 
 
 .hovered {

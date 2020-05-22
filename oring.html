@@ -231,10 +231,10 @@
 			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
 			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
 			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
-			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2);
-			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2);
-			setV('clrm_min', (getVE('d3',-1)-getVE('d2',+1))/2);
-			setV('clrm_max', (getVE('d3',+1)-getVE('d2',-1))/2);
+			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2, 4);
+			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2, 4);
+			setV('clrm_min', (getVE('d3',-1)-getVE('d2',+1))/2, 4);
+			setV('clrm_max', (getVE('d3',+1)-getVE('d2',-1))/2, 4);
 		} else if (type=='rad_f') {
 			setV('com_min', (1+(getVE('d1',-1)-getVE('d3',+1))/2/getVE('rw',-1))*100);
 			setV('com_max', (1+(getVE('d1',+1)-getVE('d3',-1))/2/getVE('rw',+1))*100);
@@ -242,8 +242,8 @@
 			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
 			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
 			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
-			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2);
-			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2);
+			setV('clr_min', (getVE('d4',-1)-getVE('d1',+1))/2, 4);
+			setV('clr_max', (getVE('d4',+1)-getVE('d1',-1))/2, 4);
 		} else if (type=='rad_m') {
 			setV('com_min', (1+(getVE('d1',-1)-getVE('d3',+1))/2/getVE('rw',-1))*100);
 			setV('com_max', (1+(getVE('d1',+1)-getVE('d3',-1))/2/getVE('rw',+1))*100);
@@ -251,8 +251,8 @@
 			setV('vol_max', ( Math.PI/4*getVE('rw',+1)*getVE('rw',+1) ) / ( (getVE('d3',-1)-getVE('d1',+1))/2*getVE('d5',-1) )* 100 );
 			setV('str_max', (getVE('d1', +1) / getVE('rid', -1) - 1) * 100);
 			setV('str_min', (getVE('d1', -1) / getVE('rid', +1) - 1) * 100);
-			setV('clr_min', (getVE('d3',-1)-getVE('d2',+1))/2);
-			setV('clr_max', (getVE('d3',+1)-getVE('d2',-1))/2);
+			setV('clr_min', (getVE('d3',-1)-getVE('d2',+1))/2, 4);
+			setV('clr_max', (getVE('d3',+1)-getVE('d2',-1))/2, 4);
 		} else if (type=='face') {
 			setV('com_min', (getVE('rw',-1)-getVE('d5',+1))/getVE('rw',-1)*100);
 			setV('com_max', (getVE('rw',+1)-getVE('d5',-1))/getVE('rw',+1)*100);
@@ -743,15 +743,15 @@ input {
 				<td class="unit">[%]</td>
 			</tr><tr>
 				<th class="rowlabel">Clearance</th>
-				<td><input id="clr_min" readonly></td>
-				<td><input id="clr_max" readonly></td>
+				<td><input class="unit" data-unit="dimension" id="clr_min" readonly></td>
+				<td><input class="unit" data-unit="dimension" id="clr_max" readonly></td>
 				<td></td>
 				<td></td>
 				<td class="unit" id="unit_clr_min"></td>
 			</tr><tr id="clrm_row">
 				<th class="rowlabel">Clearance</th>
-				<td><input id="clrm_min" readonly></td>
-				<td><input id="clrm_max" readonly></td>
+				<td><input class="unit" data-unit="dimension" id="clrm_min" readonly></td>
+				<td><input class="unit" data-unit="dimension" id="clrm_max" readonly></td>
 				<td></td>
 				<td></td>
 				<td class="unit" id="unit_clrm_min"></td>

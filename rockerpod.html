@@ -17,7 +17,8 @@
 		"force": 		["N","lbf"],
 		"torque": 		["N-m", "in-lbf"],
 		"dimension": 	["mm", "in"],
-		"speed": 		["m/s", "ft/s"]
+		"speed": 		["m/s", "ft/s"],
+		"omega":        ["RPM", "RPM"]
 	}
 
 	function init() {
@@ -97,30 +98,37 @@
 		F = G_pod*(T_in-T_clutch) / r_wheel;
 		N = (T_in + F*h_pod)/w;
 		mu_ideal = F/N;
-		v = omega_free/60*Math.PI*r_wheel*2/G_pod/G_pre;
+		v = omega_free*r_wheel/G_pod/G_pre;
 
 		setV("F", F);
 		setV("N", N);
 		setV("mu_ideal", mu_ideal);
 		setV("free_speed", v);
 		if (mu < mu_ideal) {
-			document.getElementById("F").classList.add('error');
-			document.getElementById("N").classList.add('error');
-			document.getElementById("mu_ideal").classList.add('error');
+			document.getElementById("F").classList.add('slip');
+			document.getElementById("N").classList.add('slip');
+			document.getElementById("mu_ideal").classList.add('slip');
+			setError(0, 'Computed fully; but the rocker pod is going to slip!');
 		}
 		else{
-			document.getElementById("F").classList.remove('error');
-			document.getElementById("N").classList.remove('error');
-			document.getElementById("mu_ideal").classList.remove('error');
+			document.getElementById("F").classList.remove('slip');
+			document.getElementById("N").classList.remove('slip');
+			document.getElementById("mu_ideal").classList.remove('slip');
+			setError(0);
 		}
 	}catch(err){
 		console.log(err);
 		setError(2,err);
 		return;
 	}
-	setError(0);
 	}
 </script>
+
+<style>
+	.slip {
+		background-color: #e87 !important;
+	}
+</style>
 
 <html>
 
@@ -186,9 +194,9 @@
 		</tr>
 		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input id="motor_max_rpm" readonly /></td>
-			<td><input id="motor_max_rpm_adj" readonly /></td>
-			<td class="unit" >[RPM]</td>
+			<td><input class="unit" data-unit="omega" id="motor_max_rpm" readonly /></td>
+			<td><input class="unit" data-unit="omega" id="motor_max_rpm_adj" readonly /></td>
+			<td class="unit" data-unit="omega" >[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 			<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly /></td>
@@ -269,11 +277,11 @@
 <div class="output">
 	<table>
 		<tr>
-			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
+			<th class="rowlabel">Slide Stall Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
 				<td><input class="unit" data-unit="force" id="F" readonly /></td></td>
 				<td class="unit" data-unit="force" id="unit_F"></td>
 		</tr><tr>
-			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
+			<th class="rowlabel">Normal Stall Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
 				<td><input class="unit" data-unit="force" id="N" readonly /></td></td>
 				<td class="unit" data-unit="force" id="unit_N"></td>
 		</tr><tr>
