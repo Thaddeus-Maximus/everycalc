@@ -34,7 +34,7 @@ function BELT_calculateCenterDist(l, d1, d2, crossed) {
 		fb = BELT_calculateLength(b, d1, d2, crossed) - l;
 		fc = BELT_calculateLength(c, d1, d2, crossed) - l;
 
-		if (Math.abs(fc)<1e-4) {
+		if (Math.abs(fc)<1e-5) {
 			break;
 		}
 

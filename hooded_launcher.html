@@ -172,7 +172,7 @@
 	function computeRevUp(params_pack) {
 		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, kM, omega_drop] = params_pack;
 
-		dt = 0.01;
+		dt = 0.001;
 
 		i = 0;
 		t = 0;
@@ -193,8 +193,6 @@
 			cur_cons += cur*dt;
 			t += dt;
 			i ++;
-
-			console.log(domega, T, M, I_w, cur);
 
 			res.t.push(t);
 			res.omega.push(omega);
@@ -803,7 +801,7 @@
 			<g class="plot-labels">
 			  <text x=405 y=485 class="plot-titlelabel" id="chart_rev_t_label">Time [s]</text>
 			  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="chart_rev_cur_label" fill="#d91200">Current Draw [A]</text>
-			  <text x=-240 y=800 class="plot-titlelabel unit" transform="rotate(270)" id="chart_rev_omega_label" fill="#0074d9">Flywheel Speed [RPM]</text>
+			  <text x=-240 y=800 class="plot-titlelabel unit" transform="rotate(270)" data-unit="omega" id="chart_rev_omega_label" fill="#0074d9">Flywheel Speed [RPM]</text>
 			</g>
 
 			<g class="plot-axlabels" id='chart_rev_x_axlabels'></g>
