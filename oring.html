@@ -1,3 +1,6 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 
@@ -23,24 +26,27 @@
 		EXP_onload();
 		UNIT_change();
 
-		EC_setOnInputChange(
+		// not an expensive calculator, just fire on all changes
+		EC_setOnInput(
 			function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
-		    	if (e.target.id == 'dashsize')
+		    	if(key!=13) setError(1);
+		    	if (e.target.id == 'dashsize'){
 		    		selectDashSize();
-		    	if (e.target.id == 'rw' || e.target.id == 'rid')
+		    		setError(1);
+		    	}
+		    	if (e.target.id == 'rw' || e.target.id == 'rid'){
 		    		clearDashSize();
+		    		setError(1);
+		    	}
 
 		    	if (e.target.id.startsWith('d')) {
 		    		illustrationHighlight(e.target.id.substring(1,2));
 		    	}
 
-		    	if (key==13) {
-		    		compute();
-		    	} else {
-		    		compute();
-		    	}
+		    	compute();
 		    });
+		EC_setOnKeyUp(); // default handler ok
 
 
 		let inputs = document.getElementsByTagName('input');

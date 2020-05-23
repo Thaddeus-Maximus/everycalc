@@ -1,3 +1,6 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 
@@ -33,22 +36,21 @@
 		EXP_onload();
 		EC_onload();
 
-		EC_setOnInputChange(function(e) {
+		EC_setOnInput(function(e) {
+	    });
+	    // constant updates are fine; this calculator isn't computationally expensive
+	    EC_setOnKeyUp(function(e) {
 	    	let key = e.keyCode ? e.keyCode : e.which;
 	    	let input = e.target;
-			setError(1);
+			if(key!=13) setError(1);
 
 			if(input.id.startsWith('rpm')){
 				computeRPM(input);
-				if (key==13) compute();
 			}
 			else if(input.id.startsWith('torque')){
 				computeTorque(input);
-				if (key==13) compute();
 			}
-			else {
-				compute();
-			}
+			compute();
 	    });
 
 		selectVendor();

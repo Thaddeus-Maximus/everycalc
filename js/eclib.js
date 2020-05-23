@@ -22,10 +22,26 @@ function EC_onload() {
     	}
     }
 */
-function EC_setOnInputChange(fn) {
+function EC_setOnInput(fn) {
 	let inputs = document.getElementsByTagName('input');
 	for (index = 0; index < inputs.length; ++index) {
-	    inputs[index].onkeyup = fn;
+	    inputs[index].oninput = typeof fn == 'undefined' ?
+	    	function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	if(key!=13) setError(1);
+			}
+		: fn;
+	}
+}
+function EC_setOnKeyUp(fn) {
+	let inputs = document.getElementsByTagName('input');
+	for (index = 0; index < inputs.length; ++index) {
+	    inputs[index].onkeyup = typeof fn == 'undefined' ? 
+		    function(e) {
+		    	let key = e.keyCode ? e.keyCode : e.which;
+				if (key == 13) compute();
+			} 
+		: fn; // default handler calls compute if you press enter
 	}
 }
 
@@ -126,9 +142,11 @@ function collapseDiv(id) {
 	if(el.style['display'] != 'none') {
 		el.style['display'] = 'none';
 		btn.innerHTML = "&#9660";
+		return false; // close
 	} else {
 		el.style['display'] = 'inherit';
 		btn.innerHTML = "&#9650";
+		return true; // open
 	}
 }
 

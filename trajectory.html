@@ -1,3 +1,6 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 
@@ -50,14 +53,8 @@
 		UNIT_change();
 		selectMode();
 
-		EC_setOnInputChange(function(e) {
-		    	var key = e.keyCode ? e.keyCode : e.which;
-		    	setError(1);
-
-		    	if (key==13) {
-		    		compute();
-		    	}
-			});
+		EC_setOnInput(); // default handler OK
+		EC_setOnKeyUp(); // default handler OK
 
 		compute();
 	}

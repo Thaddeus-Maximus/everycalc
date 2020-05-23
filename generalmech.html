@@ -15,8 +15,8 @@
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript" id="main">
-	EXP_FN_BASE = 'simplemech';
-	UNIT_MAP = {
+	EXP_FN_BASE = 'simplemech'; // filename base for export utility
+	UNIT_MAP = { // map of units
 		"torque": ["N-m", "N-m"],
 		"encoder_cpx": ["c/m", "c/ft"],
 		"radius": ["mm","in"],
@@ -34,6 +34,7 @@
 		"angle": ["deg", "deg"]
 	};
 
+	/* Initialization routine run on page load */
 	function init() {
 		EC_onload();
 		MOTOR_setupMotorSelect("motortype");
@@ -41,16 +42,30 @@
 		UNIT_change();
 		selectFriction();
 
-		EC_setOnInputChange(function(e) {
+		// on keyup for all variables
+		EC_setOnInput(function(e) {
 	    	let key = e.keyCode ? e.keyCode : e.which;
 	    	let input = e.target;
+
+	    	// if a key is pressed, invalidate current results
 			setError(1);
 
-			if (key == 13) compute();
+			// if something was input into the custom motor area, compute the motor specs
+			if (input.id.startsWith("motor_")) {
+				computeMotorSpecs();
+			}
+			// if a gear ratio element was edited, compute gear ratio
+			if (input.id.startsWith("G") && input.id.length == 3) {
+				calcRatio();
+			}
 	    });
+
+		EC_setOnKeyUp(); // default handler OK
 
 		calcRatio();
 		selectMotorType(document.getElementById("motortype"));
+
+		compute();
 	}
 
 	function selectFriction() {
@@ -157,7 +172,7 @@
 			variables.theta_m 	= convertTo(theta_ar[theta_ar.length-1]*G, UNIT_MAP.theta[UNIT_sys]);
 			variables.v 		= convertTo(omega_ar[omega_ar.length-1]*r, UNIT_MAP.speed[UNIT_sys]);
 			variables.x 		= convertTo(theta_ar[theta_ar.length-1]*r, UNIT_MAP.distance[UNIT_sys]);
-			if (i > 10000 || parseMath(end_expr, variables)) break;
+			if (i > 5000 || parseMath(end_expr, variables)) break;
 
 			T = Math.min(G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf, N*mu*r);
 			Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
@@ -189,13 +204,11 @@
 			if (dt_override)
 				dt = dt_override;
 			else
-				dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/100));
+				dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/40));
 			i++;
 		}
 
 		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
-
-		console.log(channels);
 
 		PLOT_drawLinePlot({
 			chartName: "chart",
@@ -256,19 +269,37 @@
 	}
 
 	function selectMotorType() {
-		e=document.getElementById("motortype");
-		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		let props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		let e = document.getElementById("motortype");
+
+		if (e.value == 'custom') {
+			props.forEach(function(a){
+				document.getElementById("motor_"+a).readOnly = false;
+			});
+		} else {
+			props.forEach(function(a) {
+				document.getElementById("motor_"+a).readOnly = true;
+				setV("motor_"+a, MOTOR_getSpecs(e.value, a));
+
+			});
+		}
+
+		computeMotorSpecs();
+	}
+
+	function computeMotorSpecs() {
+		let props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+
 		props.forEach(function(a) {
-			setV("motor_"+a, MOTOR_getSpecs(e.value, a));
-			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage")/12;
+			let adjVal = getV("motor_"+a)*getV("op_voltage")/12;
+
 			if (a=="stall_torque")
 				adjVal *= getV("motornum")*getV("efficiency")/100;
 			if (a=="free_current" || a=="stall_current" )
 				adjVal *= getV("motornum");
 			setV("motor_"+a+"_adj", adjVal);
 		});
-
-		compute();
+				
 	}
 
 	function calcRatio() {
@@ -282,6 +313,12 @@
 		G /= getV("G3A",1);
 		G /= getV("G4A",1);
 		setV("G", G);
+	}
+
+	function collapseGearRatio() {
+		let open = collapseDiv('gratio');
+		document.getElementById('G').readOnly = open;
+		if(open) calcRatio();
 	}
 </script>
 
@@ -315,14 +352,14 @@
 			<tr><th colspan=6 style="text-align: center;" class="rowlabel bold">Gearbox</th></tr>
 			<tr>
 			<td class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></td>
-			<td><input class='narrow' id="motornum" oninput="selectMotorType()" value=1 /></td>
+			<td><input class='narrow' id="motornum" oninput="selectMotorType(); compute();" value=1 /></td>
 			<td></td>
 			<td class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></td>
-			<td><input class='narrow' id="op_voltage" oninput="selectMotorType()" value=12 /></td>
+			<td><input class='narrow' id="op_voltage" oninput="selectMotorType(); compute();" value=12 /></td>
 			<td class="unit">[V]</td>
 		</tr><tr>
 			<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
-			<td><input class='narrow'  id="efficiency" oninput="selectMotorType()" value=85 /></td>
+			<td><input class='narrow'  id="efficiency" oninput="selectMotorType(); compute();" value=85 /></td>
 			<td class="unit">[%]</td>
 			<td class="rowlabel">Speed Loss<span class="ttt">Magical "Speed Loss Constant" from the JVN-calcs. Doesn't impact simulation, only used to compute "JVN adjusted speed".</span></td>
 			<td><input class='narrow'  id="speedloss" oninput="compute()" value=80 /></td>
@@ -331,14 +368,16 @@
 		</table>
 		<div>
 			<span class="rowlabel">Motor</span>
-			<select class="doublewide" id="motortype" oninput="selectMotorType()"></select>
+			<select class="doublewide" id="motortype" oninput="selectMotorType(); compute();">
+				<option value="custom">Custom</option>
+			</select>
 			<button type="button" onclick="collapseDiv('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
 		</div>
 	<table id='detail_motor' style='display:none;'>
 		<tr>
 			<th></th>
 			<th class="collabel">Raw Motor</th>
-			<th class="collabel">Adjusted</th>
+			<th class="collabel" colspan=2>Combined/Adjusted</th>
 			<th></th>
 		</tr>
 		<tr>
@@ -368,25 +407,25 @@
 		<div>
 		<span class='rowlabel bold'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
 		<input id="G"/>
-		<button type="button" onclick="collapseDiv('gratio')" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
+		<button type="button" onclick="collapseGearRatio();" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
 	</div>
 	<table id='detail_gratio' style="display:none;">
 		<tr>
-			<td><input id="G1A" oninput="calcRatio()" value=12 /></td>
+			<td><input id="G1A" value=12 /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="calcRatio()" value=72 /></td>
+			<td><input id="G1B" value=72 /></td>
 		</tr><tr>
-			<td><input id="G2A" oninput="calcRatio()" /></td>
+			<td><input id="G2A" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2B" oninput="calcRatio()" /></td>
+			<td><input id="G2B" /></td>
 		</tr><tr>
-			<td><input id="G3A" oninput="calcRatio()" /></td>
+			<td><input id="G3A" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3B" oninput="calcRatio()" /></td>
+			<td><input id="G3B" /></td>
 		</tr><tr>
-			<td><input id="G4A" oninput="calcRatio()" /></td>
+			<td><input id="G4A" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G4B" oninput="calcRatio()" /></td>
+			<td><input id="G4B" /></td>
 		</tr>
 	</table>
 </div><div class="even">

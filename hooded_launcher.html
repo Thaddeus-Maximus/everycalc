@@ -1,3 +1,6 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css">
 
@@ -37,12 +40,9 @@
 
 		EC_setOnInputChange(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
-		    	setError(1);
-
-		    	if (key==13) {
-		    		compute();
-		    	}
+		    	if(key!=13) setError(1);
 		    });
+		EC_setOnKeyUp(); // default handler OK
 
 		calcRatio();
 
