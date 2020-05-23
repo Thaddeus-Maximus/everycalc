@@ -529,6 +529,43 @@ State is determined as
 \section*{Hybrid Pitchers}
 An interesting design proliferated during the FRC 2020 season, consisting of a hooded pitcher with an extra set of 'afterburner' wheels where the hood would terminate. This could be modeled fairly easily (I simply haven't gotten to it yet). I may transfer the calculator into a single one consisting of only the hybrid pitcher, as hooded and dual-wheel pitchers could be considered just special cases.
 
-%\section*{Evaluation and Comparison to Empirical Data}
+\section*{Sanity Checks}
+	These are new analysis techniques so there is no prior art to compare to. However, we can still perform some sanity checks.
 
+	\begin{figure}[H]
+		\includegraphics[width=0.99\textwidth]{validation/hood_EC_A.png}
+		\caption{Hooded Flywheel Calculator - Exemplary Case}
+	\end{figure}
+
+	We can quickly check the relationship between ball velocity, ball spin, and wheel speed at exit. If the ball has finally latched onto the wheel, we'd see that the surface speeds of the wheel and ball should match. That is to say,
+
+	\begin{align}
+		v_b + \omega_b \frac{w}{2} = \omega_w \frac{d_w}{2}.
+	\end{align}
+
+	Numerically in this case,
+	\begin{align}
+		31.766 \frac{\text{ft}}{\text{s}} + 1456 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{5}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} = 2426.6 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{6}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} \\
+		63.5310 \frac{\text{ft}}{\text{s}} \approx 63.5282 \frac{\text{ft}}{\text{s}} .
+	\end{align}
+
+	Is the wheel drop realistic? Let's look at the lost energy. There's definitely some losses as the ball interaction has friction, but let's look at it.
+
+	\begin{align}
+		E = m_b v_b^2 + I_b \omega_b^2 + I_w \omega_w^2 \\
+		E_{init} = 4 \text{$lbm\ in^2$} \times (3000 \text{RPM})^2 = 115.5 \text{J} \\
+		E_{final} = 0.3 \text{lbm} \times (31.766 \text{ft/s})^2 + \frac{2}{5} 0.3 \text{lbm} (\frac{5 \text{in}}{2})^2 \times (1456 \text{RPM})^2 + 4 \text{$lbm\ in^2$} \times (2426 \text{RPM})^2 = 93.45 \text{J} \\
+		\eta = \frac{E_{final}}{E_{init}} = \frac{93.45 \text{J}}{115.5 \text{J}} = 80.9 \% 
+	\end{align}
+
+	That's an efficiency less than 100\% (good, physics didn't break), and it isn't dreadfully low (signalling that there isn't too much slippage).
+
+	The rev-up simulation does have some prior art to compare to, luckily. We can run basically the exact same simulation in the simple mechanism calculator.
+
+	\begin{figure}[H]
+		\includegraphics[width=0.9\textwidth]{validation/hood_ECrev_A.png}
+		\caption{Revving up a 4 $lbm\ in^2$ flywheel with a single NEO motor.}
+	\end{figure}
+
+	This shows it takes 0.154 seconds to rev up- nearly the same as the 0.153 in the previous example. Note that the efficiency is specified as 100 percent- this is because the rev-up calculator instead uses a bearing friction value that the general mechanism calculator doesn't have.
 \end{document}
