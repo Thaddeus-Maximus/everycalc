@@ -30,12 +30,16 @@ h1,h2,h3,h4,h5,h6{font-family:"Segoe UI",Arial,sans-serif;font-weight:400;margin
 hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
 
-
+.bold{
+  font-weight: bold;
+}
 .collabel{
 	text-align: top;
   text-align: center;
 }
-
+th {
+  font-weight: normal;
+}
 .rowlabel{
 	text-align: right;
 }
@@ -118,6 +122,7 @@ button {
 }
 
 .rowlabel .ttt {
+  font-weight: normal;
   visibility: hidden;
   width: 350px;
   background-color: #555;
@@ -136,6 +141,9 @@ button {
 .rowlabel:hover .ttt {
   visibility: visible;
   opacity: 1;
+}
+.ttt:hover {
+  visibility: hidden !important;
 }
 
 .graph .labels.x-labels {

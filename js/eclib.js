@@ -126,11 +126,9 @@ function collapseDiv(id) {
 	if(el.style['display'] != 'none') {
 		el.style['display'] = 'none';
 		btn.innerHTML = "&#9660";
-		if (id=='gratio') document.getElementById('G').readOnly = false;
 	} else {
 		el.style['display'] = 'inherit';
 		btn.innerHTML = "&#9650";
-		if (id=='gratio'){ document.getElementById('G').readOnly = true; calcRatio(); }
 	}
 }
 
