@@ -41,7 +41,7 @@
 
 \author{Thaddeus Hughes \\ hughes.thad@gmail.com \\ thaddeus-maximus.github.io}
 \date{\today}
-\title{Center-to-center calculation for power transmission belts}
+\title{Documentation and Validation of EveryCalc's Belt Calculator}
 
 \begin{document}
 	\maketitle
@@ -152,6 +152,67 @@
 	2-D interpolation is used to determine values on the in-betweens.
 	Tabulated values outside the bounds are extrapolated. Omitted values are presumed to be zero.
 	The multiplier factors are used to determine strength of different width belts.
-	
+
+	\newpage
+
+	\section*{Validation}
+
+	Results of my EveryCalc belt tool have been compared to \href{https://www.wcproducts.com/how-to-belts/}{\underline{West Coast Products' Belt Calculator}}.
+
+	\subsection*{Case A}
+
+	\begin{figure}[H]
+		\includegraphics[width=0.60\textwidth]{validation/belts_WCP_A.png}
+		\caption{Case A: WCP Calculator}
+	\end{figure}
+
+	\begin{figure}[H]
+		\includegraphics[width=0.45\textwidth]{validation/belts_EC_A.png}
+		\caption{Case A: EveryCalc}
+	\end{figure}
+
+	\begin{table}[H]
+	\begin{tabular}{llll}
+	                  &                 & WCP & EveryCalc \\ \cline{1-4} 
+	\multirow{4}{*}{Smaller} & Number of Teeth & 70      & 70      \\
+			                 & Center-Center   & 4.8241  & 4.8240  \\
+			                 & P1 Teeth Mesh   & 12.2978 & 12.2978 \\
+			                 & P2 Teeth Mesh   & 8.7767  & 8.7767  \\ \cline{1-4} 
+	\multirow{4}{*}{Larger}  & Number of Teeth & 80      & 80      \\
+			                 & Center-Center   & 5.8090  & 5.8089  \\
+			                 & P1 Teeth Mesh   & 12.2473 & 12.2473 \\
+			                 & P2 Teeth Mesh   & 8.8146  & 8.8146  
+	\end{tabular}
+	\caption{Case A: Comparison of results}
+	\end{table}
+
+	No issues here other than minor rounding errors.
+
+	\newpage
+
+	\subsection*{Case B}
+
+	\begin{figure}[H]
+		\includegraphics[width=0.60\textwidth]{validation/belts_WCP_B.png}
+		\caption{Case B: WCP Calculator}
+	\end{figure}
+
+	\begin{figure}[H]
+		\includegraphics[width=0.45\textwidth]{validation/belts_EC_B.png}
+		\caption{Case B: EveryCalc}
+	\end{figure}
+
+	\begin{table}[H]
+	\begin{tabular}{llll}
+	                 & WCP     & EveryCalc \\ \cline{1-3} 
+	 Number of Teeth & 180     & 180      \\
+	 Center-Center   & 9.0794  & 9.0795  \\
+	 P1 Teeth Mesh   & 4.7889  & 4.7890 \\
+	 P2 Teeth Mesh   & 21.8865 & 21.8864 
+	\end{tabular}
+	\caption{Case B: Comparison of results}
+	\end{table}
+
+	No issues here other than minor rounding errors.
 	
 \end{document}
