@@ -131,8 +131,8 @@
 			Fl = mu_l * vbar*vbar;
 			Fm = mu_m * vbar*omega;
 
-			vy += (-g - Fd*Ty + Fl*Ny + Fm*Ny)*dt;
-			vx += (   - Fd*Tx + Fl*Nx + Fm*Nx)*dt;
+			vy += (-g*m - Fd*Ty + Fl*Ny + Fm*Ny)/m*dt;
+			vx += (     - Fd*Tx + Fl*Nx + Fm*Nx)/m*dt;
 			x += vx*dt;
 			y += vy*dt;
 			t += dt;
@@ -465,7 +465,7 @@
 
 		shot_area.setAttribute('fill', missed ? '#6a1a10': '#3a6a30')
 
-		if (x_obstacle > 0) x_obstacle -= target_d;
+		if (x_obstacle > 0) x_obstacle -= target_x;
 
 		target_low .setAttribute("points","");
 		target_high.setAttribute("points","");

@@ -81,8 +81,8 @@
 		let G = getV("G");
 
 		let mu = +Infinity;
-		let N = 0;
-		if (document.getElementById("enable_friction")) {
+		let N = +Infinity;
+		if (document.getElementById("enable_friction").checked) {
 			mu = getV("friction_mu", 0);
 			N  = m*g*getV("friction_pctloaded",100)/100;
 		}
