@@ -1,364 +1,186 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
 <script type="text/javascript">
-	unit_sys = 0;
-	inputs_unit_map = {
-		"N": ["N","lbf"],
-		"F": ["N","lbf"],
-		"T_clutch": ["N-m", "in-lbf"],
-		"r_pod": ["mm", "in"],
-		"h_pod": ["mm", "in"],
-		"d_wheel": ["mm", "in"],
-		"motor_stall_torque": ["N-m", "N-m"],
-		"motor_stall_torque_adj": ["N-m", "N-m"],
-		"free_speed": ["m/s", "ft/s"]
+	EXP_FN_BASE = 'rockerpod';
+	UNIT_MAP = {
+		"force": 		["N","lbf"],
+		"torque": 		["N-m", "in-lbf"],
+		"dimension": 	["mm", "in"],
+		"speed": 		["m/s", "ft/s"],
+		"omega":        ["RPM", "RPM"],
+		"pct":   		["%", "%"]
 	}
 
-	function switch_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
 
-		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
-			}
-		}
-		compute();
-	}
+		MOTOR_setupMotorSelect("motor");
 
-	function gidv(id, default_value) {
-
-		v =  eval(document.getElementById(id).value);
-		console.log(id, v);
-		if (typeof default_value!=='undefined' && typeof v === 'undefined') v=default_value;
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		return v;
-	}
-
-	function gids(id, value, places) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			value = convert_to(value, inputs_unit_map[id][unit_sys]);
-		document.getElementById(id).value = value.toFixed(places);
-	}
-
-	function thload() {
-		var inputs, index;
-
-		select = document.getElementById("motortype");
-		i=0;
-		for(motor in motor_data) {
-			i++;
-			opt = document.createElement('option');
-			opt.innerHTML = motor_data[motor]["plain_name"];
-			opt.value = motor;
-			select.appendChild(opt);
-		}
-
-		if (packed_inputs) unpack_inputs();
-
-		switch_units();
-
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-		    inputs[index].onkeyup = function(e) {
+		EC_setOnInput(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	if(key!=13) setError(1);
 
-		    	if (key==13) {
-		    		compute(true);
-		    	} else {
-		    		compute(false);
-		    	}
-		    }
-		}
-		motortype_select(document.getElementById("motortype"));
-		calc_ratio_pre();
-		calc_ratio_pod();
-		document.getElementById('topbar_version').innerHTML = VERSION;
-	}
+				if (input.id.startsWith("G") && input.id.length == 3) {
+					computePreRatio();
+				}
+				if (input.id.startsWith("G") && input.id.length == 4) {
+					computePodRatio();
+				}
+		    });
+		EC_setOnKeyUp(); // default handler OK
 
-	function motortype_select() {
-		e=document.getElementById("motortype");
-		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
-		props.forEach(function(a) {
-			
-			gids("motor_"+a, get_motor_data(e.value, a));
-			adjVal = get_motor_data(e.value, a)*gidv("op_voltage")/12;
-			if (a=="stall_torque")
-				adjVal *= gidv("motornum")*gidv("efficiency")/100;
-			if (a=="free_current" || a=="stall_current" )
-				adjVal *= gidv("motornum");
-			gids("motor_"+a+"_adj", adjVal);
-		});
-
+		computePreRatio();
+		computePodRatio();
 		compute();
 	}
 
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
-	function calc_ratio_pre() {
+	function computePreRatio() {
 		var G = 1;
-		G *= NaNto1(gidv("G1B"));
-		G *= NaNto1(gidv("G2B"));
-		G *= NaNto1(gidv("G3B"));
-		G /= NaNto1(gidv("G1A"));
-		G /= NaNto1(gidv("G2A"));
-		G /= NaNto1(gidv("G3A"));
+		G *= getV("G1B",1);
+		G *= getV("G2B",1);
+		G *= getV("G3B",1);
+		G /= getV("G1A",1);
+		G /= getV("G2A",1);
+		G /= getV("G3A",1);
 
-		gids("G_pre", G, 4);
-		gids("G_comb", G*gidv("G_pod"), 4);
+		setV("G_pre", G, 4);
+		setV("G_comb", G*getV("G_pod"), 4);
 	}
-	function calc_ratio_pod() {
+	function computePodRatio() {
 		var G = 1;
-		G *= NaNto1(gidv("G1BP"));
-		G *= NaNto1(gidv("G2BP"));
-		G *= NaNto1(gidv("G3BP"));
-		G /= NaNto1(gidv("G1AP"));
-		G /= NaNto1(gidv("G2AP"));
-		G /= NaNto1(gidv("G3AP"));
+		G *= getV("G1BP",1);
+		G *= getV("G2BP",1);
+		G *= getV("G3BP",1);
+		G /= getV("G1AP",1);
+		G /= getV("G2AP",1);
+		G /= getV("G3AP",1);
 
-		gids("G_pod", G, 4);
-		gids("G_comb", G*gidv("G_pre"), 4);
+		setV("G_pod", G, 4);
+		setV("G_comb", G*getV("G_pre"), 4);
 	}
 
 	function compute() {
-		G_pod = gidv("G_pod");
-		G_pre = gidv("G_pre");
-		T_in  = G_pre*gidv("motor_stall_torque_adj");
-		T_clutch = gidv("T_clutch", 0);
-		h_pod = gidv("h_pod");
-		r_pod = gidv("r_pod");
-		r_wheel = gidv("d_wheel")/2;
-		mu = gidv("mu");
-		omega_free = gidv("motor_max_rpm_adj");
+		try{
+			let motor = MOTOR_packMotor('motor');
+			let G_pod = getV("G_pod");
+			let G_pre = getV("G_pre");
+			let h_pod = getV("h_pod");
+			let r_pod = getV("r_pod");
+			let mu    = getV("mu");
+			let T_clutch = getV("T_clutch", 0);
+			let r_wheel  = getV("d_wheel")/2;
 
-		w = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
-		F = G_pod*(T_in-T_clutch) / r_wheel;
-		N = (T_in + F*h_pod)/w;
-		mu_ideal = F/N;
-		v = omega_free/60*Math.PI*r_wheel*2/G_pod/G_pre;
+			let w    = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
+			let T_in = MOTOR_computeState(motor, "speed", 0).torque;
+			let F    = G_pod*(T_in-T_clutch) / r_wheel;
+			let N    = (T_in + F*h_pod)/w;
+			let mu_ideal = F/N;
 
-		gids("F", F);
-		gids("N", N);
-		gids("mu_ideal", mu_ideal);
-		gids("free_speed", v);
-		if (mu < mu_ideal) {
-			document.getElementById("F").classList.add('error');
-			document.getElementById("N").classList.add('error');
-			document.getElementById("mu_ideal").classList.add('error');
-		}
-		else{
-			document.getElementById("F").classList.remove('error');
-			document.getElementById("N").classList.remove('error');
-			document.getElementById("mu_ideal").classList.remove('error');
+			setV("F", F);
+			setV("N", N);
+			setV("mu_ideal", mu_ideal);
+			setV("free_speed", MOTOR_computeState(motor, "torque", 0).speed*r_wheel/G_pod/G_pre);
+
+			if (mu < mu_ideal) {
+				document.getElementById("F").classList.add('slip');
+				document.getElementById("N").classList.add('slip');
+				document.getElementById("mu_ideal").classList.add('slip');
+				setError(0, 'Computed fully; but the rocker pod is going to slip!');
+			}
+			else{
+				document.getElementById("F").classList.remove('slip');
+				document.getElementById("N").classList.remove('slip');
+				document.getElementById("mu_ideal").classList.remove('slip');
+				setError(0);
+			}
+		}catch(err){
+			console.log(err);
+			setError(2,err);
+			return;
 		}
 	}
 </script>
 
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		packed_inputs.unit_sys = unit_sys;
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
+<style>
+	.slip {
+		background-color: #e87 !important;
 	}
-
-	function unpack_inputs() {
-		unit_sys = packed_inputs.unit_sys;
-		delete packed_inputs.unit_sys;
-		document.getElementById('unit_english').checked = unit_sys;
-		document.getElementById('unit_metric') .checked = !unit_sys;
-		for (key in packed_inputs) {
-			document.getElementById(key).value = packed_inputs[key];
-		}
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'rockerpod_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
-	}
-
-	function print_page() {
-		window.print();
-	}
-</script>
+</style>
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_ctr">Rocker Pod</div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">English</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Rocker Pod</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
 </div>
 
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
-	<div class="odd">
-		<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units()">
-			  <label for="english">English</label><br>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units()" checked>
-			  <label for="metric">Metric</label><br>
-		</center>
-	</div>
-
 	<div class="even">
 		<table>
 		<tr>
-			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
-			<td><input id="motornum" oninput="motortype_select()" value=1 /></td>
+			<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
+			<td><input id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
+		</tr><td class="rowlabel">Operating Power<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
+			<td><input class='narrow unit' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
+			<td class="unit" data-unit="pct"></td>
 		</tr><tr>
-			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-			<td><input id="op_voltage" oninput="motortype_select()" value=12 /></td>
-			<td class="unit">[V]</td>
-		</tr><tr>
-			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-			<td><input id="efficiency" oninput="motortype_select()" value=85 /></td>
-			<td class="unit">[%]</td>
+			<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
+			<td><input class='narrow unit' data-unit="pct" id="motor_efficiency" oninput="MOTOR_selectMotor('motor'); compute();" value=85 /></td>
+			<td class="unit" data-unit="pct" ></td>
 		</tr>
-
 		<tr>
 			<th>Motor</th>
-			<td colspan="2"><select class="doublewide" id="motortype" oninput="motortype_select()">
-			  
-			  <!--<option value="neo">REV NEO</option>
-			  <option value="neo550">REV NEO550</option>
-			  <option value="falcon500">VEX Falcon 500</option>
-			  <option value="cim">CIM</option>
-			  <option value="minicim">MiniCIM</option>
-			  <option value="bag">Vex BAG</option>
-			  <option value="775pro">775Pro / Redline</option>
-			  <option value="am9015">AndyMark 9015</option>
-			  <option value="neverest">AndyMark NeveRest</option>
-			  <option value="rs550">BaneBots RS-550</option>-->
+			<td colspan="2"><select class="doublewide" id="motor_select" oninput="MOTOR_selectMotor('motor'); compute();">
 			</select></td>
 		</tr>
 		<tr>
-			<th></th>
-			<th class="collabel">Raw Motor</th>
-			<th class="collabel">Adjusted</th>
-			<th></th>
-		</tr>
-		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input id="motor_max_rpm" readonly /></td>
-			<td><input id="motor_max_rpm_adj" readonly /></td>
-			<td class="unit">[RPM]</td>
+			<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
+			<td class="unit" data-unit="omega" >[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input id="motor_stall_torque" readonly /></td>
-			<td><input id="motor_stall_torque_adj" readonly /></td>
-			<td class="unit" id="unit_motor_stall_torque"></td>
+			<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
+			<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-			<td><input id="motor_free_current" readonly /></td>
-			<td><input id="motor_free_current_adj" readonly /></td>
+			<td><input id="motor_free_current" readonly value=1.3 /></td>
 			<td class="unit">[A]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-			<td><input id="motor_stall_current" readonly /></td>
-			<td><input id="motor_stall_current_adj" readonly /></td>
+			<td><input id="motor_stall_current" readonly value=166 /></td>
 			<td class="unit">[A]</td>
 		</tr>
 	</table>
@@ -375,42 +197,46 @@
 			<td class="tiny"></td>
 			<td><input id="G_pod" readonly/></td>
 		</tr><tr>
-			<td><input id="G1A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G1A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G1AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G1B" oninput="computePreRatio()" /></td>
+			<td><input id="G1AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G1BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G1BP" oninput="computePodRatio()" /></td>
 		</tr><tr>
-			<td><input id="G2A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G2A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G2AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G2B" oninput="computePreRatio()" /></td>
+			<td><input id="G2AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G2BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G2BP" oninput="computePodRatio()" /></td>
 		</tr><tr>
-			<td><input id="G3A" oninput="calc_ratio_pre()" /></td>
+			<td><input id="G3A" oninput="computePreRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3B" oninput="calc_ratio_pre()" /></td>
-			<td><input id="G3AP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G3B" oninput="computePreRatio()" /></td>
+			<td><input id="G3AP" oninput="computePodRatio()" /></td>
 			<td class="tiny">:</td>
-			<td><input id="G3BP" oninput="calc_ratio_pod()" /></td>
+			<td><input id="G3BP" oninput="computePodRatio()" /></td>
 		</tr>
 	</table>
 </div><div class="even">
 	<table>
 		<tr>
 			<th class="rowlabel">Clutch Torque<span class="ttt">The torque of the clutch/brake on the rocker pod (linking the input torque more directly to the pod), providing additional resistance and thus dig-in at the cost of propulsive force. <i>Leave blank if no such clutch.</i></span></th>
-				<td><input id="T_clutch" oninput="compute()" /></td><td class="unit" id="unit_T_clutch"></td>
+				<td><input class="unit" data-unit="torque" id="T_clutch" oninput="compute()" /></td>
+				<td class="unit" data-unit="torque" ></td>
 		</tr><tr>
 			<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
-				<td><input id="r_pod" oninput="compute()" /></td><td class="unit" id="unit_r_pod"></td>
+				<td><input class="unit" data-unit="dimension" id="r_pod" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_r_pod"></td>
 		</tr><tr>
 			<th class="rowlabel">Pod Pivot Height<span class="ttt">Distance from ground to pod's pivot point</span></th>
-				<td><input id="h_pod" oninput="compute()" /></td><td class="unit"  id="unit_h_pod"></td>
+				<td><input class="unit" data-unit="dimension" id="h_pod" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_h_pod"></td>
 		</tr><tr>
 			<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
-				<td><input id="d_wheel" oninput="compute()" /></td><td class="unit" id="unit_d_wheel"></td>
+				<td><input class="unit" data-unit="dimension" id="d_wheel" oninput="compute()" /></td>
+				<td class="unit" data-unit="dimension" id="unit_d_wheel"></td>
 		</tr><tr>
 			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction</span></th>
 				<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
@@ -421,17 +247,20 @@
 <div class="output">
 	<table>
 		<tr>
-			<th class="rowlabel">Slide Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
-				<td><input id="F" readonly /></td></td><td class="unit" id="unit_F"></td>
+			<th class="rowlabel">Slide Stall Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
+				<td><input class="unit" data-unit="force" id="F" readonly /></td></td>
+				<td class="unit" data-unit="force" id="unit_F"></td>
 		</tr><tr>
-			<th class="rowlabel">Normal Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
-				<td><input id="N" readonly /></td></td><td class="unit" id="unit_N"></td>
+			<th class="rowlabel">Normal Stall Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
+				<td><input class="unit" data-unit="force" id="N" readonly /></td></td>
+				<td class="unit" data-unit="force" id="unit_N"></td>
 		</tr><tr>
 			<th class="rowlabel">F/N<span class="ttt">Ratio of F to N; the effective frictional coefficient of the pod. If this is larger than the actual coefficient of friction, the pod will slip rather than dig in (cells will highlight orange to display this)</span></th>
 				<td><input id="mu_ideal" readonly /></td></td><td class="unit">[-]</td>
 		</tr><tr>
 			<th class="rowlabel">Free Speed<span class="ttt">Free speed of module</span></th>
-				<td><input id="free_speed" readonly /></td></td><td class="unit" id="unit_free_speed"></td>
+				<td><input class="unit" data-unit="speed" id="free_speed" readonly /></td></td>
+				<td class="unit" data-unit="speed" id="unit_free_speed"></td>
 		</tr>
 	</table>
 </div>

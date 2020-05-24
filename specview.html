@@ -1,41 +1,45 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
-<script type="text/javascript">
-	function get_motor_data(motor,key){
-		return motor_data[motor][key];
-	}
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/orings.js"></script>
+<script type="text/javascript" src="js/belts.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/materials.js"></script>
 
+<script type="text/javascript">
 	function handleNaN(x) {
 		return isNaN(x) ? '-':x;
 	}
 
-	function thload() {
+	function init() {
 		table = document.getElementById("motor_data_table");
 		i=0;
-		for(motor in motor_data) {
+		for(motor in MOTOR_specs) {
 			i++;
 			row = table.insertRow(i);
-			row.innerHTML = "<th class='rowlabel'>" + motor_data[motor]["plain_name"] + "</th><td>" 
-				+ motor_data[motor]["max_rpm"] + "</td><td>"
-				+ motor_data[motor]["stall_torque"].toFixed(3) + "</td><td>"
-				+ motor_data[motor]["max_power"] + "</td><td>"
-				+ motor_data[motor]["stall_current"] + "</td><td>"
-				+ motor_data[motor]["free_current"].toFixed(2) + "</td>";
+			row.innerHTML = "<th class='rowlabel'>" + MOTOR_specs[motor]["plain_name"] + "</th><td>" 
+				+ MOTOR_specs[motor]["max_speed"] + "</td><td>"
+				+ MOTOR_specs[motor]["stall_torque"].toFixed(3) + "</td><td>"
+				+ MOTOR_specs[motor]["max_power"] + "</td><td>"
+				+ MOTOR_specs[motor]["stall_current"] + "</td><td>"
+				+ MOTOR_specs[motor]["free_current"].toFixed(2) + "</td>";
 			row.classList.add(i%2 ? 'oddrow' : 'evenrow');
 		}
 
 		table = document.getElementById("unit_data_table");
 		i=0;
-		for(baseunit in unit_bases) {
+		for(baseunit in UNIT_BASES) {
 			firstone = true;
-			for (tounit of unit_bases[baseunit]) {
+			for (tounit of UNIT_BASES[baseunit]) {
 				i++;
 				row = table.insertRow(i);
 				row.innerHTML = 
 					(firstone ? "<th class='rowlabel'>" + baseunit + "</th><td>" : "<td></td><td>") 
 					+ tounit + "</td><td>"
-					+ unit_conversions[tounit] + "</td>";
+					+ UNIT_CONVERSIONS[tounit] + "</td>";
 				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
 				firstone = false
 			}
@@ -43,15 +47,15 @@
 
 		table = document.getElementById("belt_data_table");
 		i=0;
-		for(mfr in belts_data) {
+		for(mfr in BELT_SIZES) {
 			firstone = true;
-			for (series in belts_data[mfr]) {
+			for (series in BELT_SIZES[mfr]) {
 				i++;
 				row = table.insertRow(i);
 				row.innerHTML = 
-					(firstone ? "<th class='rowlabel'>" + belt_mfrs[mfr] + "</th><td>" : "<td></td><td>") 
+					(firstone ? "<th class='rowlabel'>" + BELT_MFRS[mfr] + "</th><td>" : "<td></td><td>") 
 					+ series + "</td><td>"
-					+ belts_data[mfr][series].join(', ') + "</td>";
+					+ BELT_SIZES[mfr][series].join(', ') + "</td>";
 				row.classList.add(i%2 ? 'oddrow' : 'evenrow');
 				firstone = false
 			}
@@ -62,12 +66,12 @@
 		convs = {
 			"E": 1e9, "Ef": 1e9, "St": 1e6, "Sf": 1e6, "density": 1000
 		}
-		for(matl in materials) {
+		for(matl in MATERIAL_DATA) {
 			i++;
 			row = table.insertRow(i);
 			row.innerHTML = "<th class='rowlabel'>" + matl + "</th>";
 			for (property of ["E", "Ef", "St", "Sf", "density"]) {
-				row.innerHTML += '<td>' + handleNaN((materials[matl][property]/convs[property]).toFixed(3)) + "</td>";
+				row.innerHTML += '<td>' + handleNaN((MATERIAL_DATA[matl][property]/convs[property]).toFixed(3)) + "</td>";
 			}
 			row.classList.add(i%2 ? 'evenrow' : 'oddrow');
 		}
@@ -94,7 +98,7 @@ td {
 </style>
 
 <html>
-<body onload="thload()">
+<body onload="init()">
 <div style="float: left;" class="container">
 	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
 	<center><a href="./">Back To Index</a></center>

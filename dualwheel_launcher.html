@@ -1,0 +1,883 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css">
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/tolstack.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<script type="text/javascript">
+	EXP_FN_BASE = 'dualpitch';
+	UNIT_MAP = {
+		'dim': 			['mm', 'in'],
+		'mass': 		['kg', 'lbm'],
+		'stiffness': 	['N/m', 'lbf/in'],
+		'moi': 			['kg mm^2', 'lbm in^2'],
+		'omega': 		['RPM','RPM'],
+		'theta': 		['deg','deg'],
+		'v':       		['m/s','ft/s'],
+		'position': 	['mm', 'in'],
+		'force':     	['N', 'lbf'],
+		'torque':     	['N', 'lbf'],
+
+		'kM': ['N-m/kRPM', 'in-lbf/kRPM'],
+		"pct":   ["%", "%"]
+	};
+
+	function init() {
+		EC_onload();
+		MOTOR_setupMotorSelect("motor_L");
+		MOTOR_setupMotorSelect("motor_U");
+		EXP_onload();
+		UNIT_change();
+
+		EC_setOnInput(function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+				let input = e.target;
+		    	if (input.id.startsWith("G") && input.id.length == 5) {
+					calculateRatio('U');
+					calculateRatio('L');
+				}
+				if (input.id == "omega_0_L")
+					calculateRatio('L');
+				if (input.id == "omega_0_U")
+					calculateRatio('U');
+		    	if(key!=13) setError(1);
+		    });
+		EC_setOnKeyUp(); // default handler OK
+
+		calculateRatio('L');
+		calculateRatio('U');
+		MOTOR_selectMotor('motor_L');
+		selectUpperMotor();
+
+		compute();
+	}
+
+	function computeLaunch(pp) {
+		let I_b = pp.moi_rat_b*pp.m_b*pp.w*pp.w/4;
+		let G_U = document.getElementById("motor_U_select").value == 'slave' ? pp.G_U : "free";
+
+		i=0;
+
+		u0 = -Math.sqrt((pp.d_U+pp.w)*(pp.d_L+pp.w)*(pp.d_b*(pp.d_b+pp.d_U+pp.d_L)-pp.w*(pp.d_U+pp.d_L+pp.w)))/(pp.d_U+pp.d_L+2*pp.w);
+		uf = -u0;
+		y0 = (pp.d_L*(pp.d_b+pp.d_U+pp.d_L) + 2*pp.w*(pp.w + pp.d_L + pp.d_U) - pp.d_b*pp.d_U)/2/(pp.d_U+pp.d_L+2*pp.w);
+
+		i_settled=NaN;
+		u=u0+pp.w*3e-2;
+		y=y0;
+		t=0;
+		v_b=0;
+		
+		omega_b=0;
+		omega_U=pp.omega_0_U;
+		omega_L=pp.omega_0_L;
+
+		res = {
+			t: 			[0],
+			u: 			[0],
+			v_b: 		[0],
+			omega_b: 	[0],
+			omega_U: 	[omega_U],
+			omega_L: 	[omega_L],
+			N_U: 		[0],
+			N_L: 		[0],
+			F_U: 		[0],
+			F_L: 		[0]
+		};
+
+		dt = dt0 = 1e-2/Math.max(pp.omega_0_U, pp.omega_0_L);
+
+		matched_L = false; matched_U = false;
+		u_regain = 0;
+		retry = false;
+
+		while(i<10000 && u<uf) {
+			if (u > u_regain){
+				dt = dt0;
+				retry = false;
+			}
+
+			y = y0; // grumble grumble
+			psi = Math.atan2(u, (pp.d_L+pp.d_U)/2 + pp.w - y);
+			theta = Math.atan2(u, y);
+			R_U   = Math.sqrt(u*u + Math.pow((pp.d_L+pp.d_U)/2 + pp.w - y, 2)) - pp.d_U/2;
+			R_L   = Math.sqrt(u*u + y*y) - pp.d_L/2; 
+			R_U = R_L = (R_U+R_L)/2; //GRUMBLE GRUMBLE
+			del_U = (pp.d_b)/2 - R_U;
+			del_L = (pp.d_b)/2 - R_L;
+
+			N_L = 2*pp.k_b*del_L;
+			N_U = 2*pp.k_b*del_U;
+
+			F_U = N_U * pp.mu_U;
+			F_L = N_L * pp.mu_L;
+
+			var A,B,C,D,E,F;
+			if (typeof G_U == 'string') {
+				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/pp.m_b;
+				B = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b;
+				C = - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/pp.m_b - pp.d_L*pp.d_L/4/pp.I_L;
+
+				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/pp.m_b;
+				E = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b;
+				F = - R_U*R_U/I_b - Math.cos(psi)*Math.cos(psi)/pp.m_b - pp.d_U*pp.d_U/4/pp.I_U;
+			} else {
+				// it's different when there's coupled flywheels
+				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/pp.m_b;
+				B = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b - (pp.d_U*pp.d_L)/4/G_U/(pp.I_L+pp.I_U/G_U/G_U);
+				C = - (pp.d_U*pp.d_U)/4/(pp.I_L + pp.I_U/G_U/G_U) - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/pp.m_b;
+
+				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/pp.m_b;
+				E = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b - (pp.d_U*pp.d_L)/4/G_U/(pp.I_L+pp.I_U/G_U/G_U);
+				F = - Math.cos(psi)*Math.cos(psi)/pp.m_b   - R_U*R_U/I_b - (pp.d_U*pp.d_U)/4/(pp.I_L + pp.I_U/G_U/G_U) ;
+			}
+
+			if (matched_U){ 
+				F_U = (D+F_L*E)/(-F);
+			}
+			if (matched_L){ 
+				F_L = (A+F_U*B)/(-C);
+			}
+			if (matched_U && matched_L){
+				F_L = (A*F-B*D)/(B*E-C*F);
+				F_U = (C*D-A*E)/(B*E-C*F);
+				//if (isNaN(i_settled)) i_settled = i;
+			}
+
+			F_y = F_U*Math.sin(psi) - F_L*Math.sin(theta) - N_U*Math.sin(psi) + N_L*Math.sin(theta);
+
+
+			dv = N_L*Math.sin(theta) + F_L*Math.cos(theta)
+			   + N_U*Math.sin(psi) + F_L*Math.cos(psi);
+			domega_b = (F_L*R_L-F_U*R_U) / I_b;
+
+			v_b       += dv*dt;
+			omega_b   += domega_b*dt;
+			u         += v_b*dt;
+			t         += dt;
+
+			if (typeof G_U == 'string') {
+				domega_U = - F_U*pp.d_U/2 / pp.I_U;
+				domega_L = - F_L*pp.d_L/2 / pp.I_L;
+				omega_L += domega_L*dt;
+				omega_U += domega_U*dt;
+			} else {
+				domega_L = - F_L*pp.d_L/2 / (pp.I_L + pp.I_U/G_U/G_U) - F_U*pp.d_U/2/G_U / (pp.I_L + pp.I_U/G_U/G_U);
+				omega_L += domega_L*dt;
+				omega_U = omega_L/G_U;
+			}
+
+			if (!retry) {
+				if (!matched_U && v_b*Math.cos(psi)   - omega_b*pp.w/2 > omega_U*R_U) {
+					retry = true;
+				}
+				if (!matched_L && v_b*Math.cos(theta) + omega_b*pp.w/2 > omega_L*R_L) {
+					retry = true;
+				}
+				if (retry) { // fuk go back, do it slower
+					u_regain = u;
+
+					v_b       -= dv*dt;
+					omega_b   -= domega_b*dt;
+					u         -= v_b*dt;
+					t         -= dt;
+					if (typeof G_U == 'string') {
+						omega_L -= domega_L*dt;
+						omega_U -= domega_U*dt;
+					} else {
+						omega_L -= domega_L*dt;
+						omega_U = omega_L/G_U;
+					}
+
+					dt = dt0/100;
+					continue; // do not write to result array, do not pass go, do not collect 200 dollars
+				}
+			} else {
+				if (v_b*Math.cos(theta) + omega_b*pp.w/2 > omega_L*R_L) {
+					matched_L = true;
+					retry = false;
+				}
+				if (v_b*Math.cos(psi)   - omega_b*pp.w/2 > omega_U*R_U) {
+					matched_U = true;
+					retry = false;
+				}
+			}
+
+			res.t.push(t);
+			res.u.push(u-u0);
+			res.v_b.push(v_b);
+			res.omega_b.push(omega_b);
+			res.omega_U.push(omega_U);
+			res.omega_L.push(omega_L);
+			res.N_U.push(N_U);
+			res.N_L.push(N_L);
+			res.F_U.push(F_U);
+			res.F_L.push(F_L);
+
+			i+=1;
+			if (N_U <= 0 && N_L <= 0) break;
+		}
+
+		res.stats = {
+			v_b_exit: v_b,
+			omega_b_exit: omega_b,
+			omega_U_exit: omega_U,
+			omega_L_exit: omega_L,
+			i_settle: i_settled
+		}
+
+		return res;
+	}
+
+	let g = 9.81;
+
+	function compute() {
+		try{
+			if(document.getElementById('motor_U_select').value=="slave")
+				setV('omega_0_U', getV('omega_0_L')/getV('G_U'));
+
+			[extrema_vals, extrema] = TOLS_computeTolStack(computeLaunch, 
+			['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w',
+			'd_U', 'I_U', 'mu_U', 'omega_0_U',
+			'd_L', 'I_L', 'mu_L', 'omega_0_L', 'G_U'], 
+			['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']);			
+
+	      	PLOT_drawLinePlot({
+	      		chartName: "chart_launch",
+	      		multiChannelBehavior: "merge2",
+	      		axes: {
+	      			x: {
+						numTicks: 10,
+						boxEnds: false,
+						negativeHandling: 'fitzero',
+						margin: 15
+					}, y: {
+						numTicks: 7,
+						boxEnds: true,
+						negativeHandling: 'fitzero',
+						margin: 5
+					}, z: {
+						syncWithY: true,
+						margin: 5
+					}
+	      		},
+	      		datasets: {
+	      			u: {axis: 'x'},
+	      			v_b: {axis: 'y'},
+	      			omega_b: {axis: 'y'},
+	      			omega_U: {axis: 'z'},
+	      			omega_L: {axis: 'z'}
+	      		},
+	      		queries: {
+	      			INDEX: {places: 0},
+	      			t: {places: 4},
+	      			u: {places: 4},
+	      			v_b: {places: 4},
+	      			omega_b: {places: 4},
+	      			omega_U: {places: 4},
+	      			omega_L: {places: 4},
+
+	      			N_U: {places: 3},
+	      			N_L: {places: 3},
+	      			F_U: {places: 3},
+	      			F_L: {places: 3}
+	      		}
+	      	},[
+	      		extrema.v_b_exit[0],
+      			extrema.v_b_exit[1]
+	      	]);
+
+	      	for (stat of ['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']) {
+	      		setV('output_'+stat,        (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
+	      		setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
+	      	}
+
+	      	/*
+			setV('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
+			setV('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
+			setV('exit_omega_U', (max_low_stat.omega_U_exit + max_high_stat.omega_U_exit)/2);
+			setV('exit_omega_L', (max_low_stat.omega_L_exit + max_high_stat.omega_L_exit)/2);
+			setV('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
+			setV('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
+			setV('exit_omega_U_err', Math.abs(max_low_stat.omega_U_exit - max_high_stat.omega_U_exit)/2);
+			setV('exit_omega_L_err', Math.abs(max_low_stat.omega_L_exit - max_high_stat.omega_L_exit)/2);
+			*/
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;
+		}
+		setError(0);
+	}
+
+	function calculateRatio(pos) {
+		setError(1);
+		var G = 1;
+
+		G *= getV("G1B_"+pos, 1);
+		G *= getV("G2B_"+pos, 1);
+		//G *= getV("G3B_"+pos, 1);
+		//G *= getV("G4B_"+pos, 1);
+		G /= getV("G1A_"+pos, 1);
+		G /= getV("G2A_"+pos, 1);
+		//G /= getV("G3A_"+pos, 1);
+		//G /= getV("G4A_"+pos, 1);
+
+		if (pos == 'U') {
+			if (document.getElementById('motor_U_select').value == 'slave') {
+				setV('omega_0_U', getV('omega_0_L')/G);
+				setV('omega_0_U_err', getV('omega_0_L_err', 0)/G);
+			}
+		}
+
+		setV("G_"+pos, G);
+	}
+
+	function selectUpperMotor() {
+		if (document.getElementById('motor_U_select').value == 'slave') {
+			document.getElementById('detail_motor_U').style.display = 'none';
+			document.getElementById('omega_0_U')    .readOnly = true;
+			document.getElementById('omega_0_U_err').readOnly = true;
+		} else {
+			MOTOR_selectMotor('motor_U');
+			document.getElementById('detail_motor_U').style.display = '';
+			document.getElementById('omega_0_U')    .readOnly = false;
+			document.getElementById('omega_0_U_err').readOnly = false;
+		}
+	}
+</script>
+
+<html>
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+<div id="topbar">
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">English</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Hood and Wheel Pitcher</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
+</div>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="width: 100%; float: left;" class="container">
+	<div style='display:table-row'>
+		<div class="odd" style='display:table-cell'>
+			<table>
+				<tr>
+					<th class="rowlabel">Ball Diameter</th>
+					<td><input class='unit' data-unit='dim' id="d_b" value=7></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id="d_b_err" value=''></td>
+					<td class='unit' data-unit='dim' id='unit_d_b'></td>
+				</tr><tr>
+					<th class='rowlabel'>Ball Mass</th>
+					<td><input class='unit' data-unit='mass' id='m_b' value=0.3><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='mass' id='m_b_err' value=''></td>
+					<td class='unit' data-unit='mass' id='unit_m_b'></td>
+				</tr><tr>
+					<th class='rowlabel'>Ball MOI Ratio<span class="ttt">Ratio of MOI to mass times radius squared.<br/>2/5 for a solid sphere, 2/3 for a hollow sphere, 1/2 for a solid cylinder, 1 for a hollow cylinder.</span></th>
+					<td><input id='moi_rat_b' value='2/5'></td><td class="tiny">+/-</td>
+					<td><input id='moi_rat_b_err'></td>
+					<td class="unit">[-]</td>
+				</tr><tr>
+					<th class="rowlabel">Ball Stiffness<span class="ttt">Stiffness of the ball. This should be evaluated as a shock condition and near the amount of compression in the case of nonlinear balls (which, practically any ball will be)</span></th>
+					<td><input class='unit' data-unit='stiffness' id="k_b" value=20></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='stiffness' id="k_b_err" value=''></td>
+					<td class='unit' data-unit='stiffness' id='unit_k_b'></td>
+				</tr><tr>
+					<th class="rowlabel">Wheel Gap</th>
+					<td><input class='unit' data-unit='dim' id="w" value=5></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id="w_err" value=''></td>
+					<td class='unit' data-unit='dim' id='unit_w'></td>
+				</tr>
+			</table>
+		</div>
+		<div class="even" style='display:table-cell'>
+			<center>Bottom Wheel</center>
+			<table>
+				<tr>
+					<th class='rowlabel'>Wheel Diameter</th>
+					<td><input class='unit' data-unit='dim' id='d_L' value=6></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id='d_L_err' value=''></td>
+					<td class='unit' id='unit_d_L'></td>
+				</tr><tr>
+					<th class='rowlabel'>Wheel MOI</th>
+					<td><input class='unit' data-unit='moi' id='I_L' value=4><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='moi' id="I_L_err" value=''></td>
+					<td class='unit' data-unit='moi' ></td>
+				</tr><tr>
+					<th class="rowlabel">COF Wheel</th>
+					<td><input id="mu_L" value=1.0></td><td class="tiny">+/-</td>
+					<td><input id="mu_L_err" value=''></td>
+					<td class="unit">[-]</td>
+				</tr><tr>
+					<th class='rowlabel'>Flywheel Target Velocity</th>
+					<td><input class='unit' data-unit='omega' id='omega_0_L' value=3000></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_L_err' value=''></td>
+					<td class='unit' data-unit='omega' id='unit_omega_0_L'>[-]</td>
+				</tr>
+			</table>
+			<div>
+				<span class="rowlabel">Motor</span>
+				<select class="doublewide" id="motor_L_select" oninput="MOTOR_selectMotor('motor_L'); compute();"></select>
+				<!--<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>-->
+			</div>
+			<table id='detail_motor_L'>
+				<tr>
+					<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span> </th>
+					<td><input class='' id="motor_L_count" oninput="MOTOR_selectMotor('motor_L'); compute();" value=1 /></td>
+				</tr><tr>
+					<th class="rowlabel">Operating Power</th>
+					<td><input class="unit" data-unit="pct" id="motor_L_pct_power" oninput="MOTOR_selectMotor('motor_L'); compute();" value=12 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
+					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
+					<td><input class='unit' data-unit="pct" id="motor_L_efficiency" oninput="MOTOR_selectMotor('motor_L'); compute();" value=85 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
+					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+					<td><input class='unit' data-unit='omega' id="motor_L_max_speed" readonly /></td>
+					<td class='unit' data-unit='omega'>[RPM]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+					<td><input class='unit' data-unit='torque' id="motor_L_stall_torque" readonly /></td>
+					<td class='unit' data-unit='torque'>[N-m]</td>
+				</tr><tr>
+					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+					<td><input id="motor_L_free_current" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+					<td><input id="motor_L_stall_current" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr>
+			</table>
+			<div class="odd">
+				<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
+				<input id="G_L" readonly/>
+				<!--<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>-->
+			</div>
+			<table id='detail_gratio'>
+				<tr>
+					<td><input id="G1A_L" oninput="calculateRatio('L')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G1B_L" oninput="calculateRatio('L')" value=1 /></td>
+				</tr><tr>
+					<td><input id="G2A_L" oninput="calculateRatio('L')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G2B_L" oninput="calculateRatio('L')" /></td>
+				</tr><!--<tr>
+					<td><input id="G3A_L" oninput="calculateRatio('L')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G3B_L" oninput="calculateRatio('L')" /></td>
+				</tr><tr>
+					<td><input id="G4A_L" oninput="calculateRatio('L')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G4B_L" oninput="calculateRatio('L')" /></td>
+				</tr>-->
+			</table>
+		</div>
+		<div class="odd" style='display:table-cell'>
+			<center>Top Wheel</center>
+			<table>
+				<tr>
+					<th class='rowlabel'>Wheel Diameter</th>
+					<td><input class='unit' data-unit='dim' id='d_U' value=6></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id='d_U_err' value=''></td>
+					<td class='unit' data-unit='dim' id='unit_d_U'></td>
+				</tr><tr>
+					<th class='rowlabel'>Wheel MOI</th>
+					<td><input class='unit' data-unit='moi'  id='I_U' value=4><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='moi'  id="I_U_err" value=''></td>
+					<td  class='unit' data-unit='moi' id="unit_I_U"></td>
+				</tr><tr>
+					<th class="rowlabel">COF Wheel</th>
+					<td><input id="mu_U" value=1.0></td><td class="tiny">+/-</td>
+					<td><input id="mu_U_err" value=''></td>
+					<td class="unit">[-]</td>
+				</tr><tr>
+					<th class='rowlabel'>Flywheel Target Velocity</th>
+					<td><input class='unit' data-unit='omega' id='omega_0_U' value=3000></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_U_err' value=''></td>
+					<td class='unit' data-unit='omega' id='unit_omega_0_U'>[-]</td>
+				</tr>
+			</table>
+			<div>
+				<span class="rowlabel">Motor<span class="ttt">If geared to bottom, a positive number indicates spin in the reverse direction (wheels both propelling) while a negative indicates spin in the reverse direction (top wheel providing excess backspin)</span></span>
+				<select class="doublewide" id="motor_U_select" oninput="selectUpperMotor(); compute();">
+					<option value="slave">Geared to Bottom</option>
+				</select>
+				<!--<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>-->
+			</div>
+			<table id='detail_motor_U'>
+				<tr>
+					<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span> </th>
+					<td><input class='' id="motor_U_count" oninput="selectUpperMotor(); compute();" value=1 /></td>
+				</tr><tr>
+					<th class="rowlabel">Operating Power</th>
+					<td><input class="unit" data-unit="pct" id="motor_U_pct_power" oninput="selectUpperMotor(); compute();" value=100 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
+					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
+					<td><input class='unit' data-unit="pct" id="motor_U_efficiency" oninput="selectUpperMotor(); compute();" value=85 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
+					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+					<td><input class='unit' data-unit='omega' id="motor_U_max_speed" readonly /></td>
+					<td class='unit' data-unit='omega'>[RPM]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+					<td><input class='unit' data-unit='torque' id="motor_U_stall_torque" readonly /></td>
+					<td class='unit' data-unit='torque'>[N-m]</td>
+				</tr><tr>
+					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+					<td><input id="motor_U_free_current" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr><tr>
+					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+					<td><input id="motor_U_stall_current" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr>
+			</table>
+			<div class="odd">
+				<span class='rowlabel'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
+				<input id="G_U" readonly/>
+				<!--<button type="button" onclick="collapse('gratio')" id='toggle_detail_gratio'>&#9660;</button>-->
+			</div>
+			<table id='detail_gratio'>
+				<tr>
+					<td><input id="G1A_U" oninput="calculateRatio('U')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G1B_U" oninput="calculateRatio('U')" value=1 /></td>
+				</tr><tr>
+					<td><input id="G2A_U" oninput="calculateRatio('U')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G2B_U" oninput="calculateRatio('U')" /></td>
+				</tr><!--<tr>
+					<td><input id="G3A_U" oninput="calculateRatio('U')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G3B_U" oninput="calculateRatio('U')" /></td>
+				</tr><tr>
+					<td><input id="G4A_U" oninput="calculateRatio('U')" /></td>
+					<td class="tiny">:</td>
+					<td><input id="G4B_U" oninput="calculateRatio('U')" /></td>
+				</tr>-->
+			</table>
+		</div>
+		<div class="output" style='display:table-cell'>
+			<center><button type="button" onclick="compute()" id="compute_btn">Compute!</button></center>
+			<table> <!--['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']-->
+				<tr>
+					<th class='rowlabel'>Exit Velocity</th>
+					<td><input class='unit' data-unit='v' id='output_v_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='v' id='output_v_b_exit_err' readOnly></td>
+					<td class='unit' data-unit='v' ></td>
+				</tr><tr>
+					<th class='rowlabel'>Exit Ball RPM</th>
+					<td><input class='unit' data-unit='omega' id='output_omega_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='output_omega_b_exit_err' readOnly></td>
+					<td class='unit' data-unit='omega' ></td>
+				</tr><tr>
+					<th class="rowlabel">Exit Wheelspeed (Top)</th>
+					<td><input class='unit' data-unit='omega' id="output_omega_U_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id="output_omega_U_exit_err" readOnly></td>
+					<td class='unit' data-unit='omega' ></td>
+				</tr><tr>
+					<th class="rowlabel">Exit Wheelspeed (Bottom)</th>
+					<td><input class='unit' data-unit='omega' id="output_omega_L_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id="output_omega_L_exit_err" readOnly></td>
+					<td class='unit' data-unit='omega' ></td>
+				</tr><!--<tr>
+					<th class="rowlabel" colspan=3>Time to Revved</th>
+					<td><input id="t_rev_live" readOnly></td>
+					<td class="unit">[s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Current to Rev</th>
+					<td><input id="cur_cons_live" readOnly></td>
+					<td class="unit">[A-s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Time to Recover</th>
+					<td><input id="t_rev_dead" readOnly></td>
+					<td class="unit">[s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Current to Recover</th>
+					<td><input id="cur_cons_dead" readOnly></td>
+					<td class="unit">[A-s]</td>
+				</tr><tr>
+					<th class="rowlabel" colspan=3>Idle Current</th>
+					<td><input id="cur_idle" readOnly></td>
+					<td class="unit">[A]</td>
+				</tr>-->
+			</table>
+		</div>
+		<div class="even" style='display:table-cell'>
+			<table id="table_protips">
+				<tr>
+					<th class='rowlabel' colspan=2>Pro-Tips</th>
+					<td>
+						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
+					</td>
+				</tr><tr>
+					<td colspan=3>
+						Yellow: Not computed. Press enter on a field or press the compute button.<br/>
+						Green: Computed, no issues.<br/>
+						Red: An error has occurred with the results.
+					</td>
+				</tr><tr>
+					<td colspan=3>
+						The plot displays the run with the highest exit velocity, and lowest exit velocity.
+					</td>
+				</tr><tr>
+					<td colspan=3>
+						Click on the plot to probe particular points for values.
+					</td>
+				</tr><tr>
+					<td colspan=3>
+						The settling distance (where the values of everything evens out and stops changing)<br/>is marked on the plot at the black vertical lines.
+					</td>
+				</tr><tr>
+					<td colspan=3>
+						Take a look at the tooltip for frictional blurring...
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</div>
+
+<style type="text/css">
+	.graph {
+	  height: 500px;
+	  width: 800px;
+	  margin: 10px;
+	}
+</style>
+
+<div class="output-graph" style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+	<div>
+		<div style="margin-left: 0px; display:table-cell;">
+		<center>Launch Simulation</center>
+
+	<svg version="1.2" class="plot" id='chart_launch' aria-labelledby="title" role="img" style="height:550px; width:900px;">
+		<rect class="plot-background" id="chart_launch_background" x=110 y=20 width=615 height=430 />
+		<g>
+		  <line id="chart_launch_x_axis" class="plot-axis" x1=110 x2=725 y1=450 y2=450></line>
+		  <line id="chart_launch_y_axis" class="plot-axis" x1=110 x2=110 y1=20  y2=450></line>
+		  <line id="chart_launch_z_axis" class="plot-axis" x1=725 x2=725 y1=20  y2=450></line>
+		</g>
+
+		<g class="plot-grid" id="chart_launch_x_grid"></g>
+		<g class="plot-grid" id="chart_launch_y_grid"></g>
+		<g class="plot-grid" id="chart_launch_z_grid"></g>
+
+		<g class="plot-labels">
+		  <text x="425" y=485 class="plot-titlelabel unit" data-unit="position" id="chart_launch_u_label">Position []</text>
+
+		  <text x=-320 y=15 class="plot-titlelabel unit" data-unit="v" transform="rotate(270)" id="chart_launch_v_b_label" fill="#0074d9">Ball Velocity []</text>
+		  <text x=-160 y=15 class="plot-titlelabel unit" data-unit="omega" transform="rotate(270)" id="chart_launch_omega_b_label" fill="#d91200">Ball Spin []</text>
+		  <text x=-240 y=15 class="plot-titlelabel" transform="rotate(270)" id="chart_launch_y1_divider" fill="#111">/</text>
+
+		  <text x=-300 y=830 class="plot-titlelabel unit" data-unit="omega" transform="rotate(270)" id="chart_launch_omega_L_label" fill="#c48900">Lower []</text>
+		  <text x=-180 y=830 class="plot-titlelabel unit" data-unit="omega" transform="rotate(270)" id="chart_launch_omega_U_label" fill="#c49900">Upper []</text>
+		  <text x=-240 y=830 class="plot-titlelabel" transform="rotate(270)" id="chart_launch_y1_divider" fill="#111">/</text>
+		  <text x=-240 y=850 class="plot-titlelabel" transform="rotate(270)" id="chart_launch_y1_overall" fill="#111">Flywheel Speed</text>
+		</g>
+
+		<g class="plot-axlabels" id='chart_launch_x_axlabels'></g>
+		<g class="plot-axlabels" id='chart_launch_z_axlabels'></g>
+		<g class="plot-axlabels" id='chart_launch_y_axlabels'></g>
+
+		<g>
+			<line class="plot-querybar" id="chart_launch_querybar" x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+			<line class="plot-markerbar" id="chart_launch_stable_line_1" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+			<line class="plot-markerbar" id="chart_launch_stable_line_2" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+		</g>
+		<polyline
+			id='chart_launch_v_b_line'
+			stroke='#0074d9'
+			fill='#0074d9'
+			fill-opacity=0.3
+			stroke-width=2
+			points="
+			"/>
+		<polyline
+			id='chart_launch_omega_b_line'
+			stroke='#d91200'
+			fill='#d91200'
+			fill-opacity=0.3
+			stroke-width=2
+			points="
+			"/>
+		<polyline
+			id='chart_launch_omega_L_line'
+			stroke='#c48900'
+			fill='#c48900'
+			stroke-width=2
+			fill-opacity=0.3
+			points="
+			"/>
+		<polyline
+			id='chart_launch_omega_U_line'
+			stroke='#c49900'
+			fill='#c49900'
+			stroke-width=2
+			fill-opacity=0.3
+			points="
+			"/>
+	</svg>
+	<div class="output-plot" id="chart_launch_querytable" style="display:none;">
+		<table>
+			<tr>
+				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point. Position represented by a vertical bar.</span></th>
+				<td><input class='unit' data-unit='position' id="chart_launch_u_1" onkeyup="focus_handler(getV('chart_launch_u'), true);" /><input class='unit' data-unit='position' id="chart_launch_u_2" hidden /></td>
+				<td  class='unit' data-unit='position' >[s]</td>
+			</tr><tr>
+				<th class="rowlabel">Time</th>
+				<td><input id="chart_launch_t_1" readonly /></td>
+				<td><input id="chart_launch_t_2" readonly /></td>
+				<td class="unit">[s]</td>
+			</tr><tr>
+				<th class="rowlabel">Timestep</th>
+				<td><input id="chart_launch_INDEX_1" readonly /></td>
+				<td><input id="chart_launch_INDEX_2" readonly /></td>
+				<td class="unit"></td>
+			</tr><tr>
+				<th class="rowlabel">Ball Velocity</th>
+				<td><input class='unit' data-unit='v' id="chart_launch_v_b_1" readonly /></td>
+				<td><input class='unit' data-unit='v' id="chart_launch_v_b_2" readonly /></td>
+				<td class='unit' data-unit='v' ></td>
+			</tr><tr>
+				<th class="rowlabel">Ball Spin</th>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_b_1" readonly /></td>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_b_2" readonly /></td>
+				<td class='unit' data-unit='omega' >[A]</td>
+			</tr><tr>
+				<th class="rowlabel">Top Speed</th>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_U_1" readonly /></td>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_U_2" readonly /></td>
+				<td class='unit' data-unit='omega' ></td>
+			</tr><tr>
+				<th class="rowlabel">Bottom Speed</th>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_L_1" readonly /></td>
+				<td><input class='unit' data-unit='omega' id="chart_launch_omega_L_2" readonly /></td>
+				<td class='unit' data-unit='omega' ></td>
+			</tr><tr>
+				<th class="rowlabel">Top Normal</th>
+				<td><input class='unit' data-unit='force' id="chart_launch_N_U_1" readonly /></td>
+				<td><input class='unit' data-unit='force' id="chart_launch_N_U_2" readonly /></td>
+				<td class='unit' data-unit='force' ></td>
+			</tr><tr>
+				<th class="rowlabel">Top Force</th>
+				<td><input class='unit' data-unit='force' id="chart_launch_F_U_1" readonly /></td>
+				<td><input class='unit' data-unit='force' id="chart_launch_F_U_2" readonly /></td>
+				<td class='unit' data-unit='force' ></td>
+			</tr><tr>
+				<th class="rowlabel">Bottom Normal</th>
+				<td><input class='unit' data-unit='force' id="chart_launch_N_L_1" readonly /></td>
+				<td><input class='unit' data-unit='force' id="chart_launch_N_L_2" readonly /></td>
+				<td class='unit' data-unit='force' ></td>
+			</tr><tr>
+				<th class="rowlabel">Bottom Force</th>
+				<td><input class='unit' data-unit='force' id="chart_launch_F_L_1" readonly /></td>
+				<td><input class='unit' data-unit='force' id="chart_launch_F_L_2" readonly /></td>
+				<td class='unit' data-unit='force' ></td>
+			</tr>
+		</table>
+	</div>
+	<!--<div style="margin-left: 0px; display:table-cell;">
+		<center>Spin-Up Simulation</center>
+		<svg version="1.2" class="plot" id='chart_rev' aria-labelledby="title" role="img" style="height:550px; width:800px;">
+			<title id="title">Revving Simulation</title>
+
+
+			<rect class="plot-background" id="chart_rev_background" x=90 y=20 width=615 height=430 />
+			<g>
+			  <line id="chart_rev_x_axis" class="plot-axis" x1=90  x2=705 y1=450 y2=450></line>
+			  <line id="chart_rev_y_axis" class="plot-axis" x1=90  x2=90  y1=20  y2=450></line>
+			  <line id="chart_rev_z_axis" class="plot-axis" x1=705 x2=705 y1=20  y2=450></line>
+			</g>
+
+			<g class="plot-grid" id="chart_rev_x_grid"></g>
+			<g class="plot-grid" id="chart_rev_y_grid"></g>
+			<g class="plot-grid" id="chart_rev_z_grid"></g>
+
+			<g class="plot-labels">
+			  <text x="405" y=485 class="plot-titlelabel" id="chart_rev_t_label">Time [s]</text>
+
+			  <text x=-240 y=15 class="plot-titlelabel" transform="rotate(270)" id="chart_rev_cur_label" fill="#d91200">Current Draw [A]</text>
+
+			  <text x=-240 y=800 class="plot-titlelabel unit" data-unit="omega" transform="rotate(270)" id="chart_rev_omega_label" fill="#0074d9">Flywheel Speed [RPM]</text>
+			</g>
+
+			<g class="plot-axlabels" id='chart_rev_x_axlabels'></g>
+			<g class="plot-axlabels" id='chart_rev_z_axlabels'></g>
+			<g class="plot-axlabels" id='chart_rev_y_axlabels'></g>
+
+			<g>
+				<line class="plot-querybar"  id="chart_rev_querybar"      x1=100 x2=100 y1=15 y2=455 opacity=0></line>
+				<line class="plot-markerbar" id="chart_rev_stable_line_1" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+				<line class="plot-markerbar" id="chart_rev_stable_line_2" x1=110 x2=110 y1=15 y2=455 opacity=0></line>
+			</g>
+			<polyline
+				id='chart_rev_omega_line'
+				stroke='#0074d9'
+				fill=none
+				stroke-width=2
+				points="
+				"/>
+			<polyline
+				id='chart_rev_cur_line'
+				stroke='#d91200'
+				fill=none
+				stroke-width=2
+				points="
+				"/>
+		</svg>
+		<div class="output-plot" id="chart_rev_querytable" style="display:none;">
+			<table>
+				<tr>
+					<th class="rowlabel">Queried Time<span class="ttt">Query a time on the graph by clicking (and optionally dragging) a point. Position represented by a vertical bar.</span></th>
+					<td><input id="chart_rev_t" /></td>
+					<td class="unit">[s]</td>
+				</tr><tr>
+					<th class="rowlabel">Timestep</th>
+					<td><input id="chart_rev_INDEX" readonly /></td>
+					<td class="unit"></td>
+				</tr><tr>
+					<th class="rowlabel">Flywheel Speed</th>
+					<td><input class='unit' data-unit='omega' id="chart_rev_omega" readonly /></td>
+					<td class='unit' data-unit='omega' >[RPM]</td>
+				</tr><tr>
+					<th class="rowlabel">Current</th>
+					<td><input id="chart_rev_cur" readonly /></td>
+					<td class="unit">[A]</td>
+				</tr>
+			</table>
+		</div>
+	</div>-->
+	</div>
+</div>
+</body>
+</html>

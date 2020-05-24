@@ -1,179 +1,110 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
-<link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="include/specs.js"></script>
-<script type="text/javascript" src="include/math.js"></script>
+<link rel="stylesheet" href="include/style.css">
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/math.js"></script>
+<script type="text/javascript" src="js/materials.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
 <script type="text/javascript">
-	unit_sys = 0;
-	inputs_unit_map = {
+  EXP_FN_BASE = 'beam';
+	UNIT_MAP = {
 		'force':           ['N', 'lbf'],
 		'elastic_modulus': ['GPa', '10^6 psi'],
 		'moi':       ['mm^4', 'in^4'],
 		'area': 	 ['mm^2', 'in^2'],
-		'section_1': ['mm', 'in'],
-		'section_2': ['mm', 'in'],
-		'section_3': ['mm', 'in'],
-		'section_4': ['mm', 'in'],
-		'length':    ['mm', 'in'],
-		'rmax':      ['mm', 'in'],
-		'rmin':      ['mm', 'in'],
-		'query_l':   ['mm', 'in'],
-		'query_q':   ['mm', 'thou'],
-		'query_m':   ['N-m', 'ft-lbf'],
-		'query_sl':  ['deg', 'deg'],
-		'query_sh':  ['N', 'lbf'],
-		'query_stress_bend_top': ['MPa', 'psi'],
-		'query_stress_bend_bot': ['MPa', 'psi'],
-		'query_stress_shear':    ['MPa', 'psi'],
-		'density': ['g/cm^3', 'lbm/in^3'],
-		'mass':    ['kg',  'lbm'],
-		'Sf':      ['MPa', 'psi']
-
+		'dimension': ['mm', 'in'],
+		'deflection':['mm', 'thou'],
+		'torque':    ['N-m', 'ft-lbf'],
+		'slope':     ['deg', 'deg'],
+		'density':   ['g/cm^3', 'lbm/in^3'],
+		'mass':      ['kg',  'lbm'],
+		'stress':    ['MPa', 'psi']
 	}
 
-	function switch_units() {
-		if(document.getElementById('unit_metric').checked)
-			unit_sys = 0;
-		else 
-			unit_sys = 1;
-
-		unit_labels = document.getElementsByClassName('unit');
-		for (unit in unit_labels) {
-			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
-				varname = unit_labels[unit].id.substring(5);
-				document.getElementById('unit_'+varname).innerHTML = '['+inputs_unit_map[varname][unit_sys]+']';
+	function init() {
+		EC_onload();
+		EXP_onload();
+		if (typeof EXP_inputs != 'undefined') {
+			loads = document.getElementsByClassName('load');
+			for (load of loads) {
+				load.identifier = load.firstChild.getAttribute('identifier');
 			}
+			for (btn of document.getElementsByClassName('toggle_button'))
+				btn.innerHTML = "&#9650;";
 		}
 
-		document.getElementById('chart_q_label').innerHTML = `Deflection [${inputs_unit_map["query_q"][unit_sys]}]`;
-		document.getElementById('chart_m_label').innerHTML = `Bending Moment [${inputs_unit_map["query_m"][unit_sys]}]`;
-		document.getElementById('chart_x_label').innerHTML = `Position [${inputs_unit_map["query_l"][unit_sys]}]`;
-	}
+		UNIT_change();
 
-	var poschart = null, poschart_options = null;
-
-	function gidv(id) {
-		v =  eval(document.getElementById(id).value);
-		if (typeof inputs_unit_map[id] !== 'undefined')
-			v = convert(v, inputs_unit_map[id][unit_sys]);
-		return v;
-	}
-
-	function gids(id, value, places) {
-		if (typeof places === 'undefined')
-			places = 3;
-		if (typeof value === 'string') {
-			document.getElementById(id).value = value;
-		} else {
-			if (typeof inputs_unit_map[id] !== 'undefined')
-				value = convert_to(value, inputs_unit_map[id][unit_sys]);
-			document.getElementById(id).value = value.toFixed(places);
-		}
-	}
-
-	function input_callback(e) {
-    	var key = e.keyCode ? e.keyCode : e.which;
-
-    	if (key==13) {
-    		compute(true);
-    	} else {
-    		compute(false);
-    	}
-    }
-
-	function register_callbacks() {
-		var inputs, index;
-		inputs = document.getElementsByTagName('input');
-		for (index = 0; index < inputs.length; ++index) {
-			if (inputs[index].id.startsWith('query_')) continue;
-		    inputs[index].onkeyup = input_callback;
-		    inputs[index].onchange = input_callback;
-		}
-	}
-
-	function thload() {
-		document.getElementById('topbar_version').innerHTML = VERSION;
-		if(packed_inputs) unpack_inputs();
-		switch_units();
-
-		populate_materials();
+		collapseTable('section'); 
+		populateMaterials();
 		document.getElementById('material').value = 'Aluminum';
-		select_material();
+		selectMaterial();
 
-		if(!packed_inputs) {
-			add_load({where: 10, amount: 0, type: 0});
-			add_load({where: 50, amount: 0, type: 0});
-			add_load({where: 90, amount: 100, type: 2});
-			add_load({where: 10, amount: -10, type: 3});
+		// custom code to make default inputs
+		// cookies preferred
+		if(typeof EXP_inputs == 'undefined') {
+			addLoad({where: 10, amount: 0, type: 0});
+			addLoad({where: 50, amount: 0, type: 0});
+			addLoad({where: 90, amount: 100, type: 2});
+			addLoad({where: 10, amount: -10, type: 3});
 			document.getElementById('length').value=100;
 		}
-		shape_select();		
-		moi_compute();
-		
-		register_callbacks();
+
+		selectShape();
+		computeMOI();
+
+		registerCallbacks();
 
 		compute();
 	}
 
-		
-	function sign(x) {
-		if (x>0) return 1;
-		if (x<0) return -1;
-		return 0;
+	function registerCallbacks() {
+		EC_setOnInput(function(e) {
+	    	let key = e.keyCode ? e.keyCode : e.which;
+	    	let input = e.target;
+			if(key!=13) setError(1);
+	    });
+		EC_setOnKeyUp(); // default handler OK
 	}
 
-
-	function NaNtoerr(x) {
-		if (isNaN(x)) return '-'; return x;
-	}
-
-
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
-	function collapse(id) {
-		tbl = document.getElementById('table_'+id);
-
-		btn = document.getElementById('toggle_detail_'+id);
-		if(tbl.rows[1].style['display'] != 'none') {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
-			btn.innerHTML = "&#9660";
-		} else {
-			for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
-			btn.innerHTML = "&#9650";
-		}
-	}
-
-	function moi_compute() {
-		invalidate_computations();
+	function computeMOI() {
+		setError(1);
 		shape = document.getElementById('section').value;
 		var moi, area, rmax, rmin;
 		flip = document.getElementById('section_flip').checked;
-		// TODO: unsupported sections
 		if (shape == 'rndbar') {
-			d = gidv('section_1');
+			d = getV('section_1');
 			rmax = rmin = d/2;
 			area = Math.PI/4 * d*d;
 			moi = Math.PI/64*Math.pow(d,4);
 		} else if (shape == 'boxbar') {
-			w = gidv('section_1');
-			h = gidv('section_2');
+			w = getV('section_1');
+			h = getV('section_2');
 			rmax = rmin = h/2;
 			area = w*h;
 			moi = w*Math.pow(h,3)/12;
 		} else if (shape == 'boxtube') {
-			w = gidv('section_1');
-			h = gidv('section_2');
-			t = gidv('section_3');
+			w = getV('section_1');
+			h = getV('section_2');
+			t = getV('section_3');
 			rmax = rmin = h/2;
 			area = w*h - (w-2*t)*(w-2*t);
 			moi = (w*Math.pow(h,3) - (w-2*t)*Math.pow(h-2*t,3))/12;
 		} else if (shape == 'angle') {
-			a = gidv('section_1');
-			b = gidv('section_2');
-			t = gidv('section_3');
+			a = getV('section_1');
+			b = getV('section_2');
+			t = getV('section_3');
 			d = b - t;
 			c = a - t;
 			rmin = (t*(2*d+a)+d*d)/2/(d+a);
@@ -186,9 +117,9 @@
 				rmin = tmp;
 			}
 		} else if (shape == 'channel') {
-			b = gidv('section_1');
-			d = gidv('section_2');
-			t = gidv('section_3');
+			b = getV('section_1');
+			d = getV('section_2');
+			t = getV('section_3');
 			s = t;
 			h = d-2*s;
 			area = 2*s*b + h*t
@@ -201,14 +132,14 @@
 				moi  = (b*d*d*d - h*h*h*(b-t))/12;
 			}
 		} else if (shape == 'rndtube') {
-			d = gidv('section_1');
-			t = gidv('section_2');
+			d = getV('section_1');
+			t = getV('section_2');
 			rmax = rmin = d/2;
 			area = Math.PI/4 * (d*d-(d-2*t)*(d-2*t));
 			moi = Math.PI/64*(Math.pow(d,4)-Math.pow(d-2*t,4));
 		} else if (shape == 'hex') {
-			a = gidv('section_1')/2; //side length
-			id = gidv('section_2');
+			a = getV('section_1')/2; //side length
+			id = getV('section_2');
 			if (isNaN(id)) id = 0;
 			area = Math.sqrt(3)*3/2*a*a 			- Math.PI/4 * id*id;
 			moi  = 5/16*Math.sqrt(3)*Math.pow(a, 4) - Math.PI/64*Math.pow(id,4);
@@ -216,16 +147,16 @@
 		}
 
 		if (shape != 'custom') {
-			gids("moi", moi);
-			gids("area", area);
-			gids("rmax", rmax);
-			gids("rmin", rmin);
-		} 
-		
+			setV("moi", moi);
+			setV("area", area);
+			setV("rmax", rmax);
+			setV("rmin", rmin);
+		}
+
 	}
 
-	function shape_select(disable_recompute) {
-		if(!disable_recompute) invalidate_computations();
+	function selectShape(disable_recompute) {
+		if(!disable_recompute) setError(1);
 		shape = document.getElementById('section').value;
 		document.getElementById('moi').readOnly = true;
 		document.getElementById('area').readOnly = true;
@@ -303,25 +234,25 @@
 			document.getElementById('section_flip_label').innerHTML = 'Rotate 90?';
 			for (i=3;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
-		} 
+		}
 		if (!disable_recompute) {
-			moi_compute();
-			select_material();
+			computeMOI();
+			selectMaterial();
 		}
 	}
 
 	var current_load_number = 0;
-	function add_load(params) {
-		invalidate_computations();
+	function addLoad(params) {
+		setError(1);
 		loads = document.getElementById('loads');
 		load_div = document.createElement('div');
 		x = current_load_number;
 		current_load_number ++;
-		load_div.innerHTML = 
+		load_div.innerHTML =
 		`<table identifier=${x}>
 			<tr>
-				<td>[${x}] <button onclick="remove_load(${x}); compute();" title="Remove">-</button></td>
-				<td><select id="load_type_${x}" onchange="change_load(${x}); compute();">
+				<td>[${x}] <button onclick="removeLoad(${x}); compute();" title="Remove">-</button></td>
+				<td><select id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
 					<option value="pin" selected='selected' >Pinned</option>
 					<option value="fix">Fixed</option>
 					<option value="force">Force </option>
@@ -330,20 +261,20 @@
 			</tr>
 			<tr id="load_${x}_1_row">
 				<th class="rowlabel" id="load_${x}_1_label">L1</th>
-				<td><input id="load_${x}_1" onchange="drawbeam()"/></td>
-				<td class="unit" id="unit_load_${x}_1"></td>
+				<td><input id="load_${x}_1" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td class="unit" id="load_${x}_1_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_2_row">
 				<th class="rowlabel" id="load_${x}_2_label">L2</th>
-				<td><input id="load_${x}_2" onchange="drawbeam()" /></td>
-				<td class="unit" id="unit_load_${x}_2"></td>
+				<td><input id="load_${x}_2" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td class="unit" id="load_${x}_2_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_3_row">
 				<th class="rowlabel" id="load_${x}_3_label">L3</th>
-				<td><input id="load_${x}_3" onchange="drawbeam()" /></td>
-				<td class="unit" id="unit_load_${x}_3"></td>
+				<td><input id="load_${x}_3" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td class="unit" id="load_${x}_3_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_4_row">
 				<th class="rowlabel" id="load_${x}_4_label">L4</th>
-				<td><input id="load_${x}_4" onchange="drawbeam()" /></td>
-				<td class="unit" id="unit_load_${x}_4"></td>
+				<td><input id="load_${x}_4" onchange="drawBeam()" data-unit="dimension"/></td>
+				<td class="unit" id="load_${x}_4_unit" data-unit="dimension"></td>
 			</tr>
 		</table>`;
 		load_div.identifier = x;
@@ -356,52 +287,66 @@
 			document.getElementById(`load_${x}_2`).value = params.amount;
 			document.getElementById(`load_type_${x}`).selectedIndex = params.type;
 		}
-		change_load(x);
-		register_callbacks();
+		selectLoadType(x);
+		registerCallbacks();
 	}
 
-	function change_load(i) {
-		invalidate_computations();
+	function selectLoadType(i) {
+		setError(1);
 		type = document.getElementById('load_type_'+i).value;
 		if (type == 'pin' ) { //
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_1`).readOnly = false;
+			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
+			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
+
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
 			document.getElementById(`load_${i}_2`).readOnly = true;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
+			document.getElementById(`load_${i}_2`).dataset.unit = 'force';
+			document.getElementById(`load_${i}_2_unit`).dataset.unit = 'force';
 			for (j=3;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		} else if (type == 'fix' ) { //
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_1`).readOnly = false;
+			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
+			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
+
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
 			document.getElementById(`load_${i}_2`).readOnly = true;
+			document.getElementById(`load_${i}_2`).dataset.unit = 'force';
+			document.getElementById(`load_${i}_2_unit`).dataset.unit = 'force';
+
 			document.getElementById(`load_${i}_3_row`).style.display = '';
 			document.getElementById(`load_${i}_3_label`).innerHTML = 'M=';
 			document.getElementById(`load_${i}_3`).readOnly = true;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = ['N', 'lbf'];
-			inputs_unit_map[`load_${i}_3`] = ['N-m', 'ft-lbf'];
+			document.getElementById(`load_${i}_3`).dataset.unit = 'torque';
+			document.getElementById(`load_${i}_3_unit`).dataset.unit = 'torque';
 			for (j=4;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		} else if (type == 'force' || type == 'moment') {
 			document.getElementById(`load_${i}_1_row`).style.display = '';
 			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_1`).readOnly = false;
+			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
+			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
+
 			document.getElementById(`load_${i}_2_row`).style.display = '';
 			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'force' ? 'F=' : 'M=';
 			document.getElementById(`load_${i}_2`).readOnly = false;
-			inputs_unit_map[`load_${i}_1`] = ['mm', 'in'];
-			inputs_unit_map[`load_${i}_2`] = type == 'force' ? ['N', 'lbf'] : ['N-m', 'ft-lbf'];
+			document.getElementById(`load_${i}_2`).dataset.unit 	  = type == 'force' ? 'force' : 'torque';
+			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'force' ? 'force' : 'torque';
 			for (j=3;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		}
-		switch_units();
+		UNIT_change(); // draw the units
 	}
 
-	function remove_load(load_no) {
+	function removeLoad(load_no) {
 		loads = document.getElementById('loads');
 		for(i=0; i<loads.children.length-1; i++) {
 			if (loads.children[i].identifier == load_no) {
@@ -414,18 +359,18 @@
 			}
 		}
 
-		delete inputs_unit_map[`load_${load_no}_1`];
-		delete inputs_unit_map[`load_${load_no}_2`];
-		delete inputs_unit_map[`load_${load_no}_3`];
-		delete inputs_unit_map[`load_${load_no}_4`];
+		delete UNIT_MAP[`load_${load_no}_1`];
+		delete UNIT_MAP[`load_${load_no}_2`];
+		delete UNIT_MAP[`load_${load_no}_3`];
+		delete UNIT_MAP[`load_${load_no}_4`];
 		compute();
 	}
 
-	function populate_materials() {
+	function populateMaterials() {
 		select = document.getElementById('material');
 
 		i=0;
-		for(matl in materials) {
+		for(matl in MATERIAL_DATA) {
 			i++;
 			opt = document.createElement('option');
 			opt.innerHTML = matl;
@@ -434,7 +379,7 @@
 		}
 	}
 
-	function select_material() {
+	function selectMaterial() {
 		matl = document.getElementById('material').value;
 
 		document.getElementById('elastic_modulus').readOnly = matl != 'custom';
@@ -442,18 +387,18 @@
 		document.getElementById('density').readOnly 		= matl != 'custom';
 
 		if (matl != 'custom') {
-			gids('elastic_modulus', materials[matl]['Ef']);
-			gids('density', materials[matl]['density']);
-			gids('mass', materials[matl]['density']*gidv('area')*gidv('length'));
-			gids('Sf', materials[matl]['Sf'] ? materials[matl]['Sf'] : '-');
+			setV('elastic_modulus', MATERIAL_DATA[matl]['Ef']);
+			setV('density', MATERIAL_DATA[matl]['density']);
+			setV('mass', MATERIAL_DATA[matl]['density']*getV('area')*getV('length'));
+			setV('Sf', MATERIAL_DATA[matl]['Sf'] ? MATERIAL_DATA[matl]['Sf'] : '-');
 		}
-		
+
 	}
 </script>
 
 <script type="text/javascript">
 	//la = linearAlgebra();
-	function make_stiffness_matrix(EI, L) {
+	function computeStiffnessMatrix(EI, L) {
 		var m = math.matrix([ [12,  6*L,   -12,  6*L   ],
 							  [6*L, 4*L*L, -6*L, 2*L*L ],
 							  [-12, -6*L,  12,   -6*L  ],
@@ -461,11 +406,11 @@
 		return math.multiply(m, EI/L/L/L);
 	}
 
-	function run_fe(E, I, order, poses, forces, moments, pinned, fixed) {
+	function computeFE(E, I, order, poses, forces, moments, pinned, fixed) {
 		numel = order.length-1;
 
 		numnode = (numel+1)*2;
-		
+
 		var K = math.matrix(math.zeros([numnode,numnode]));
 		F = math.matrix(math.zeros([numnode,1]));
 		dofs_to_remove = [];
@@ -486,7 +431,7 @@
 		for (i=0;i<numel;i++) {
 			idx = math.index(math.range(i*2, i*2+4), math.range(i*2, i*2+4));
 			ss = K.subset(idx);
-			Ks = make_stiffness_matrix(E*I, poses[order[i+1]]-poses[order[i]]);
+			Ks = computeStiffnessMatrix(E*I, poses[order[i+1]]-poses[order[i]]);
 			K.subset(idx,
 				math.add(ss, Ks));
 		}
@@ -505,36 +450,38 @@
 			if (dofs_to_remove.includes(i)){fq.push(0); offs++}
 			else fq.push(q._data[i-offs][0]);
 		}
-		
-		xp = []; // x; position
-		tp = []; // theta; angle
-		qp = []; // q; deflection
-		mp = []; // m; bending moment
-		sp = []; // s; shear force
+
+		channels = {
+			x : [], // x, position
+			t : [], // theta, angle
+			q : [], // q, deflection
+			m : [], // m, bending moment
+			s : []  // s, shear force
+		}
 		for (i=0;i<numel;i++) {
 			q_seg = fq.slice(i*2, i*2+4);
 			dl = poses[order[i+1]] - poses[order[i]];
 			for (zeta=-1; zeta<1; zeta+=0.05) {
-				xp.push(poses[order[i]] + (zeta+1)/2*dl);
-				tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
-				qp.push(beam_shape_fcn(q_seg, zeta, dl));
-				mp.push(E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
-				sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
+				channels.x.push(poses[order[i]] + (zeta+1)/2*dl);
+				channels.t.push(beamShapeFunctionSlope(q_seg, zeta, dl));
+				channels.q.push(beamShapeFunction(q_seg, zeta, dl));
+				channels.m.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
+				channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 			}
 			zeta = 1;
-			xp.push(poses[order[i]] + (zeta+1)/2*dl);
-			tp.push(beam_shape_fcn_slope(q_seg, zeta, dl));
-			qp.push(beam_shape_fcn(q_seg, zeta, dl));
-			mp.push(E*I*beam_shape_fcn_curv(q_seg, zeta, dl));
-			sp.push(E*I*beam_shape_fcn_dcurv(q_seg, zeta, dl));
+			channels.x.push(poses[order[i]] + (zeta+1)/2*dl);
+			channels.t.push(beamShapeFunctionSlope(q_seg, zeta, dl));
+			channels.q.push(beamShapeFunction(q_seg, zeta, dl));
+			channels.m.push(E*I*beamShapeFunctionCurv(q_seg, zeta, dl));
+			channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 		}
 
 		rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
 
-		return [xp, qp, tp, mp, sp, rxns];
+		return [channels, rxns];
 	}
 
-	function beam_shape_fcn(arr, zeta, dl) {
+	function beamShapeFunction(arr, zeta, dl) {
 		Hfns = [1/4 *Math.pow(1-zeta, 2)*(2+zeta),
 				dl/8*Math.pow(1-zeta, 2)*(zeta+1),
 				1/4 *Math.pow(1+zeta, 2)*(2-zeta),
@@ -542,7 +489,7 @@
 		return math.dot(arr, Hfns);
 	}
 
-	function beam_shape_fcn_slope(arr, zeta, dl) {
+	function beamShapeFunctionSlope(arr, zeta, dl) {
 		Hfns = [3/4*(zeta*zeta-1)*2/dl,
 				dl/8*(3*zeta*zeta-2*zeta-1)*2/dl,
 				-3/4*(zeta*zeta-1)*2/dl,
@@ -550,7 +497,7 @@
 		return math.dot(arr, Hfns);
 	}
 
-	function beam_shape_fcn_curv(arr, zeta, dl) {
+	function beamShapeFunctionCurv(arr, zeta, dl) {
 		Hfns = [6*zeta/dl/dl,
 				(3*zeta-1)/dl,
 				-6*zeta/dl/dl,
@@ -562,7 +509,7 @@
 		return math.dot(arr, Hfns);
 	}
 
-	function beam_shape_fcn_dcurv(arr, zeta, dl) {
+	function beamShapeFunctionDcurv(arr, zeta, dl) {
 		Hfns = [3/2*Math.pow(2/dl, 3),
 				3/4*dl*Math.pow(2/dl, 3),
 				-3/2*Math.pow(2/dl, 3),
@@ -574,16 +521,11 @@
 		return math.dot(arr, Hfns);
 	}
 
-	function invalidate_computations() {
-		document.getElementById('charts').classList.add('error');
-	}
-
 	function compute() {
-		shape_select();
+		try{
+		selectShape();
 
-		L = gidv('length');
-
-		invalidate_computations();
+		L = getV('length');
 
 		order   = [0,   1]; // node ids, in order (sort later)
 		poses   = {0:0, 1:L}; // positions
@@ -596,17 +538,17 @@
 		for(i=2; i<loads.children.length-1+2; i++) {
 			x = loads.children[i-2].identifier;
 			type = document.getElementById(`load_type_${x}`).value;
-			
+
 			order.push(i);
-			poses[i] = gidv(`load_${x}_1`);
+			poses[i] = getV(`load_${x}_1`);
 			if (type == 'fix') {
 				fixed[i] = x;
 			} else if (type == 'pin') {
 				pinned[i] = x;
 			} else if (type == 'force') {
-				forces[i] = gidv(`load_${x}_2`);
+				forces[i] = getV(`load_${x}_2`);
 			} else if (type == 'moment') {
-				moments[i] = gidv(`load_${x}_2`);
+				moments[i] = getV(`load_${x}_2`);
 			}
 		}
 
@@ -641,147 +583,103 @@
 			}
 		}
 
-		console.log('run_fe( ', gidv('moi'), gidv('elastic_modulus'),
-			order, poses, forces, moments, pinned, fixed);
-
-		[xp, qp, tp, mp, sp, rxns] = run_fe(gidv('moi'), gidv('elastic_modulus'),
+		[channels, rxns] = computeFE(getV('moi'), getV('elastic_modulus'),
 			order, poses, forces, moments, pinned, fixed);
 
 		for (pin in pinned) {
 			noden = order.indexOf(parseInt(pin));
-			gids(`load_${pinned[pin]}_2`, rxns[noden*2]);
+			setV(`load_${pinned[pin]}_2`, rxns[noden*2]);
 		}
 		for (fix in fixed) {
 			noden = order.indexOf(parseInt(fix));
-			gids(`load_${fixed[fix]}_2`, rxns[noden*2]);
-			gids(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
+			setV(`load_${fixed[fix]}_2`, rxns[noden*2]);
+			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
 		}
 
-		drawchart([xp, qp, tp, mp, sp], [poses, forces, moments, pinned, fixed]);
-
-
-		document.getElementById('charts').classList.remove('error');
-	}
-</script>
-
-<script>
-	function makeTicks(mins, maxes, num_to_print, n) {
-		all_positive = !(mins);
-		H = [];
-		bases = [];
-		for(var i=0; i<maxes.length; i++){
-			h = maxes[i]/n;
-			if (!all_positive)
-				h = (Math.max(-mins[i], maxes[i]))/n;
-			base = Math.floor(Math.log10(h)-Math.log10(5));
-			bases.push(base);
-			H.push(Math.round(h/Math.pow(10, base))*Math.pow(10, base));
-		}
-
-		ticks = [];
-		ticksstr = [];
-		alive = true;
-		for(var i=0; alive; i++) {
-			alive = false;
-			labelstr = '';
-			for(var j=0; j<maxes.length; j++) {
-				if (j<num_to_print) {
-					if (ticks.length <= j+1)
-						ticks.push([]);
-					ticks[j].push(H[j]*i);
-					labelstr += (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-					if (j != num_to_print-1)
-						labelstr += ' / ';
+		// draw the plot
+		PLOT_drawLinePlot({
+			chartName: "chart",
+			axes: {
+				x: {
+					numTicks: 10,
+					boxEnds: false,
+					negativeHandling: 'posonly',
+					margin: 15
+				}, y: {
+					numTicks: 7,
+					boxEnds: true,
+					negativeHandling: 'symmetric',
+					margin: 5
+				}, z: {
+					syncWithY: true,
+					margin: 5
 				}
-				if (H[j]*(i) < (all_positive ? maxes[j] : Math.max(maxes[j], -mins[j]) ))
-					alive = true;
+			},
+			datasets: {
+				x: {
+					axis: 'x'
+				},
+				q: {
+					axis: 'y'
+				},
+				m: {
+					axis: 'z'
+				},
+				s: {
+					axis: 'z'
+				}				
+			},
+			queries: {
+				//INDEX: { places: 0 },
+				x: { places: 4 },
+				t: { places: 4 },
+				q: { places: 4 },
+				m: { places: 4 },
+				s: { places: 4 }
 			}
-			ticksstr.push(labelstr);
+		},
+		channels,
+		plotClickHandler);
 
-			if(all_positive || i==0) continue;
+		drawBeam();
 
-			labelstr = '';
-			for(var j=0; j<maxes.length; j++) {
-				if (j<num_to_print) {
-					if (ticks.length <= j+1)
-						ticks.push([]);
-					ticks[j].unshift(-H[j]*i);
-					labelstr += '- ' + (H[j]*i).toFixed(bases[j] > 0 ? 0:-bases[j]);
-					if (j != num_to_print-1)
-						labelstr += ' / ';
-				}
-			}
-			ticksstr.unshift(labelstr);
-			
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;
 		}
-		return [ticks, ticksstr];
+		setError(0);
 	}
 
-	function sign(x) {
-		if(x>0) return 1;
-		if(x<0) return -1;
-		return 0;
-	}
+	function plotClickHandler(e) {
+		let xq = NaN; // pull out a value if the query succeeds
+		if(!isNaN(e)) {
+			xq = PLOT_focusHandler(document.getElementById("chart"), e);
+		} else if (e.buttons==2) {
+		} else if (e.target.classList.contains('beam-shape')) { // if clicked on a beam shape, focus on the shape
+			if(e.buttons==1)
+				xq = PLOT_focusHandler(document.getElementById("chart"), e.target.getAttribute('cp'));
+		} else if (e.buttons==1) {
+			xq = PLOT_focusHandler(document.getElementById("chart"), e);
+		}
 
-	chart_name = 'chart';
-
-	function drawTicks(axis, ticks, maxtick, ticklabels, ff, f0, gf, g0, marg) {
-		altaxis = axis == 'x' ? 'y':'x';
-		realaxis = axis == 'z' ? 'y':axis;
-		xgrid = document.getElementById(chart_name+'_'+axis+'_grid');
-		while(xgrid.firstChild) xgrid.removeChild(xgrid.firstChild);
-
-		labels = document.getElementById(chart_name+'_'+axis+'_axis_labels');
-		while(labels.firstChild) labels.removeChild(labels.firstChild);
-
-		gfl = (axis=='z'?gf:g0) + (axis=='y'?-1:1)*marg;
-
-		for (i in ticklabels) {
-			line = document.createElementNS('http://www.w3.org/2000/svg','line');
-			line.setAttribute(altaxis+'1', gf); line.setAttribute(altaxis+'2', g0);
-			fp = f0 + (ff-f0)*(ticks==null ? i/(ticklabels.length-1) : ticks[i]/maxtick);
-			line.setAttribute(realaxis+'1', fp);
-			line.setAttribute(realaxis+'2', fp);
-			line.setAttribute('class', 'grid');
-			xgrid.append(line);
-
-			label = document.createElementNS('http://www.w3.org/2000/svg','text');
-			label.setAttribute(altaxis, gfl);
-			label.setAttribute(realaxis, fp);
-			label.innerHTML = ticklabels[i];
-			labels.append(label);
+		if (!isNaN(xq)) {
+			setV("query_stress_shear",     interp1D(channels.x, channels.s, xq)/getV('area'));
+			setV("query_stress_bend_top", -interp1D(channels.x, channels.m, xq)*getV('rmax')/getV('moi'));
+			setV("query_stress_bend_bot", +interp1D(channels.x, channels.m, xq)*getV('rmin')/getV('moi'));
 		}
 	}
 
-	function linterp_idx(xs, xq) {
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return i;
-	}
-
-	function linterp(xs, ys, xq) {
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
-	}
-
-	function makept(canv_geo, xq, yq) {
-		[x0, xf, xl, y_ctr] = canv_geo;
-		var pt = svg.createSVGPoint();
-		pt.x = x0 + (xf-x0)/xl*xq;
-		pt.y = y0 + (yf-y0)/(ym-0)*yq;
-		return pt;
-	}
-
-	function drawbeam() {
-
+	function drawBeam() {
 		beam = document.getElementById('chart_beam');
 		beam_items = document.getElementById('chart_beam_items');
 		while(beam_items.firstChild) beam_items.removeChild(beam_items.firstChild);
-		y_axis = document.getElementById('chart_y_axis');
+		x_axis = document.getElementById('chart_x_axis');
 
-		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
+		x0 = Math.min(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
+		xf = Math.max(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
 		y0 = beam.y1.baseVal.value;
-		len = gidv('length');
+		len = getV('length');
 		canv_geo = [x0, xf, y0];
 
 		loads = document.getElementById('loads');
@@ -789,14 +687,10 @@
 		for(i=0; i<loads.children.length-1; i++) {
 			x = loads.children[i].identifier;
 			type = document.getElementById(`load_type_${x}`).value;
-			
-			
-			position = gidv(`load_${x}_1`);
-			cp = x0 + (xf-x0)*position/len;
 
-			subhandler = function (event) {
-				focus_handler(event.target.getAttribute('cp'));
-			}
+
+			position = getV(`load_${x}_1`);
+			cp = x0 + (xf-x0)*position/len;
 
 			if (type == 'fix') {
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
@@ -806,7 +700,6 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${x2},${y0} ${x1},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'pin') {
@@ -817,18 +710,16 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', '#111');
 				shape.setAttribute('points', `${cp},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'force') {
-				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
 				y2 = y0 - 25*sgn;
 				shape.setAttribute('points', `${cp},${y0} ${cp},${y2}`);
 				shape.classList.add('beam-arrow');
 				shape.setAttribute('stroke', '#111');
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 
@@ -840,11 +731,10 @@
 				shape.classList.add('beam-shape');
 				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			} else if (type == 'moment') {
-				sgn = gidv(`load_${x}_2`) < 0 ? -1 : +1;
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','circle');
 				shape.classList.add('beam-shape');
@@ -852,379 +742,79 @@
 				shape.setAttribute('cx', cp);
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
-				shape.addEventListener('click', subhandler);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			}
 		}
 	}
-
-	var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0, focus_l_max;
-	var last_lq;
-	function focus_handler(event, disable_position_write){
-		var xq, lq;
-		query_l_unit = inputs_unit_map['query_l'][unit_sys];
-		if (!isNaN(event)) {
-			lq = parseFloat(event);
-			xq = x0 + (xf-x0)*lq/len;
-		}else{
-			if(event.buttons != 1) return;
-			bg = document.getElementById('chart');
-			xq = event.clientX - bg.getBoundingClientRect().left;
-			//yq = event.clientY - bg.getBoundingClientRect().top;
-
-			lq = (convert(focus_l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
-			if (lq > Math.max(...focus_l)){
-				lq = Math.max(...focus_l);
-				xq = focus_x0 + (focus_xf-focus_x0)/(convert(focus_l_max, query_l_unit)-0)*lq;
-			}
-			if (lq<0) {
-				lq=0; xq=focus_x0;
-			}
-		}
-			
-		qq   = linterp(focus_l, focus_q, lq);
-		mq   = linterp(focus_l, focus_m, lq);
-		slq  = linterp(focus_l, focus_sl, lq);
-		shq  = linterp(focus_l, focus_sh, lq);
-		qline.setAttribute('opacity', 1);
-
-		qline.setAttribute('x1', xq);
-		qline.setAttribute('x2', xq);
-
-		if (!disable_position_write) gids('query_l', lq);
-		gids('query_q', qq, 5);
-		gids('query_m', mq);
-		gids('query_sl', slq, 6);
-		gids('query_sh', shq);
-
-		smid = shq / gidv('area');
-		stop = - mq * gidv('rmax') / gidv('moi');
-		sbot = + mq * gidv('rmin') / gidv('moi');
-
-		gids("query_stress_bend_top", stop);
-		gids("query_stress_bend_bot", sbot);
-		gids("query_stress_shear",    smid);
-
-		last_lq = lq;
-	}
-
-	function find_extrema_handler(event) {
-		if (event.buttons != 2) return;
-		query_l_unit = inputs_unit_map['query_l'][unit_sys];
-
-		bg = document.getElementById('chart');
-		xq = event.clientX - bg.getBoundingClientRect().left;
-		//yq = event.clientY - bg.getBoundingClientRect().top;
-
-		lq = (convert(focus_l_max, query_l_unit)-0)/(focus_xf-focus_x0)*(xq-focus_x0);
-		if (lq > Math.max(...focus_l) || lq < 0)
-			return;
-		
-		// init extremization algorithm
-		idx = linterp_idx(focus_l, lq);
-		direction = -sign(focus_m[idx]) * sign(focus_sl[idx]);
-		if (direction == 0) direction = 1; // can't be indecisive
-		max_or_min = -sign(focus_m[idx]);
-		if (max_or_min == 0) max_or_min = 1;
-
-		while ( idx >= 1 && idx < focus_l.length-1 ) {
-			idx += direction;
-			if (sign(focus_sl[idx+direction]) != max_or_min*direction)
-				break;
-		}
-
-		focus_handler(focus_l[idx]);
-
-		event.preventDefault();
-		return false;
-	}
-
-	function drawchart(channels) {
-		//var focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, focus_x0;
-		drawbeam();
-		beam_items = document.getElementById('beam_items');
-		
-
-		[l, q, sl, m, sh] = channels; //[xp, qp, tp, mp, sp];
-		lc = convert_to(l, inputs_unit_map['query_l'][unit_sys]);
-		qc = convert_to(q, inputs_unit_map['query_q'][unit_sys]);
-		mc = convert_to(m, inputs_unit_map['query_m'][unit_sys]);
-		slc = convert_to(q, inputs_unit_map['query_sl'][unit_sys]);
-		shc = convert_to(m, inputs_unit_map['query_sh'][unit_sys]);
-
-		svg    = document.getElementById('chart');
-		x_axis = document.getElementById('chart_x_axis');
-		y_axis = document.getElementById('chart_y_axis');
-
-		x0 = Math.min(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		xf = Math.max(y_axis.x1.baseVal.value, y_axis.x2.baseVal.value);
-		y0 = Math.max(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
-		yf = Math.min(x_axis.y1.baseVal.value, x_axis.y2.baseVal.value);
-
-		q_line = document.getElementById('chart_q_line');
-		m_line = document.getElementById('chart_m_line');
-		q_line.setAttribute("points",""); // I don't like it, but it does clear the points
-		m_line.setAttribute('points','');
-
-		[[l_ticks], xticklabels] = makeTicks(null, [Math.max(...lc)], 1, 10);
-		[[q_ticks], yticklabels] = makeTicks([Math.min(...qc), Math.min(...mc)], [Math.max(...qc), Math.max(...mc)], 1, 6);
-		[[m_ticks], zticklabels] = makeTicks([Math.min(...mc), Math.min(...qc)], [Math.max(...mc), Math.max(...qc)], 1, 6);
-
-		l_ticks.pop(); xticklabels.pop();
-		
-		l_max = Math.max(...lc);
-		q_max = q_ticks[q_ticks.length-1];
-		q_min = q_ticks[0];
-		m_max = m_ticks[m_ticks.length-1];
-		m_min = m_ticks[0];
-
-		drawTicks('x', l_ticks, l_max, xticklabels, xf, x0, yf, y0, 15);
-		drawTicks('y', null, null, yticklabels, yf, y0, xf, x0, 5);
-		drawTicks('z', null, null, zticklabels, yf, y0, xf, x0, 5);
-
-		for (i in lc) {
-			var ptq = svg.createSVGPoint();
-			var ptm = svg.createSVGPoint();
-
-			xq = x0 + (xf-x0)/(l_max-0)*lc[i];
-			ptq.x = ptm.x = xq;
-
-
-			ptq.y   = y0 + (yf-y0)/(q_max-q_min)*(qc[i]-q_min);
-			ptm.y   = y0 + (yf-y0)/(m_max-m_min)*(mc[i]-m_min);
-			q_line.points.appendItem(ptq);
-			m_line.points.appendItem(ptm);
-		}
-		
-		bg_old=document.getElementById('chart_query_area');
-		var bg = bg_old.cloneNode(true);
-		bg_old.parentNode.replaceChild(bg, bg_old);
-
-		qline = document.getElementById('chart_query_line');
-		//qline.setAttribute('opacity', 0);
-
-		gids('query_l', '-');
-		gids('query_q', '-');
-		gids('query_m', '-');
-		gids('query_sl', '-');
-		gids('query_sh', '-');
-
-		gids("query_stress_bend_top", '-');
-		gids("query_stress_bend_bot", '-');
-		gids("query_stress_shear",    '-');
-
-		focus_l_max = l_max;
-		focus_l = l
-		focus_q = q;
-		focus_m = m;
-		focus_sl = sl;
-		focus_sh = sh;
-		focus_xf = xf;
-		focus_x0 = x0;
-		//[focus_l, focus_q, focus_m, focus_sl, focus_sh, focus_xf, x0] = [l, q, m, sl, sh, xf, x0];
-
-		
-
-		bg.addEventListener('mousemove', focus_handler);
-		bg.addEventListener('mousedown', focus_handler);
-		bg.addEventListener('mousedown', find_extrema_handler);
-		bg.addEventListener('contextmenu', function(e){e.preventDefault(); return false; });
-
-		if (last_lq) focus_handler(last_lq);
-	}
-</script>
-
-<script id="packed_inputs_dump">
-	packed_inputs = null; // set to an object/dict (id => value) with some specials
-	// unit_sys
-</script>
-
-<script>
-	function pack_inputs() {
-		packed_inputs = {};
-		packed_inputs.current_load_number = current_load_number;
-		packed_inputs.inputs_unit_map     = inputs_unit_map;
-		for (input of document.getElementsByTagName('input')) {
-			if (input.type == "text") {
-				packed_inputs[input.id] = input.value;
-			}
-			if (input.type == "radio") {
-				packed_inputs[input.id] = input.checked;
-			}
-		}
-		for (input of document.getElementsByTagName('select')) {
-			packed_inputs[input.id] = input.value;
-		}
-
-		document.getElementById("packed_inputs_dump").innerHTML = "packed_inputs="+JSON.stringify(packed_inputs)+";";
-	}
-
-	function unpack_inputs() {
-		current_load_number = packed_inputs.current_load_number;
-		inputs_unit_map     = packed_inputs.inputs_unit_map;
-		delete packed_inputs.current_load_number;
-		delete packed_inputs.inputs_unit_map;
-		for (key in packed_inputs) {
-			if (typeof packed_inputs[key] == "boolean")
-				document.getElementById(key).checked = packed_inputs[key];
-			else
-				document.getElementById(key).value   = packed_inputs[key];
-		}
-
-		loads = document.getElementsByClassName('load');
-		for (load of loads) {
-			console.log('unpacked ', load)
-			load.identifier = load.firstChild.getAttribute('identifier');
-		}
-		for (btn of document.getElementsByClassName('toggle_button'))
-			btn.innerHTML = "&#9650;";
-	}
-
-	function readTextFile(file)
-	{
-		var allText = null;
-	    var rawFile = new XMLHttpRequest();
-	    rawFile.open("GET", file, false);
-	    rawFile.onreadystatechange = function ()
-	    {
-	        if(rawFile.readyState === 4)
-	        {
-	            if(rawFile.status === 200 || rawFile.status == 0)
-	            {
-	                allText = rawFile.responseText;
-	            }
-	        }
-	    }
-	    rawFile.send(null);
-	    return allText;
-	}
-
-	if (!String.prototype.decodeHTML) {
-	  String.prototype.decodeHTML = function () {
-	    return this.replace(/&apos;/g, "'")
-	               .replace(/&quot;/g, '"')
-	               .replace(/&gt;/g, '>')
-	               .replace(/&lt;/g, '<')
-	               .replace(/&amp;/g, '&');
-	  };
-	}
-
-	months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-	function download_page() {
-		today = new Date();
-		var fileName = 'beam_' + today.getFullYear()+months[today.getMonth()]+today.getDate();
-		fileName = prompt("Enter a filename. (.html will be appended)", fileName)
-		if (!fileName) return;
-		document.getElementById('topbar_fname').innerHTML = fileName;
-		fileName += '.html';
-
-
-		head = document.head || document.getElementsByTagName('head')[0];
-
-		pack_inputs();
-
-		scripts   = document.getElementsByTagName('script');
-		for (script of scripts) {
-			if (script.src) {
-				scr = readTextFile(script.src);
-				script.innerHTML = scr;
-				script.removeAttribute('src');
-			}
-		}
-
-		links = document.getElementsByTagName('link');
-		for (link of links) {
-			if (link.href) {
-				scr = readTextFile(link.href);
-				style = document.createElement('style');
-				style.type='text/css';
-				if(style.styleSheet) {
-					style.styleSheet.cssText = scr;
-				} else {
-					style.appendChild(document.createTextNode(scr));
-				}
-				head.prepend(style);
-				link.parentElement.removeChild(link);
-			}
-		}
-
-
-		var fileContent = new XMLSerializer().serializeToString(document).decodeHTML();
-		var myFile = new Blob([fileContent], {type: 'text/html'});
-		window.URL = window.URL || window.webkitURL;
-		dlurl = window.URL.createObjectURL(myFile);
-		document.getElementById('download_iframe').download = fileName;
-		document.getElementById('download_iframe').href = dlurl;
-		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
-	}
-
-	function print_page() {
-		window.print();
-	}
 </script>
 
 
 <html>
-<body onload="thload()">
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
 <div id="topbar">
-	<div class="topbar_la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar_la" id='topbar_version'></div>
-	<div class="topbar_la" id='topbar_fname'></div>
-	<div class="topbar_ctr">Beam Calculator</div>
-	<div class="topbar_ra selectable" onclick="download_page();" id="download">Export HTML</div>
-	<div class="topbar_ra selectable" onclick="print_page();">Print</div>
-	<a id="download_iframe" hidden></a>
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-la" id='topbar_unit'>
+		<!-- Required for unit library. You could also put this in the calculator main body -->
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0 >Metric</option>
+			<option value=1 selected="selected">English</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Beam Structural Calc</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
 </div>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 275px; float: left;" class="container">
 		<div class="even">
-			<center>
-			  <input type="radio" id="unit_english" name="unit" value="english" onclick="switch_units(); compute();">
-			  <label for="english">English</label>
-			  <input type="radio" id="unit_metric" name="unit" value="metric" onclick="switch_units(); compute();" checked>
-			  <label for="metric">Metric</label>
-			</center>
 			<table>
 				<tr>
 					<th class='rowlabel'>Length</th>
-					<td><input id='length' /></td>
-					<td class='unit' id='unit_length'></td>
+					<td><input id='length' data-unit='dimension' /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr>
 			</table>
 		</div>
 		<div class="odd">
 			<table id="table_material">
-				
+
 				<tr>
 					<th class='rowlabel'>Material</th>
 					<td colspan>
-						<select id="material" onchange="select_material(); compute();">
+						<select id="material" onchange="selectMaterial(); compute();">
 							<option value="custom">Custom</option>
 						</select>
 					</td>
 					<td>
-						<button type="button" onclick="collapse('material'); shape_select(true)" id='toggle_detail_section' class="toggle_button">&#9650;</button>
+						<button type="button" onclick="collapseTable('material'); selectShape(true)" id='toggle_detail_material' class="toggle_button">&#9650;</button>
 					</td>
 
 				</tr>
 				<tr>
 					<th class='rowlabel'>Flexural Modulus</th>
-					<td><input id='elastic_modulus' value=69 /></td>
-					<td class='unit' id='unit_elastic_modulus'></td>
+					<td><input id='elastic_modulus' data-unit='elastic_modulus' value=69 /></td>
+					<td class='unit' data-unit='elastic_modulus'></td>
 				</tr><tr>
 					<th class='rowlabel'>Flexural Strength</th>
-					<td><input id='Sf' value=30 /></td>
-					<td class='unit' id='unit_Sf'></td>
+					<td><input id='Sf' data-unit='stress' value=30 /></td>
+					<td class='unit' data-unit='stress'></td>
 				</tr><tr>
 					<th class='rowlabel'>Density</th>
-					<td><input id='density' value=0 /></td>
-					<td class='unit' id='unit_density'></td>
+					<td><input id='density' data-unit='density' value=0 /></td>
+					<td class='unit' data-unit='density'></td>
 				</tr><tr>
 					<th class='rowlabel'>Mass</th>
-					<td><input id='mass' readonly /></td>
-					<td class='unit' id='unit_mass'></td>
+					<td><input id='mass' data-unit='mass' readonly /></td>
+					<td class='unit' data-unit='mass'></td>
 				</tr>
 			</table>
 		</div>
@@ -1233,7 +823,7 @@
 				<tr>
 					<th class='rowlabel'>Cross-Section</th>
 					<td>
-						<select id="section" onchange="shape_select(); compute();">
+						<select id="section" onchange="selectShape(); compute();">
 							<option value="rndbar" selected='selected'>Round Bar</option>
 							<option value="boxbar">Rect. Bar</option>
 							<option value="boxtube">Box Tube</option>
@@ -1245,7 +835,7 @@
 						</select>
 					</td>
 					<td>
-						<button type="button" onclick="collapse('section'); shape_select(true)" id='toggle_detail_section' class="toggle_button">&#9650;</button>
+						<button type="button" onclick="collapseTable('section'); selectShape(true)" id='toggle_detail_section' class="toggle_button">&#9650;</button>
 					</td>
 				</tr>
 				<tr>
@@ -1255,50 +845,50 @@
 				</tr>
 				<tr>
 					<th class='rowlabel'>MOI<span class="ttt">The area moment of inertia for the section</span></th>
-					<td><input id='moi' readonly /></td>
-					<td class='unit' id='unit_moi'></td>
+					<td><input id='moi' data-unit='moi' readonly /></td>
+					<td class='unit' data-unit='moi'></td>
 				</tr><tr>
 					<th class='rowlabel'>Area<span class="ttt">Cross-sectional area</span></th>
-					<td><input id='area' readonly /></td>
-					<td class='unit' id='unit_area'></td>
+					<td><input id='area' data-unit='area' readonly /></td>
+					<td class='unit' data-unit='area'></td>
 				</tr><tr>
 					<th class='rowlabel'>Top Height<span class="ttt">Distance from neutral axis to top of section</span></th>
-					<td><input id='rmax' readonly /></td>
-					<td class='unit' id='unit_rmax'></td>
+					<td><input id='rmax' data-unit='dimension' readonly /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr>
 					<th class='rowlabel'>Bottom Height<span class="ttt">Distance from neutral axis to bottom of section</span></th>
-					<td><input id='rmin' readonly /></td>
-					<td class='unit' id='unit_rmin'></td>
+					<td><input id='rmin' data-unit='dimension' readonly /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr id='section_1_row'>
 					<th class='rowlabel' id='section_1_label'>D1</th>
-					<td><input id='section_1' value=5 /></td>
-					<td class='unit' id='unit_section_1'></td>
+					<td><input id='section_1' data-unit='dimension' value=5 /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr id='section_2_row'>
 					<th class='rowlabel' id='section_2_label'>D2</th>
-					<td><input id='section_2' /></td>
-					<td class='unit' id='unit_section_2'></td>
+					<td><input id='section_2' data-unit='dimension' /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr id='section_3_row'>
 					<th class='rowlabel' id='section_3_label'>D3</th>
-					<td><input id='section_3' /></td>
-					<td class='unit' id='unit_section_3'></td>
+					<td><input id='section_3' data-unit='dimension' /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr id='section_4_row'>
 					<th class='rowlabel' id='section_4_label'>D4</th>
-					<td><input id='section_4' /></td>
-					<td class='unit' id='unit_section_4'></td>
+					<td><input id='section_4' data-unit='dimension' /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr><tr id='section_flip_row'>
 					<th class='rowlabel' id='section_flip_label'>Flip?</th>
 					<td><input type="checkbox" id='section_flip' /></td>
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads'><center class=""><button id='add_load_btn' onclick='add_load()'>Add Load</button><button id='compute_btn' onclick='compute()'>Compute</button><table id="table_protips">
+		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><button id='compute_btn' onclick='compute()'>Compute</button><table id="table_protips">
 				<tr>
 					<th class='rowlabel' colspan=2>Pro-Tips and Easter Eggs</th>
 					<td>
-						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips' class="toggle_button">&#9650;</button>
+						<button type="button" onclick="collapseTable('protips'); selectShape(true)" id='toggle_detail_protips' class="toggle_button">&#9650;</button>
 					</td>
 				</tr>
-				<tr>
+				<tr style="display: none;">
 					<td colspan=3>
 							Moments are positive counter-clockwise.<br/><br/>
 							Click on the chart to query points. <br/><br/>
@@ -1320,10 +910,6 @@
 		stroke: #555;
 		stroke-width: 8px;
 	}
-	.graph {
-		height: 600px !important;
-		width: 700px !important;
-	}
 
 	.beam-shape {
 		stroke: none;
@@ -1338,101 +924,100 @@
 	}
 </style>
 
-<svg version="1.2" class="graph" id='chart' aria-labelledby="title" role="img">
-  <title id="title">Position/Velocity Data</title>
+<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:600px; width:700px;">
+	<rect class="plot-background" id="chart_background" x=70 y=20 width=555 height=430 />
+	<g>
+	  <line id="chart_x_axis" class="plot-axis" x1=70  x2=625 y1=235 y2=235></line>
+	  <line id="chart_y_axis" class="plot-axis" x1=70  x2=70  y1=20  y2=450 ></line>
+	  <line id="chart_z_axis" class="plot-axis" x1=625 x2=625 y1=20  y2=450></line>
+	</g>
 
+	<!-- non-standard beam stuff -->
+	<g class="beam">
+	  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
+	</g>
+	<g id="chart_beam_items"></g>
 
+	<g class="plot-grid" id="chart_x_grid"></g>
+	<g class="plot-grid" id="chart_y_grid"></g>
+	<g class="plot-grid" id="chart_z_grid"></g>
 
-<rect class="background" id="chart_background" x=70 y=20 width=555 height=430 />
-<g class="x-grid">
-  <line id="chart_x_axis" class="axes" x1=70 x2=70 y1=20 y2=450 ></line>
-</g>
-<g class="y-grid">
-  <line id="chart_y_axis" class="axes" x1=70 x2=625 y1=235 y2=235></line>
-  <line id="chart_z_axis" class="axes" x1=625 x2=625 y1=20 y2=450></line>
-</g>
+	<g class="plot-labels">
+	  <text x="325" y=485 class="plot-titlelabel unit" id="chart_x_label" data-unit='dimension' >Position []</text>
 
-<g class="beam">
-  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
-</g>
-<g id="chart_beam_items"></g>
+	  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="chart_q_label" data-unit='deflection' fill="#0074d9">Deflection []</text>
 
-<g class="x-grid" id="chart_x_grid"></g>
-<g class="y-grid" id="chart_y_grid"></g>
-<g class="z-grid" id="chart_z_grid"></g>
+	  <text x=-120 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_m_label" data-unit='torque' fill="#d91200">Bending Moment []</text>
+	  <text x=-240 y=700 class="plot-titlelabel" transform="rotate(270)" fill="#111">/</text>
+	  <text x=-320 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_s_label" data-unit='force' fill="#c48900">Shear Force []</text>
+	</g>
 
-<g class="labels x-labels" id='chart_x_labels'>
-  <text x="325" y=485 class="label-title" id="chart_x_label">Position [mm]</text>
-</g>
+	<g class="plot-axlabels" id='chart_x_axlabels'></g>
+	<g class="plot-axlabels" id='chart_z_axlabels'></g>
+	<g class="plot-axlabels" id='chart_y_axlabels'></g>
 
-<g class="labels y-labels" id='chart_y_labels'>
-  <text x=-240 y=15 class="label-title" transform="rotate(270)" id="chart_q_label" fill="#0074d9">Deflection [mm]</text>
-</g>
+	<g>
+		<line class="plot-querybar" id="chart_querybar" x1=100 x2=100 y1=15 y2=555 opacity=0></line>
+	</g>
+	<polyline
+		id='chart_q_line'
+		fill='none'
+		stroke='#0074d9'
+		stroke-width=2
+		points="
+		"/>
+	<polyline
+		id='chart_m_line'
+		fill='none'
+		stroke='#d91200'
+		stroke-width=2
+		points="
+		"/>
+	<polyline
+		id='chart_s_line'
+		fill='none'
+		stroke='#c48900'
+		stroke-width=2
+		points="
+		"/>
 
-<g class="labels z-labels" id='chart_z_labels'>
-  <text x=-240 y=700 class="label-title" transform="rotate(270)" id="chart_m_label" fill="#d91200">Bending Moment [N-m]</text>
-</g>
-
-<g class="labels x-labels" id='chart_x_axis_labels'></g>
-<g class="labels z-labels" id='chart_z_axis_labels'></g>
-<g class="labels y-labels" id='chart_y_axis_labels'></g>
-
-<g class="query-line">
-	<line id="chart_query_line" x1=100 x2=100 y1=15 y2=555></line>
-</g>
-<polyline
-	id='chart_q_line'
-	fill='none'
-	stroke='#0074d9'
-	stroke-width=2
-	points="
-	"/>
-<polyline
-	id='chart_m_line'
-	fill='none'
-	stroke='#d91200'
-	stroke-width=2
-	points="
-	"/>
-
-<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
+	<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
 </svg>
 
-<div class="output-graph">
-
+<div class="output-plot" id ="chart_querytable" style='display:none;'>
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
-				<td><input id="query_l" onkeyup="focus_handler(gidv('query_l'), true);" /></td>
-				<td class="unit" id="unit_query_l"></td>
+				<td><input id="chart_x" data-unit='dimension' onchange="plotClickHandler(getV('chart_x'));" /></td>
+				<td class="unit" data-unit='dimension'></td>
 			</tr><tr>
 				<th class="rowlabel">Deflection</th>
-				<td><input id="query_q" readonly /></td>
-				<td class="unit" id="unit_query_q"></td>
+				<td><input id="chart_q" data-unit='deflection' readonly /></td>
+				<td class="unit" data-unit='deflection'></td>
 			</tr><tr>
 				<th class="rowlabel">Slope</th>
-				<td><input id="query_sl" readonly /></td>
-				<td class="unit" id="unit_query_sl"></td>
+				<td><input id="chart_t" data-unit='slope' readonly /></td>
+				<td class="unit" data-unit='slope'></td>
 			</tr><tr>
 				<th class="rowlabel">Bending Moment</th>
-				<td><input id="query_m" readonly /></td>
-				<td class="unit" id="unit_query_m"></td>
+				<td><input id="chart_m" data-unit='torque' readonly /></td>
+				<td class="unit" data-unit='torque'></td>
 			</tr><tr>
 				<th class="rowlabel">Shear Force<span class="ttt">Note: Shear force at a load/constraint is not properly defined. Query before and after.</span></th>
-				<td><input id="query_sh" readonly /></td>
-				<td class="unit" id="unit_query_sh"></td>
+				<td><input id="chart_s" data-unit='force' readonly /></td>
+				<td class="unit" data-unit='force'></td>
 			</tr><tr>
 				<th class="rowlabel">Bending Stress @ Top<span class="ttt">Positive is tension</span></th>
-				<td><input id="query_stress_bend_top" readonly /></td>
-				<td class="unit" id="unit_query_stress_bend_top"></td>
+				<td><input id="query_stress_bend_top" data-unit='stress' readonly /></td>
+				<td class="unit" data-unit='stress'></td>
 			</tr><tr>
 				<th class="rowlabel">Bending Stress @ Bottom<span class="ttt">Positive is tension</span></th>
-				<td><input id="query_stress_bend_bot" readonly /></td>
-				<td class="unit" id="unit_query_stress_bend_bot"></td>
+				<td><input id="query_stress_bend_bot" data-unit='stress' readonly /></td>
+				<td class="unit" data-unit='stress'></td>
 			</tr><tr>
 				<th class="rowlabel">Shear Stress @ Center</th>
-				<td><input id="query_stress_shear" readonly /></td>
-				<td class="unit" id="unit_query_stress_shear"></td>
+				<td><input id="query_stress_shear" data-unit='stress' readonly /></td>
+				<td class="unit" data-unit='stress'></td>
 			</tr>
 		</div>
 

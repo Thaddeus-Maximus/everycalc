@@ -1,3 +1,6 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 <script type="text/javascript" src="include/specs.js"></script>
@@ -33,7 +36,6 @@
 			unit_sys = 1;
 
 		unit_labels = document.getElementsByClassName('unit');
-		//console.log(unit_labels);
 		for (unit in unit_labels) {
 			if (unit_labels[unit].id && inputs_unit_map[unit_labels[unit].id.substring(5)] ){
 				varname = unit_labels[unit].id.substring(5);
@@ -239,24 +241,12 @@
       	document.getElementById('v_endstop').classList.remove('uncomputed');
       	document.getElementById('E_endstop').classList.remove('uncomputed');
       	document.getElementById('air_cons').classList.remove('uncomputed');
-      	gids('t_endstop', NaNtoerr(t_endstop));
-      	gids('t_steady',  NaNtoerr(t_ss));
-      	gids('v_endstop', NaNtoerr(v_endstop));
-      	gids('E_endstop', NaNtoerr(E_endstop));
+      	gids('t_endstop', NaNToerr(t_endstop));
+      	gids('t_steady',  NaNToerr(t_ss));
+      	gids('v_endstop', NaNToerr(v_endstop));
+      	gids('E_endstop', NaNToerr(E_endstop));
       	gids('air_cons',  air_cons);
 	}
-
-	function NaNtoerr(x) {
-		if (isNaN(x)) return '-'; return x;
-	}
-
-
-	function NaNto1(x) {
-		if (isNaN(x))
-			return 1;
-		return x;
-	}
-
 
 </script>
 
@@ -467,7 +457,6 @@
 
 		loads = document.getElementsByClassName('load');
 		for (load of loads) {
-			console.log('unpacked ', load)
 			load.identifier = load.firstChild.getAttribute('identifier');
 		}
 	}
@@ -549,8 +538,6 @@
 		document.getElementById('download_iframe').download = fileName;
 		document.getElementById('download_iframe').href = dlurl;
 		document.getElementById('download_iframe').click();
-		//document.getElementById('download').setAttribute('download', fileName);
-		console.log('done!');
 	}
 
 	function print_page() {

@@ -24,18 +24,26 @@ legend{color:inherit;display:table;max-width:100%;padding:0;white-space:normal}t
 [type=search]::-webkit-search-decoration{-webkit-appearance:none}
 ::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}
 /* End extract */
-html,body{font-family:sans-serif;font-size:9pt;line-height:1.3}html{overflow-x:hidden}
-h1{font-size:36px}h2{font-size:30px}h3{font-size:24px;text-align: center;}h4{font-size:20px}h5{font-size:18px}h6{font-size:16px}.w3-serif{font-family:serif}
-h1,h2,h3,h4,h5,h6{font-family:"Segoe UI",Arial,sans-serif;font-weight:400;margin:10px 0}.w3-wide{letter-spacing:4px}
+html,body{font-size:9pt;line-height:1.3}html{overflow-x:hidden}
+h1,h2,h3,h4,h5,h6{font-weight:400;margin:10px 0}.w3-wide{letter-spacing:4px}
 hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
+@import url('https://fonts.googleapis.com/css?family=Noto+Sans&display=swap');
 
+* {
+  font-family: "Noto Sans", "Segoe UI", sans-serif;
+}
 
+.bold{
+  font-weight: bold;
+}
 .collabel{
 	text-align: top;
   text-align: center;
 }
-
+th {
+  font-weight: normal;
+}
 .rowlabel{
 	text-align: right;
 }
@@ -67,7 +75,7 @@ hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
 select, input {
   border: 1px solid #aaa;
-  width: 90px;
+  width: 80px;
   margin: 1px;
   padding: 1px;
 }
@@ -94,12 +102,13 @@ button {
 }
 
 .doublewide {
-  width: 240px;
+  width: 140px;
 }
 
 .container {
 	float: left;
 	margin: 0;
+  margin-top: 28px;
 }
 
 .container-oall {
@@ -117,36 +126,28 @@ button {
 }
 
 .rowlabel .ttt {
+  font-weight: normal;
   visibility: hidden;
   width: 350px;
   background-color: #555;
   color: #fff;
   text-align: center;
-  border-radius: 6px;
   padding: 5px 0;
   position: absolute;
   z-index: 1;
-  bottom: 125%;
-  left: 50%;
+  top: 100%;
+  left: 5%;
   margin-left: 0px;
   opacity: 0;
   transition: opacity 0.3s;
 }
 
-.rowlabel .ttt::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: #555 transparent transparent transparent;
-}
-
 .rowlabel:hover .ttt {
   visibility: visible;
   opacity: 1;
+}
+.ttt:hover {
+  visibility: hidden !important;
 }
 
 .graph .labels.x-labels {
@@ -159,97 +160,130 @@ button {
 .graph .labels.z-labels {
   text-anchor: start;
 }
-
-
-.graph {
-  height: 550px;
-  width: 800px;
-  margin: 10px;
-}
-
-.graph .background {
-  fill: #e5f0e0;
-}
-.output-graph {
+.output-plot {
   background-color: #b5e0a0;
 }
 
-.graph .axes {
+
+.plot {
+  margin: 10px;
+}
+
+.plot-background {
+  fill: #e5f0e0;
+}
+
+.plot-axis {
   stroke: #333;
   stroke-dasharray: 0;
   stroke-width: 1.5;
 }
 
-.graph .grid {
+.plot-grid {
   stroke: #ccc;
   stroke-dasharray: 0;
   stroke-width: 1;
 }
 
-.labels {
+.plot-labels {
   font-size: 13px;
 }
+.plot-axlabels {
+  font-size: 10px;
+}
 
-.label-title {
+.plot-titlelabel {
   font-weight: bold;
   font-size: 12px;
   text-anchor: middle;
 }
 
-.query-line line {
+.plot-querybar {
   stroke: #55a040;
   stroke-width: 2;
 }
 
-.qline-hidden {
-  opacity: 0;
+.plot-markerbar {
+  stroke: #333;
+  stroke-width: 2;
 }
-
 .error {
-  background: #d99 !important;
+  background: #e43 !important;
 }
-.uncomputed {
-  background: #fd6 !important;
-}
-
-#k_table td {
-  width: 100px;
+.warning {
+  background: #eb3 !important;
 }
 
-#compute_btn {
-  background-color: #55a040;
-}
 
 .hovered {
   background-color: #55a040;
 }
 
 #topbar {
-  width: 100%;
   background-color: #ddd;
   display: flex;
   flex-direction: row;
   font-weight: bold;
+  font-size: 10px;
+
+  position: fixed;
+  width: 100%;
+  height: 28px;
+  top: 0;
+  z-index: 5;
+  border-bottom: 1px solid #333;
 }
-.topbar_la {
+.topbar-la {
   text-align: left;
   flex-grow: 0;
   padding: 5px;
+  margin: 0px;
   border-right: 1px solid #333;
 }
-.topbar_ra {
+.topbar-ra {
   text-align: right;
   flex-grow: 0;
   padding: 5px;
+  margin: 0px;
   border-left:  1px solid #333;
 }
-.topbar_ctr {
+.topbar-ctr {
   text-align: center;
   flex-grow: 10;
   padding: 5px;
 }
 
 .selectable:hover {
-  background-color: #55a040;
+  background-color: #0074d9;
   cursor: pointer;
+}
+
+#topbar select {
+  margin: 0px;
+  padding: 0px;
+}
+
+.topbar-ra .ttt {
+  visibility: hidden;
+  width: 400px;
+  background-color: #ddd;
+  color: black;
+  text-align: center;
+  padding: 5px 0;
+
+  position: fixed;
+  width: 300px;
+  top: 28px;
+  right: 0%;
+  margin-left: 0px; /* Use half of the width (120/2 = 60), to center the tooltip */
+  border: 1px solid #333;
+  z-index: 1;
+}
+
+.topbar-ra:hover .ttt {
+  visibility: visible;
+  opacity: 1;
+}
+#topbar_status {
+  background-color: #b5e0a0;
 }
