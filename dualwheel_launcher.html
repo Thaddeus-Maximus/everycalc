@@ -10,6 +10,7 @@
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/tolstack.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -46,6 +47,10 @@
 					calculateRatio('U');
 					calculateRatio('L');
 				}
+				if (input.id == "omega_0_L")
+					calculateRatio('L');
+				if (input.id == "omega_0_U")
+					calculateRatio('U');
 		    	if(key!=13) setError(1);
 		    });
 		EC_setOnKeyUp(); // default handler OK
@@ -58,28 +63,25 @@
 		compute();
 	}
 
-	function computeLaunch(params_pack) {
-		[d_b, m_b, moi_rat_b, k_b, w,
-		d_U, I_U, mu_U, omega_0_U,
-		d_L, I_L, mu_L, omega_0_L,
-		G_U] = params_pack;
-		I_b = moi_rat_b*m_b*w*w/4;
+	function computeLaunch(pp) {
+		let I_b = pp.moi_rat_b*pp.m_b*pp.w*pp.w/4;
+		let G_U = document.getElementById("motor_U_select").value == 'slave' ? pp.G_U : "free";
 
 		i=0;
 
-		u0 = -Math.sqrt((d_U+w)*(d_L+w)*(d_b*(d_b+d_U+d_L)-w*(d_U+d_L+w)))/(d_U+d_L+2*w);
+		u0 = -Math.sqrt((pp.d_U+pp.w)*(pp.d_L+pp.w)*(pp.d_b*(pp.d_b+pp.d_U+pp.d_L)-pp.w*(pp.d_U+pp.d_L+pp.w)))/(pp.d_U+pp.d_L+2*pp.w);
 		uf = -u0;
-		y0 = (d_L*(d_b+d_U+d_L) + 2*w*(w + d_L + d_U) - d_b*d_U)/2/(d_U+d_L+2*w);
+		y0 = (pp.d_L*(pp.d_b+pp.d_U+pp.d_L) + 2*pp.w*(pp.w + pp.d_L + pp.d_U) - pp.d_b*pp.d_U)/2/(pp.d_U+pp.d_L+2*pp.w);
 
 		i_settled=NaN;
-		u=u0+w*3e-2;
+		u=u0+pp.w*3e-2;
 		y=y0;
 		t=0;
 		v_b=0;
 		
 		omega_b=0;
-		omega_U=omega_0_U;
-		omega_L=omega_0_L;
+		omega_U=pp.omega_0_U;
+		omega_L=pp.omega_0_L;
 
 		res = {
 			t: 			[0],
@@ -94,7 +96,7 @@
 			F_L: 		[0]
 		};
 
-		dt = dt0 = 1e-2/Math.max(omega_0_U, omega_0_L);
+		dt = dt0 = 1e-2/Math.max(pp.omega_0_U, pp.omega_0_L);
 
 		matched_L = false; matched_U = false;
 		u_regain = 0;
@@ -107,38 +109,38 @@
 			}
 
 			y = y0; // grumble grumble
-			psi = Math.atan2(u, (d_L+d_U)/2 + w - y);
+			psi = Math.atan2(u, (pp.d_L+pp.d_U)/2 + pp.w - y);
 			theta = Math.atan2(u, y);
-			R_U   = Math.sqrt(u*u + Math.pow((d_L+d_U)/2 + w - y, 2)) - d_U/2;
-			R_L   = Math.sqrt(u*u + y*y) - d_L/2; 
+			R_U   = Math.sqrt(u*u + Math.pow((pp.d_L+pp.d_U)/2 + pp.w - y, 2)) - pp.d_U/2;
+			R_L   = Math.sqrt(u*u + y*y) - pp.d_L/2; 
 			R_U = R_L = (R_U+R_L)/2; //GRUMBLE GRUMBLE
-			del_U = (d_b)/2 - R_U;
-			del_L = (d_b)/2 - R_L;
+			del_U = (pp.d_b)/2 - R_U;
+			del_L = (pp.d_b)/2 - R_L;
 
-			N_L = 2*k_b*del_L;
-			N_U = 2*k_b*del_U;
+			N_L = 2*pp.k_b*del_L;
+			N_U = 2*pp.k_b*del_U;
 
-			F_U = N_U * mu_U;
-			F_L = N_L * mu_L;
+			F_U = N_U * pp.mu_U;
+			F_L = N_L * pp.mu_L;
 
 			var A,B,C,D,E,F;
 			if (typeof G_U == 'string') {
-				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/m_b;
-				B = - Math.cos(psi)*Math.cos(theta)/m_b + R_U*R_L/I_b;
-				C = - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/m_b - d_L*d_L/4/I_L;
+				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/pp.m_b;
+				B = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b;
+				C = - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/pp.m_b - pp.d_L*pp.d_L/4/pp.I_L;
 
-				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/m_b;
-				E = - Math.cos(psi)*Math.cos(theta)/m_b + R_U*R_L/I_b;
-				F = - R_U*R_U/I_b - Math.cos(psi)*Math.cos(psi)/m_b - d_U*d_U/4/I_U;
+				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/pp.m_b;
+				E = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b;
+				F = - R_U*R_U/I_b - Math.cos(psi)*Math.cos(psi)/pp.m_b - pp.d_U*pp.d_U/4/pp.I_U;
 			} else {
 				// it's different when there's coupled flywheels
-				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/m_b;
-				B = - Math.cos(psi)*Math.cos(theta)/m_b + R_U*R_L/I_b - (d_U*d_L)/4/G_U/(I_L+I_U/G_U/G_U);
-				C = - (d_U*d_U)/4/(I_L + I_U/G_U/G_U) - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/m_b;
+				A = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(theta)/pp.m_b;
+				B = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b - (pp.d_U*pp.d_L)/4/G_U/(pp.I_L+pp.I_U/G_U/G_U);
+				C = - (pp.d_U*pp.d_U)/4/(pp.I_L + pp.I_U/G_U/G_U) - R_L*R_L/I_b - Math.cos(theta)*Math.cos(theta)/pp.m_b;
 
-				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/m_b;
-				E = - Math.cos(psi)*Math.cos(theta)/m_b + R_U*R_L/I_b - (d_U*d_L)/4/G_U/(I_L+I_U/G_U/G_U);
-				F = - Math.cos(psi)*Math.cos(psi)/m_b   - R_U*R_U/I_b - (d_U*d_U)/4/(I_L + I_U/G_U/G_U) ;
+				D = (N_L*Math.sin(theta)+N_U*Math.sin(psi))*Math.cos(psi)/pp.m_b;
+				E = - Math.cos(psi)*Math.cos(theta)/pp.m_b + R_U*R_L/I_b - (pp.d_U*pp.d_L)/4/G_U/(pp.I_L+pp.I_U/G_U/G_U);
+				F = - Math.cos(psi)*Math.cos(psi)/pp.m_b   - R_U*R_U/I_b - (pp.d_U*pp.d_U)/4/(pp.I_L + pp.I_U/G_U/G_U) ;
 			}
 
 			if (matched_U){ 
@@ -166,22 +168,21 @@
 			t         += dt;
 
 			if (typeof G_U == 'string') {
-				domega_U = - F_U*d_U/2 / I_U;
-				domega_L = - F_L*d_L/2 / I_L;
+				domega_U = - F_U*pp.d_U/2 / pp.I_U;
+				domega_L = - F_L*pp.d_L/2 / pp.I_L;
 				omega_L += domega_L*dt;
 				omega_U += domega_U*dt;
 			} else {
-				domega_L = - F_L*d_L/2 / (I_L + I_U/G_U/G_U) - F_U*d_U/2/G_U / (I_L + I_U/G_U/G_U);
-				//console.log(domega_L);
+				domega_L = - F_L*pp.d_L/2 / (pp.I_L + pp.I_U/G_U/G_U) - F_U*pp.d_U/2/G_U / (pp.I_L + pp.I_U/G_U/G_U);
 				omega_L += domega_L*dt;
 				omega_U = omega_L/G_U;
 			}
 
 			if (!retry) {
-				if (!matched_U && v_b*Math.cos(psi)   - omega_b*w/2 > omega_U*R_U) {
+				if (!matched_U && v_b*Math.cos(psi)   - omega_b*pp.w/2 > omega_U*R_U) {
 					retry = true;
 				}
-				if (!matched_L && v_b*Math.cos(theta) + omega_b*w/2 > omega_L*R_L) {
+				if (!matched_L && v_b*Math.cos(theta) + omega_b*pp.w/2 > omega_L*R_L) {
 					retry = true;
 				}
 				if (retry) { // fuk go back, do it slower
@@ -203,11 +204,11 @@
 					continue; // do not write to result array, do not pass go, do not collect 200 dollars
 				}
 			} else {
-				if (v_b*Math.cos(theta) + omega_b*w/2 > omega_L*R_L) {
+				if (v_b*Math.cos(theta) + omega_b*pp.w/2 > omega_L*R_L) {
 					matched_L = true;
 					retry = false;
 				}
-				if (v_b*Math.cos(psi)   - omega_b*w/2 > omega_U*R_U) {
+				if (v_b*Math.cos(psi)   - omega_b*pp.w/2 > omega_U*R_U) {
 					matched_U = true;
 					retry = false;
 				}
@@ -228,7 +229,7 @@
 			if (N_U <= 0 && N_L <= 0) break;
 		}
 
-		stats = {
+		res.stats = {
 			v_b_exit: v_b,
 			omega_b_exit: omega_b,
 			omega_U_exit: omega_U,
@@ -236,229 +237,82 @@
 			i_settle: i_settled
 		}
 
-		return [res, stats];
+		return res;
 	}
-
-	/*function computeRevUp(params_pack) {
-		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, kM, omega_drop] = params_pack;
-
-		dt = 0.01;
-
-		i = 0;
-		t = 0;
-		omega = 0;
-		cur_cons = 0;
-		cur_cons_drop = 0;
-		res = {t:[t],omega:[omega],cur:[cur_stall]};
-
-		t_drop = 0;
-		validity = 0;
-		
-		while(i<1000) {
-			T = T_stall*(omega_max-omega)/omega_max;
-			cur = cur_free + (cur_stall-cur_free)*(omega_max-omega)/omega_max;
-			M = kM * omega;
-			domega = (T-M)/I_w;
-			omega += domega*dt;
-			cur_cons += cur*dt;
-			t += dt;
-			i ++;
-
-			res.t.push(t);
-			res.omega.push(omega);
-			res.cur.push(cur);
-
-			if (t_drop == 0 && omega > omega_drop) {
-				t_drop = t;
-				cur_cons_drop = cur_cons;
-				validity ++;
-			}
-			if (omega > omega_target) {
-				validity ++;
-				break;
-			}
-		}
-
-		cmd_pct  = kM/(T_stall*(omega_max-omega_target)/omega_max / omega_target)
-		cur_idle = cmd_pct * (cur_free + (cur_stall-cur_free)*(omega_max-omega_target)/omega_max);
-		
-		stats = {
-			idle_current: cur_idle,
-			cur_cons_live: cur_cons-cur_cons_drop,
-			cur_cons_dead: cur_cons,
-			t_dead: t,
-			t_live: t-t_drop,
-			valid: validity
-		};
-
-		return [res, stats];
-	}*/
 
 	let g = 9.81;
 
-	function compute(simulate) {
+	function compute() {
 		try{
-		if(document.getElementById('motor_U_select').value=="slave")
-			setV('omega_w_0_U', getV('omega_w_0_L')/getV('G_U'));
-		simulate = typeof simulate !== 'undefined' ? simulate : true;
-		if(!simulate) return; // lol you gotta simulate this
+			if(document.getElementById('motor_U_select').value=="slave")
+				setV('omega_0_U', getV('omega_0_L')/getV('G_U'));
 
-		max_low       = +Infinity;
-		max_low_stat  = {};
-		max_low_run   = [];
-		max_low_param = []
-		max_high      = -Infinity;
-		max_high_stat = {};
-		max_high_run  = [];
-		max_high_param = [];
-		params_list   = ['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w',
-		'd_w_U', 'I_w_U', 'mu_w_U', 'omega_w_0_U',
-		'd_w_L', 'I_w_L', 'mu_w_L', 'omega_w_0_L'];
-		params_var_list  = [];
-		params_var_count = 0;
-		for (param of params_list) {
-			if (getV(param+'_err')) {
-				params_var_list.push(true);
-				params_var_count++;
-			} else {
-				params_var_list.push(false);
-			}
-		}
-		low_omega_w   = +Infinity;
+			[extrema_vals, extrema] = TOLS_computeTolStack(computeLaunch, 
+			['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w',
+			'd_U', 'I_U', 'mu_U', 'omega_0_U',
+			'd_L', 'I_L', 'mu_L', 'omega_0_L', 'G_U'], 
+			['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']);			
 
-		for (var i=0; i<Math.pow(2, params_var_count); i++) {
-			params = [];
-			pvc = 0;
-			for (j=0; j<params_list.length; j++) {
-				if (params_var_list[j]) {
-					params.push(getVE(params_list[j], bitTest(i,pvc) ? 1:-1));
-					pvc ++;
-				} else {
-					params.push(getV(params_list[j]));
-				}
+	      	PLOT_drawLinePlot({
+	      		chartName: "chart_launch",
+	      		multiChannelBehavior: "merge2",
+	      		axes: {
+	      			x: {
+						numTicks: 10,
+						boxEnds: false,
+						negativeHandling: 'fitzero',
+						margin: 15
+					}, y: {
+						numTicks: 7,
+						boxEnds: true,
+						negativeHandling: 'fitzero',
+						margin: 5
+					}, z: {
+						syncWithY: true,
+						margin: 5
+					}
+	      		},
+	      		datasets: {
+	      			u: {axis: 'x'},
+	      			v_b: {axis: 'y'},
+	      			omega_b: {axis: 'y'},
+	      			omega_U: {axis: 'z'},
+	      			omega_L: {axis: 'z'}
+	      		},
+	      		queries: {
+	      			INDEX: {places: 0},
+	      			t: {places: 4},
+	      			u: {places: 4},
+	      			v_b: {places: 4},
+	      			omega_b: {places: 4},
+	      			omega_U: {places: 4},
+	      			omega_L: {places: 4},
 
-			}
-			params.push(document.getElementById('motor_U_select').value=="slave" ? getV("G_U"):"free");
-			[run, stats] = computeLaunch(params);
-			if (stats.v_b_exit < max_low)   {
-				max_low      = stats.v_b_exit;
-				max_low_run  = run;
-				max_low_stat = stats;
-				max_low_param = params;
-			}
-			if (stats.v_b_exit > max_high) {
-				max_high      = stats.v_b_exit;
-				max_high_run  = run;
-				max_high_stat = stats;
-				max_high_param = params;
-			}
-			if (stats.omega_L_exit < low_omega_w) {
-				low_omega_w = stats.omega_L_exit;
-			}
-			//break;
-		}
+	      			N_U: {places: 3},
+	      			N_L: {places: 3},
+	      			F_U: {places: 3},
+	      			F_L: {places: 3}
+	      		}
+	      	},[
+	      		extrema.v_b_exit[0],
+      			extrema.v_b_exit[1]
+	      	]);
 
-      	PLOT_drawLinePlot({
-      		chartName: "chart_launch",
-      		multiChannelBehavior: "merge2",
-      		axes: {
-      			x: {
-					numTicks: 10,
-					boxEnds: false,
-					negativeHandling: 'fitzero',
-					margin: 15
-				}, y: {
-					numTicks: 7,
-					boxEnds: true,
-					negativeHandling: 'fitzero',
-					margin: 5
-				}, z: {
-					syncWithY: true,
-					margin: 5
-				}
-      		},
-      		datasets: {
-      			u: {axis: 'x'},
-      			v_b: {axis: 'y'},
-      			omega_b: {axis: 'y'},
-      			omega_U: {axis: 'z'},
-      			omega_L: {axis: 'z'}
-      		},
-      		queries: {
-      			INDEX: {places: 0},
-      			t: {places: 4},
-      			u: {places: 4},
-      			v_b: {places: 4},
-      			omega_b: {places: 4},
-      			omega_U: {places: 4},
-      			omega_L: {places: 4},
+	      	for (stat of ['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']) {
+	      		setV('output_'+stat,        (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
+	      		setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
+	      	}
 
-      			N_U: {places: 3},
-      			N_L: {places: 3},
-      			F_U: {places: 3},
-      			F_L: {places: 3}
-      		}
-      	}, [max_high_run, max_low_run]);
-
-      	/*G = getV('G_L');
-
-		[rev_run, rev_stats] = computeRevUp([
-			getV('motor_stall_torque_adj')*G,
-			convert(getV('motor_max_speed_adj'), 'RPM')/G,
-			getV('motor_free_current_adj'),
-			getV('motor_stall_current_adj'),
-			getV('I_w') + getV('I_w_err'),
-			getV('omega_w_0'),
-			getV('kM'),
-			low_omega_w, '0']);
-
-      	PLOT_drawLinePlot({
-      		chartName: "chart_rev",
-      		axes: {
-      			x: {
-					numTicks: 10,
-					boxEnds: false,
-					negativeHandling: 'fitzero',
-					margin: 15
-				}, y: {
-					numTicks: 7,
-					boxEnds: true,
-					negativeHandling: 'fitzero',
-					margin: 5
-				}, z: {
-					syncWithY: true,
-					margin: 5
-				}
-      		},
-      		datasets: {
-      			u: {axis: 'x'},
-      			cur: {axis: 'y'},
-      			omega: {axis: 'z'}
-      		},
-      		queries: {
-      			INDEX: {places: 0},
-      			t: {places: 4},
-      			omega: {places: 4},
-      			cur: {places: 4}
-      		}
-      	}, rev_run);*/
-
-
-		setV('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
-		setV('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
-		setV('exit_omega_w_U', (max_low_stat.omega_U_exit + max_high_stat.omega_U_exit)/2);
-		setV('exit_omega_w_L', (max_low_stat.omega_L_exit + max_high_stat.omega_L_exit)/2);
-		setV('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
-		setV('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
-		setV('exit_omega_w_U_err', Math.abs(max_low_stat.omega_U_exit - max_high_stat.omega_U_exit)/2);
-		setV('exit_omega_w_L_err', Math.abs(max_low_stat.omega_L_exit - max_high_stat.omega_L_exit)/2);
-
-		/*setV('t_rev_live', rev_stats.t_live);
-		setV('t_rev_dead', rev_stats.t_dead);
-		setV('cur_cons_dead', rev_stats.cur_cons_dead);
-		setV('cur_cons_live', rev_stats.cur_cons_live);
-		setV('cur_idle', rev_stats.idle_current);*/
-
+	      	/*
+			setV('exit_v', (max_low_stat.v_b_exit + max_high_stat.v_b_exit)/2);
+			setV('exit_omega_b', (max_low_stat.omega_b_exit + max_high_stat.omega_b_exit)/2);
+			setV('exit_omega_U', (max_low_stat.omega_U_exit + max_high_stat.omega_U_exit)/2);
+			setV('exit_omega_L', (max_low_stat.omega_L_exit + max_high_stat.omega_L_exit)/2);
+			setV('exit_v_err', Math.abs(max_low_stat.v_b_exit - max_high_stat.v_b_exit)/2);
+			setV('exit_omega_b_err', Math.abs(max_low_stat.omega_b_exit - max_high_stat.omega_b_exit)/2);
+			setV('exit_omega_U_err', Math.abs(max_low_stat.omega_U_exit - max_high_stat.omega_U_exit)/2);
+			setV('exit_omega_L_err', Math.abs(max_low_stat.omega_L_exit - max_high_stat.omega_L_exit)/2);
+			*/
 		}catch(err){
 			console.log(err);
 			setError(2, err);
@@ -482,8 +336,8 @@
 
 		if (pos == 'U') {
 			if (document.getElementById('motor_U_select').value == 'slave') {
-				setV('omega_w_0_U', getV('omega_w_0_L')/G);
-				setV('omega_w_0_U_err', getV('omega_w_0_L_err',0)/G);
+				setV('omega_0_U', getV('omega_0_L')/G);
+				setV('omega_0_U_err', getV('omega_0_L_err', 0)/G);
 			}
 		}
 
@@ -494,9 +348,13 @@
 		// TODO: fix this
 		if (document.getElementById('motor_U_select').value == 'slave') {
 			document.getElementById('detail_motor_U').style.display = 'none';
+			document.getElementById('omega_0_U')    .readOnly = true;
+			document.getElementById('omega_0_U_err').readOnly = true;
 		} else {
 			MOTOR_selectMotor('motor_U');
 			document.getElementById('detail_motor_U').style.display = '';
+			document.getElementById('omega_0_U')    .readOnly = false;
+			document.getElementById('omega_0_U_err').readOnly = false;
 		}
 	}
 </script>
@@ -562,24 +420,24 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Wheel Diameter</th>
-					<td><input class='unit' data-unit='dim' id='d_w_L' value=6></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id='d_w_L_err' value=''></td>
-					<td class='unit' id='unit_d_w_L'></td>
+					<td><input class='unit' data-unit='dim' id='d_L' value=6></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id='d_L_err' value=''></td>
+					<td class='unit' id='unit_d_L'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input class='unit' data-unit='moi' id='I_w_L' value=4><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='moi' id="I_w_L_err" value=''></td>
+					<td><input class='unit' data-unit='moi' id='I_L' value=4><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='moi' id="I_L_err" value=''></td>
 					<td class='unit' data-unit='moi' ></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
-					<td><input id="mu_w_L" value=1.0></td><td class="tiny">+/-</td>
-					<td><input id="mu_w_L_err" value=''></td>
+					<td><input id="mu_L" value=1.0></td><td class="tiny">+/-</td>
+					<td><input id="mu_L_err" value=''></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Flywheel Target Velocity</th>
-					<td><input class='unit' data-unit='omega' id='omega_w_0_L' value=3000></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='omega_w_0_L_err' value=''></td>
-					<td class='unit' data-unit='omega' id='unit_omega_w_0_L'>[-]</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_L' value=3000></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_L_err' value=''></td>
+					<td class='unit' data-unit='omega' id='unit_omega_0_L'>[-]</td>
 				</tr>
 			</table>
 			<div>
@@ -647,24 +505,24 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Wheel Diameter</th>
-					<td><input class='unit' data-unit='dim' id='d_w_U' value=6></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id='d_w_U_err' value=''></td>
-					<td class='unit' data-unit='dim' id='unit_d_w_U'></td>
+					<td><input class='unit' data-unit='dim' id='d_U' value=6></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='dim' id='d_U_err' value=''></td>
+					<td class='unit' data-unit='dim' id='unit_d_U'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input class='unit' data-unit='moi'  id='I_w_U' value=4><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='moi'  id="I_w_U_err" value=''></td>
-					<td  class='unit' data-unit='moi' id="unit_I_w_U"></td>
+					<td><input class='unit' data-unit='moi'  id='I_U' value=4><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='moi'  id="I_U_err" value=''></td>
+					<td  class='unit' data-unit='moi' id="unit_I_U"></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
-					<td><input id="mu_w_U" value=1.0></td><td class="tiny">+/-</td>
-					<td><input id="mu_w_U_err" value=''></td>
+					<td><input id="mu_U" value=1.0></td><td class="tiny">+/-</td>
+					<td><input id="mu_U_err" value=''></td>
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Flywheel Target Velocity</th>
-					<td><input class='unit' data-unit='omega' id='omega_w_0_U' value=3000></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='omega_w_0_U_err' value=''></td>
-					<td class='unit' data-unit='omega' id='unit_omega_w_0_U'>[-]</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_U' value=3000></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='omega_0_U_err' value=''></td>
+					<td class='unit' data-unit='omega' id='unit_omega_0_U'>[-]</td>
 				</tr>
 			</table>
 			<div>
@@ -731,26 +589,26 @@
 		</div>
 		<div class="output" style='display:table-cell'>
 			<center><button type="button" onclick="compute()" id="compute_btn">Compute!</button></center>
-			<table>
+			<table> <!--['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']-->
 				<tr>
 					<th class='rowlabel'>Exit Velocity</th>
-					<td><input class='unit' data-unit='v' id='exit_v' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='v' id='exit_v_err' readOnly></td>
+					<td><input class='unit' data-unit='v' id='output_v_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='v' id='output_v_b_exit_err' readOnly></td>
 					<td class='unit' data-unit='v' ></td>
 				</tr><tr>
 					<th class='rowlabel'>Exit Ball RPM</th>
-					<td><input class='unit' data-unit='omega' id='exit_omega_b' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='exit_omega_b_err' readOnly></td>
+					<td><input class='unit' data-unit='omega' id='output_omega_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id='output_omega_b_exit_err' readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><tr>
 					<th class="rowlabel">Exit Wheelspeed (Top)</th>
-					<td><input class='unit' data-unit='omega' id="exit_omega_w_U" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id="exit_omega_w_U_err" readOnly></td>
+					<td><input class='unit' data-unit='omega' id="output_omega_U_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id="output_omega_U_exit_err" readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><tr>
 					<th class="rowlabel">Exit Wheelspeed (Bottom)</th>
-					<td><input class='unit' data-unit='omega' id="exit_omega_w_L" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id="exit_omega_w_L_err" readOnly></td>
+					<td><input class='unit' data-unit='omega' id="output_omega_L_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='omega' id="output_omega_L_exit_err" readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><!--<tr>
 					<th class="rowlabel" colspan=3>Time to Revved</th>

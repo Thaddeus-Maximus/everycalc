@@ -25,7 +25,7 @@ function TOLS_computeTolStack(fn, argsList, rankers) {
 	let params_var   = {};
 	let nvars = 0;
 	for (param of argsList) {
-		if (getV(param+'_err')) {
+		if (document.getElementById(param+'_err') && getV(param+'_err')) {
 			params_var[param]   = NaN;
 			nvars++;
 		} else {
@@ -55,12 +55,3 @@ function TOLS_computeTolStack(fn, argsList, rankers) {
 
 	return [extrema_vals, extrema];
 }
-
-/*
-for (stat of ['y_C', 'ang', 'tof', 'sv']) {
-	setV('output_'+stat, (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
-	setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
-}
-setV('output_sweep', (extrema_vals.y_U[1] + extrema_vals.y_L[0])/2);
-setV('output_sweep', (extrema_vals.y_U[1] - extrema_vals.y_L[0])/2);
-*/

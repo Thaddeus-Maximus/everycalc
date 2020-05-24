@@ -84,6 +84,7 @@ function PLOT_computeScaling(config, mins, maxs) {
 			H.push(1);
 		}
 	}
+	// TODO: plot multiple values on the same scaling
 	// FIXME: posonly + boxEnds + nonzero lower data bound = bad time??
 	// how many intervals to the end? (may be a float with non-boxed ends)
 	let min_rem = Math.min(...min_scaling);
@@ -299,6 +300,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		for (run of channels) {
 			let cconv = {};
 			for (name in run) {
+				if (name == 'stats') continue;
 				let label = document.getElementById(`${config.chartName}_${name}_label`);
 				let unit  = label && UNIT_MAP ? UNIT_MAP[label.dataset.unit] : undefined;
 				if (unit){
