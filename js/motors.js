@@ -3,36 +3,113 @@
  * TODO: flesh out this library a lot more; create 'states' and standardize motor selection more
  */
 
-function MOTOR_setupMotorSelect(select_id) {
-	let select = document.getElementById(select_id);
+function MOTOR_setupMotorSelect(id) {
+	let select = document.getElementById(id + '_select');
 	let i=0;
+	let opt = null;
 	for(motor in MOTOR_specs) {
 		i++;
-		let opt = document.createElement('option');
+		opt = document.createElement('option');
 		opt.innerHTML = MOTOR_specs[motor]["plain_name"];
 		opt.value = motor;
 		select.appendChild(opt);
 	}
+
+	opt = document.createElement('option');
+	opt.innerHTML = "** Custom Values **"
+	opt.value = 'custom';
+	select.appendChild(opt);
+
+	MOTOR_selectMotor(id, select.value);
 }
 
-function MOTOR_getSpecs(motor,key){
-	if (key=="max_rpm")
+function MOTOR_getSpec(motor, key){
+	if (key=="max_speed")
 		return convertFrom(MOTOR_specs[motor][key], 'RPM');
 	else
 		return MOTOR_specs[motor][key];
 }
 
+function MOTOR_computeState(motor, from, value) {
+	// everything must be in base units here
+	let state = {};
+	let stall_torque = motor.count*motor.stall_torque*motor.efficiency*motor.pct_power;
+	let max_speed = motor.max_speed*motor.pct_power;
+	let stall_current = motor.count*motor.stall_current*motor.pct_power;
+	let free_current  = motor.count*motor.free_current*motor.pct_power;
+	switch(from) {
+		case 'torque':
+			state.current = (stall_current-free_current)*value/stall_torque + free_current;
+			state.torque  = value;
+			state.speed   = max_speed - value*max_speed/stall_torque;
+			break;
+		case 'speed':
+			state.current = (stall_current-free_current)*(max_speed-value)/max_speed + free_current;
+			state.torque  = (stall_torque)*(max_speed-value)/max_speed;
+			state.speed   = value;
+			break;
+		case 'current':
+			state.current = value;
+			state.torque  = (value - free_current)*stall_torque/(stall_current-free_current);
+			state.speed   = max_speed - state.torque*max_speed/stall_torque;
+			break;
+	}
+	return state;
+}
+
+let MOTOR_PROPS = ['max_speed', 'free_current', 'stall_torque', 'stall_current', 'count', 'pct_power', 'efficiency'];
+let SELECTABLE_MOTOR_PROPS = ['max_speed', 'free_current', 'stall_torque', 'stall_current'];
+
+function MOTOR_selectMotor(id, motorName) {
+	if(typeof motorName == 'undefined')
+		motorName = document.getElementById(id+"_select").value;
+	else
+		document.getElementById(id+"_select").value = motorName;
+
+	console.log(motorName);
+
+	if (motorName == 'custom') {
+		SELECTABLE_MOTOR_PROPS.forEach(function(a){
+			document.getElementById(id+"_"+a).readOnly = false;
+		});
+	} else {
+		SELECTABLE_MOTOR_PROPS.forEach(function(a) {
+			document.getElementById(id+"_"+a).readOnly = true;
+			setV(id+"_"+a, MOTOR_getSpec(motorName, a));
+		});
+	}
+}
+
+// build a motor object from inputs prefixed with id
+function MOTOR_packMotor(id) {
+	let motor = {};
+	for (prop of MOTOR_PROPS) {
+		motor[prop] = getV(id+'_'+prop);
+	}
+	/*motor.free_current  *= getV(id+'_count')*getV(id+'_pct_power');
+	motor.stall_current *= getV(id+'_count')*getV(id+'_pct_power');
+	motor.stall_torque  *= getV(id+'_count')*getV(id+'_pct_power');*/
+	return motor;
+}
+
+function MOTOR_dumpMotor(id, motor) {
+	for (prop of SELECTABLE_MOTOR_PROPS) {
+		setV(id+'_'+prop, motor[prop]);
+	}
+	return motor;
+}
+
 var MOTOR_specs = {
 	"neo": {
 		"plain_name": "REV NEO",
-		"max_rpm": 5880,
+		"max_speed": 5880,
 		"free_current": 1.3,
 		"max_power": 516,
 		"stall_torque": 3.36,
 		"stall_current": 166
 	},"neo550": {
 		"plain_name": "REV NEO 550",
-		"max_rpm": 11000,
+		"max_speed": 11000,
 		"free_current": 1.4,
 		"max_power": 279,
 		"stall_torque": 0.97,
@@ -41,7 +118,7 @@ var MOTOR_specs = {
 
 	"cim": {
 		"plain_name": "CIM",
-		"max_rpm": 5330,
+		"max_speed": 5330,
 		"free_current": 2.7,
 		"max_power": 337,
 		"stall_torque": 2.41,
@@ -50,7 +127,7 @@ var MOTOR_specs = {
 
 	"falcon500": {
 		"plain_name":"VEX Falcon 500",
-		"max_rpm": 6380,
+		"max_speed": 6380,
 		"free_current": 1.5,
 		"max_power": 783,
 		"stall_torque": 4.69,
@@ -59,7 +136,7 @@ var MOTOR_specs = {
 
 	"minicim": {
 		"plain_name": "MiniCIM",
-		"max_rpm": 5840,
+		"max_speed": 5840,
 		"free_current": 3,
 		"max_power": 215,
 		"stall_torque": 1.41,
@@ -68,7 +145,7 @@ var MOTOR_specs = {
 
 	"bag": {
 		"plain_name": "BAG",
-		"max_rpm": 13180,
+		"max_speed": 13180,
 		"free_current": 1.8,
 		"max_power": 149,
 		"stall_torque": 0.43,
@@ -77,7 +154,7 @@ var MOTOR_specs = {
 
 	"775pro": {
 		"plain_name": "775Pro or AM Redline",
-		"max_rpm": 18730,
+		"max_speed": 18730,
 		"free_current": 0.7,
 		"max_power": 347,
 		"stall_torque": 0.71,
@@ -86,7 +163,7 @@ var MOTOR_specs = {
 
 	"am9015": {
 		"plain_name": "AndyMark 9015",
-		"max_rpm": 14270,
+		"max_speed": 14270,
 		"free_current": 3.7,
 		"max_power": 134,
 		"stall_torque": 0.36,
@@ -95,7 +172,7 @@ var MOTOR_specs = {
 
 	"neverest": {
 		"plain_name": "AndyMark NeveRest",
-		"max_rpm": 5480,
+		"max_speed": 5480,
 		"free_current": 0.4,
 		"max_power": 25,
 		"stall_torque": 0.17,
@@ -104,7 +181,7 @@ var MOTOR_specs = {
 
 	"rs550": {
 		"plain_name": "BaneBots RS550",
-		"max_rpm": 19000,
+		"max_speed": 19000,
 		"free_current": 0.4,
 		"max_power": 190,
 		"stall_torque": 0.38,
@@ -113,7 +190,7 @@ var MOTOR_specs = {
 
 	"nxt_nimh": {
 		"plain_name": "Mindstorms NXT Motor, NiMH",
-		"max_rpm": 130,
+		"max_speed": 130,
 		"free_current": 60e-3, 
 		"max_power": 1.07,
 		"stall_torque": 28e-2,
@@ -123,7 +200,7 @@ var MOTOR_specs = {
 
 	"nxt_9v": {
 		"plain_name": "Mindstorms NXT Motor, 9V",
-		"max_rpm": 165,
+		"max_speed": 165,
 		"free_current": 60e-3, 
 		"max_power": 1.7,
 		"stall_torque": 37e-2,

@@ -15,292 +15,264 @@
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript" id="main">
-	EXP_FN_BASE = 'simplemech'; // filename base for export utility
-	UNIT_MAP = { // map of units
-		"torque": ["N-m", "N-m"],
-		"encoder_cpx": ["c/m", "c/ft"],
-		"radius": ["mm","in"],
-		"force": ["N", "lbf"],
-		"mass": ["kg", "lbm"],
-		"speed": ["m/s", "ft/s"],
-		"distance": ["m", "ft"],
-		"acceleration": ["m/s^2", "ft/s^2"],
-		'moi': ['kg mm^2', 'lbm in^2'],
 
-		"omega": ["RPM", "RPM"],
-		"theta": ["rev", "rev"],
-		"alpha": ["RPM/s", "RPM/s"],
+EXP_FN_BASE = 'simplemech'; // filename base for export utility
+UNIT_MAP = { // map of units
+	"torque": ["N-m", "N-m"],
+	"encoder_cpx": ["c/m", "c/ft"],
+	"radius": ["mm","in"],
+	"force": ["N", "lbf"],
+	"mass": ["kg", "lbm"],
+	"speed": ["m/s", "ft/s"],
+	"distance": ["m", "ft"],
+	"acceleration": ["m/s^2", "ft/s^2"],
+	'moi': ['kg mm^2', 'lbm in^2'],
+	"omega": ["RPM", "RPM"],
+	"theta": ["rev", "rev"],
+	"alpha": ["RPM/s", "RPM/s"],
+	"angle": ["deg", "deg"],
+	"pct":   ["%", "%"]
+};
 
-		"angle": ["deg", "deg"]
-	};
+/* Initialization routine run on page load */
+function init() {
+	EC_onload();
+	EXP_onload();
+	UNIT_change();
+	MOTOR_setupMotorSelect("motor");
+	selectFriction();
 
-	/* Initialization routine run on page load */
-	function init() {
-		EC_onload();
-		MOTOR_setupMotorSelect("motortype");
-		EXP_onload();
-		UNIT_change();
-		selectFriction();
+	// on keyup for all variables
+	EC_setOnInput(function(e) {
+		let key = e.keyCode ? e.keyCode : e.which;
+		let input = e.target;
 
-		// on keyup for all variables
-		EC_setOnInput(function(e) {
-			let key = e.keyCode ? e.keyCode : e.which;
-			let input = e.target;
+    	// if a key is pressed, invalidate current results
+    	setError(1);
 
-	    	// if a key is pressed, invalidate current results
-	    	setError(1);
-
-			// if something was input into the custom motor area, compute the motor specs
-			if (input.id.startsWith("motor_")) {
-				computeMotorSpecs();
-			}
-			// if a gear ratio element was edited, compute gear ratio
-			if (input.id.startsWith("G") && input.id.length == 3) {
-				calcRatio();
-			}
-		});
-		EC_setOnKeyUp(); // default handler is OK
-
-		calcRatio();
-		selectMotorType(document.getElementById("motortype"));
-		compute();
-	}
-
-	let g = 9.81; // acceleration due to gravity
-
-	function compute() {
-		let computed_basic = false;
-		try{
-			let dt = 0;
-			let dt_override = getV("dt_override", undefined);
-			let r = getV("radius");
-			let m = getV("mass");
-			let TS = getV("motor_stall_torque_adj");
-			let wf = getV("motor_max_rpm_adj");
-			let If = getV("motor_free_current_adj");
-			let Is = getV("motor_stall_current_adj");
-			let G = getV("G");
-
-			let mu = +Infinity;
-			let N = +Infinity;
-			if (document.getElementById("enable_friction").checked) {
-				mu = getV("friction_mu", 0);
-				N  = m*g*getV("friction_pctloaded",100)/100;
-			}
-
-			load_expr = document.getElementById("load").value;
-			end_expr  = document.getElementById("endcond").value;
-
-			if(end_expr == "") end_expr = "0";
-
-			I = m*r*r;
-
-			console.log(dt, r, m, TS, wf, If, Is, G);
-
-			// computing basic parameters
-			// variables object to pass into parseMath
-			let variables = {
-				t 		: 0,
-				omega 	: 0,
-				theta 	: 0,
-				omega_m : 0,
-				theta_m : 0,
-				x 		: 0,
-				v 		: 0
-			}
-			Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
-			omega_m_theor = (G*TS - Mres)/(G*TS/wf);
-			setV("theor_adj_spd", r*wf/G*getV("speedloss", NaN)/100);
-			setV("theor_free_spd", r*wf/G);
-			setV("theor_free_current", If, 2);
-			setV("theor_run_spd", r*omega_m_theor/G);
-			setV("theor_run_current", If + (Is-If) * (wf-omega_m_theor)/wf, 2);
-			setV("theor_stall_force", G*TS/r);
-			setV("theor_stall_current", Is, 2);
-			setV("theor_traction_force", N*mu);
-			setV("theor_traction_current", If + (Is-If)*(N*mu*r/G)/(TS), 2);
-
-			// encoder computations
-			enc_plc = document.getElementById('encoder_placement').value;
-			enc_els = document.getElementsByClassName('encoder_detail');
-			if (enc_plc == 'none') {
-				for (i=0;i<enc_els.length;i++) {
-					enc_els[i].style.display = 'none';
-				}
-			} else {
-				for (i=0;i<enc_els.length;i++) {
-					enc_els[i].style.display = 'table-row';
-				}
-
-				cpx = getV('encoder_cpr')/NaNTo(1,getV('encoder_reduction'))/(r*2*Math.PI);
-				if(enc_plc == 'motor') cpx *= G;
-
-				setV('encoder_cpx', cpx);
-				setV('encoder_max_cps', cpx*r*wf/G);
-			}
-
-			computed_basic = true;
-
-			cur_cons = 0;
-
-			alpha_o = NaN;
-
-			alpha_ar 	= [0,0];
-			omega_ar 	= [0,0];
-			theta_ar 	= [0];
-			t_ar 		  = [0];
-
-			channels = {t:[],v:[],d:[],cur:[],f:[],a:[],omega:[],theta:[],T:[],alpha:[]}; // plotting channels
-			i=0;
-			while(1) {
-				// make variables for call to parseMath
-				variables.t 		= t_ar[t_ar.length-1];
-				variables.omega 	= convertTo(omega_ar[omega_ar.length-1], UNIT_MAP.omega[UNIT_sys]);
-				variables.theta 	= convertTo(theta_ar[theta_ar.length-1], UNIT_MAP.theta[UNIT_sys]);
-				variables.omega_m 	= convertTo(omega_ar[omega_ar.length-1]*G, UNIT_MAP.omega[UNIT_sys]);
-				variables.theta_m 	= convertTo(theta_ar[theta_ar.length-1]*G, UNIT_MAP.theta[UNIT_sys]);
-				variables.v 		= convertTo(omega_ar[omega_ar.length-1]*r, UNIT_MAP.speed[UNIT_sys]);
-				variables.x 		= convertTo(theta_ar[theta_ar.length-1]*r, UNIT_MAP.distance[UNIT_sys]);
-
-				// check if end condition has been met
-				if (i > 5000 || parseMath(end_expr, variables)) break;
-
-				T = Math.min(G*TS*(wf-omega_ar[omega_ar.length-1]*G)/wf, N*mu*r);
-				Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
-				alpha = (T-Mres) / I;
-				if(isNaN(alpha_o)) alpha_o = alpha;
-				alpha_ar.push(alpha);
-
-				// Use Adams-Bradforth method of integration
-				theta_ar.push(theta_ar[theta_ar.length-1] 
-					+ omega_ar[omega_ar.length-1]*dt*3/2 
-					- omega_ar[omega_ar.length-2]*dt*1/2);
-
-				omega_ar.push(omega_ar[omega_ar.length-1] 
-					+ alpha_ar[alpha_ar.length-1]*dt*3/2 
-					- alpha_ar[alpha_ar.length-2]*dt*1/2);
-
-				t_ar.push(t_ar[t_ar.length-1]+dt);
-				
-				// plain euler integration is OK for current
-				cur = If + (Is-If)*(wf-omega_ar[omega_ar.length-1]*G)/wf;
-				cur_cons = cur_cons + dt*cur;
-
-				// push to channels for plotting
-				channels.t.push(t_ar[t_ar.length-1]);
-				channels.cur.push(cur);
-				channels.v.push(omega_ar[omega_ar.length-1]*r);
-				channels.d.push(theta_ar[theta_ar.length-1]*r);
-				channels.f.push(T/r);
-				channels.a.push(alpha*r);
-				channels.omega.push(omega_ar[omega_ar.length-1]);
-				channels.theta.push(theta_ar[theta_ar.length-1]);
-				channels.T.push(T);
-				channels.alpha.push(alpha);
-
-				if (dt_override)
-					dt = dt_override;
-				else
-					dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(wf/G/alpha_o),Math.abs(wf/G/alpha))/40));
-				i++;
-			}
-
-			omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
-
-			console.log(channels);
-
-			// draw the line plot
-			PLOT_drawLinePlot({
-				chartName: "chart",
-				axes: {
-					x: {
-						numTicks: 10,
-						boxEnds: false,
-						negativeHandling: 'posonly',
-						margin: 15
-					}, y: {
-						numTicks: 7,
-						boxEnds: true,
-						negativeHandling: 'posonly',
-						margin: 5
-					}, z: {
-						syncWithY: true,
-						margin: 5
-					}
-				},
-				datasets: {
-					t: {axis: 'x'},
-					d: {axis: 'y'},
-					v: {axis: 'y'},
-					cur: {axis: 'z'},
-					f: {axis: 'z'}
-				},
-				queries: {
-					INDEX: { places: 0 },
-					cur: { places: 4 },
-					t: { places: 4 },
-
-					d: { places: 4 },
-					v: { places: 4 },
-					a: { places: 4 },
-					f: { places: 4 },
-
-					omega: { places: 4 },
-					theta: { places: 4 },
-					T: { places: 4 },
-					alpha: { places: 4 }
-				}
-			}, channels);
-
-			setV("endcond_met", parseMath(end_expr, variables) ? t_ar[t_ar.length-1]:"NOT MET");
-			setV("current_cons", cur_cons);
-
-		}catch(err){
-			console.log(err);
-
-			if (computed_basic)
-				setError(2, "Finished basic computations, but simulation failed. Most likely, you didn't plug in a mass value (simulation doesn't work without it). Error Code: " + err);
-			else
-				setError(2, err);
-			return;
+		// if something was input into the custom motor area, compute the motor specs
+		/*if (input.id.startsWith("motor_")) {
+			computeMotorSpecs();
+		}*/
+		// if a gear ratio element was edited, compute gear ratio
+		if (input.id.startsWith("G") && input.id.length == 3) {
+			calcRatio();
 		}
-		setError(0);
-	}
+	});
+	EC_setOnKeyUp(); // default handler is OK
 
-/* select the type of motor being used */
-function selectMotorType() {
-	let props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
-	let e = document.getElementById("motortype");
-
-	if (e.value == 'custom') {
-		props.forEach(function(a){
-			document.getElementById("motor_"+a).readOnly = false;
-		});
-	} else {
-		props.forEach(function(a) {
-			document.getElementById("motor_"+a).readOnly = true;
-			setV("motor_"+a, MOTOR_getSpecs(e.value, a));
-
-		});
-	}
-
-	computeMotorSpecs();
+	calcRatio();
+	compute();
 }
 
-/* compute motor specs from raw motor parameters */
-function computeMotorSpecs() {
-	let props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+let g = 9.81; // acceleration due to gravity
 
-	props.forEach(function(a) {
-		let adjVal = getV("motor_"+a)*getV("op_voltage")/12;
+function compute() {
+	let computed_basic = false;
+	try{
+		let dt = 0;
+		let dt_override = getV("dt_override", undefined);
+		let r = getV("radius");
+		let m = getV("mass");
+		/*let TS = getV("motor_stall_torque_adj");
+		let wf = getV("motor_max_speed_adj");
+		let If = getV("motor_free_current_adj");
+		let Is = getV("motor_stall_current_adj");*/
+		let G = getV("G");
+		let motor = MOTOR_packMotor('motor');
+		let mu = +Infinity;
+		let N = +Infinity;
+		if (document.getElementById("enable_friction").checked) {
+			mu = getV("friction_mu", 0);
+			N  = m*g*getV("friction_pctloaded",100)/100;
+		}
 
-		if (a=="stall_torque")
-			adjVal *= getV("motornum")*getV("efficiency")/100;
-		if (a=="free_current" || a=="stall_current" )
-			adjVal *= getV("motornum");
-		setV("motor_"+a+"_adj", adjVal);
-	});
+		let load_expr = document.getElementById("load").value;
+		let end_expr  = document.getElementById("endcond").value;
 
+		if(end_expr == "") end_expr = "0";
+
+		I = m*r*r;
+
+		// computing basic parameters
+		// variables object to pass into parseMath
+		let variables = {
+			t 		: 0,
+			omega 	: 0,
+			theta 	: 0,
+			omega_m : 0,
+			theta_m : 0,
+			x 		: 0,
+			v 		: 0
+		}
+		let Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
+		let run_state = MOTOR_computeState(motor, 'torque', 0);
+		setV("theor_run_spd",     run_state.speed*r/G);
+		setV("theor_run_current", run_state.current, 2);
+		
+
+		let free_state = MOTOR_computeState(motor, 'torque', 0);
+		setV("theor_free_spd",     free_state.speed*r/G);
+		setV("theor_free_current", free_state.current, 2);
+		setV("theor_adj_spd",      free_state.speed*r/G*getV("gearbox_speedloss", NaN));
+
+		let stall_state = MOTOR_computeState(motor, 'speed', 0);
+		setV("theor_stall_force",    stall_state.torque*G/r);
+		setV("theor_stall_current",  stall_state.current, 2);
+
+		let traction_state = MOTOR_computeState(motor, 'torque', Mres/G);
+		setV("theor_traction_force",    traction_state.torque*G/r);
+		setV("theor_traction_current",  traction_state.current, 2);
+
+		// encoder computations
+		enc_plc = document.getElementById('encoder_placement').value;
+		enc_els = document.getElementsByClassName('encoder_detail');
+		if (enc_plc == 'none') {
+			for (i=0;i<enc_els.length;i++) {
+				enc_els[i].style.display = 'none';
+			}
+		} else {
+			for (i=0;i<enc_els.length;i++) {
+				enc_els[i].style.display = 'table-row';
+			}
+
+			cpx = getV('encoder_cpr')/NaNTo(1,getV('encoder_reduction'))/(r*2*Math.PI);
+			if(enc_plc == 'motor') cpx *= G;
+
+			setV('encoder_cpx', cpx);
+			setV('encoder_max_cps', cpx*r*wf/G);
+		}
+
+		computed_basic = true;
+
+		cur_cons = 0;
+
+		alpha_o = NaN;
+
+		alpha_ar 	= [0,0];
+		omega_ar 	= [0,0];
+		theta_ar 	= [0];
+		t_ar 		  = [0];
+
+		channels = {t:[],v:[],d:[],cur:[],f:[],a:[],omega:[],theta:[],T:[],alpha:[]}; // plotting channels
+		i=0;
+		while(1) {
+			// make variables for call to parseMath
+			variables.t 		= t_ar[t_ar.length-1];
+			variables.omega 	= convertTo(omega_ar[omega_ar.length-1], UNIT_MAP.omega[UNIT_sys]);
+			variables.theta 	= convertTo(theta_ar[theta_ar.length-1], UNIT_MAP.theta[UNIT_sys]);
+			variables.omega_m 	= convertTo(omega_ar[omega_ar.length-1]*G, UNIT_MAP.omega[UNIT_sys]);
+			variables.theta_m 	= convertTo(theta_ar[theta_ar.length-1]*G, UNIT_MAP.theta[UNIT_sys]);
+			variables.v 		= convertTo(omega_ar[omega_ar.length-1]*r, UNIT_MAP.speed[UNIT_sys]);
+			variables.x 		= convertTo(theta_ar[theta_ar.length-1]*r, UNIT_MAP.distance[UNIT_sys]);
+
+			// check if end condition has been met
+			if (i > 5000 || parseMath(end_expr, variables)) break;
+
+			let motor_state = MOTOR_computeState(motor, 'speed', omega_ar[omega_ar.length-1]*G);
+			let T = Math.min(motor_state.torque*G, N*mu*r);
+			    motor_state = MOTOR_computeState(motor, 'torque', T/G);
+
+			Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
+
+			alpha = (motor_state.torque*G-Mres) / I;
+			if(isNaN(alpha_o)) alpha_o = alpha;
+			alpha_ar.push(alpha);
+
+			// Use Adams-Bradforth method of integration
+			theta_ar.push(theta_ar[theta_ar.length-1] 
+				+ omega_ar[omega_ar.length-1]*dt*3/2 
+				- omega_ar[omega_ar.length-2]*dt*1/2);
+
+			omega_ar.push(omega_ar[omega_ar.length-1] 
+				+ alpha_ar[alpha_ar.length-1]*dt*3/2 
+				- alpha_ar[alpha_ar.length-2]*dt*1/2);
+
+			t_ar.push(t_ar[t_ar.length-1]+dt);
+			
+			// plain euler integration is OK for current
+			cur      = motor_state.current;
+			cur_cons = cur_cons + dt*cur;
+
+			// push to channels for plotting
+			channels.t.push(t_ar[t_ar.length-1]);
+			channels.cur.push(cur);
+			channels.v.push(omega_ar[omega_ar.length-1]*r);
+			channels.d.push(theta_ar[theta_ar.length-1]*r);
+			channels.f.push(T/r);
+			channels.a.push(alpha*r);
+			channels.omega.push(omega_ar[omega_ar.length-1]);
+			channels.theta.push(theta_ar[theta_ar.length-1]);
+			channels.T.push(T);
+			channels.alpha.push(alpha);
+
+			if (dt_override)
+				dt = dt_override;
+			else
+				dt = Math.min(0.1,Math.max(1e-7,Math.min(Math.abs(motor.max_speed/G/alpha_o),Math.abs(motor.max_speed/G/alpha))/40));
+			i++;
+		}
+
+		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
+
+		console.log(channels);
+
+		// draw the line plot
+		PLOT_drawLinePlot({
+			chartName: "chart",
+			axes: {
+				x: {
+					numTicks: 10,
+					boxEnds: false,
+					negativeHandling: 'posonly',
+					margin: 15
+				}, y: {
+					numTicks: 7,
+					boxEnds: true,
+					negativeHandling: 'posonly',
+					margin: 5
+				}, z: {
+					syncWithY: true,
+					margin: 5
+				}
+			},
+			datasets: {
+				t: {axis: 'x'},
+				d: {axis: 'y'},
+				v: {axis: 'y'},
+				cur: {axis: 'z'},
+				f: {axis: 'z'}
+			},
+			queries: {
+				INDEX: { places: 0 },
+				cur: { places: 4 },
+				t: { places: 4 },
+
+				d: { places: 4 },
+				v: { places: 4 },
+				a: { places: 4 },
+				f: { places: 4 },
+
+				omega: { places: 4 },
+				theta: { places: 4 },
+				T: { places: 4 },
+				alpha: { places: 4 }
+			}
+		}, channels);
+
+		setV("endcond_met", parseMath(end_expr, variables) ? t_ar[t_ar.length-1]:"NOT MET");
+		setV("current_cons", cur_cons);
+
+	}catch(err){
+		console.log(err);
+
+		if (computed_basic)
+			setError(2, "Finished basic computations, but simulation failed. Most likely, you didn't plug in a mass value (simulation doesn't work without it). Error Code: " + err);
+		else
+			setError(2, err);
+		return;
+	}
+	setError(0);
 }
 
 /* compute gear ratio from expanded sheet */
@@ -367,52 +339,42 @@ function selectFriction() {
 					<th colspan=6 style="text-align: center;" class="rowlabel bold">Gearbox</th>
 				</tr><tr>
 					<td class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></td>
-					<td><input class='narrow' id="motornum" oninput="selectMotorType(); compute();" value=1 /></td>
+					<td><input class='narrow' id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
 					<td></td>
-					<td class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></td>
-					<td><input class='narrow' id="op_voltage" oninput="selectMotorType(); compute();" value=12 /></td>
-					<td class="unit">[V]</td>
+					<td class="rowlabel">% Voltage<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
+					<td><input class='narrow unit' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
+					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
-					<td><input class='narrow'  id="efficiency" oninput="selectMotorType(); compute();" value=85 /></td>
-					<td class="unit">[%]</td>
+					<td><input class='narrow unit' data-unit="pct" id="motor_efficiency" oninput="MOTOR_selectMotor('motor'); compute();" value=85 /></td>
+					<td class="unit" data-unit="pct" ></td>
 					<td class="rowlabel">Speed Loss<span class="ttt">Magical "Speed Loss Constant" from the JVN-calcs. Doesn't impact simulation, only used to compute "JVN adjusted speed".</span></td>
-					<td><input class='narrow'  id="speedloss" oninput="compute()" value=80 /></td>
-					<td class="unit">[%]</td>
+					<td><input class='narrow unit' data-unit="pct"  id="gearbox_speedloss" oninput="compute()" value=80 /></td>
+					<td class="unit" data-unit="pct" ></td>
 				</tr>
 			</table>
 			<div>
 				<span class="rowlabel">Motor</span>
-				<select class="doublewide" id="motortype" oninput="selectMotorType(); compute();">
-					<option value="custom">Custom</option>
+				<select class="doublewide" id="motor_select" onchange="console.log('hello?'); MOTOR_selectMotor('motor'); compute();">
 				</select>
 				<button type="button" onclick="collapseDiv('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
 			</div>
 			<table id='detail_motor' style='display:none;'>
 				<tr>
-					<th></th>
-					<th class="collabel">Raw Motor</th>
-					<th class="collabel" colspan=2>Combined/Adjusted</th>
-					<th></th>
-				</tr><tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-					<td><input class="unit" data-unit="omega" id="motor_max_rpm" readonly value=5880 /></td>
-					<td><input class="unit" data-unit="omega" id="motor_max_rpm_adj" readonly /></td>
+					<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
 					<td class="unit" data-unit="omega" >[RPM]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 					<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
-					<td><input class="unit" data-unit="torque" id="motor_stall_torque_adj" readonly /></td>
 					<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 					<td><input id="motor_free_current" readonly value=1.3 /></td>
-					<td><input id="motor_free_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
 					<td><input id="motor_stall_current" readonly value=166 /></td>
-					<td><input id="motor_stall_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr>
 			</table>

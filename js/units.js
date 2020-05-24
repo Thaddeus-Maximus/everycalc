@@ -143,6 +143,8 @@ var UNIT_CONVERSIONS = {
 	'': 1, // bypass
 	'-': 1,
 	's': 1,
+
+	'%': 0.01,
 	
 	"m":  1,
 	"mm": 1e-3,

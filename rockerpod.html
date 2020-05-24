@@ -45,7 +45,7 @@
 
 	function selectMotorType() {
 		e=document.getElementById("motortype");
-		var props = ["max_rpm", "stall_torque", "free_current", "stall_current"];
+		var props = ["max_speed", "stall_torque", "free_current", "stall_current"];
 		props.forEach(function(a) {
 			setV("motor_"+a, MOTOR_getSpecs(e.value, a));
 			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage")/12;
@@ -94,7 +94,7 @@
 		let r_pod = getV("r_pod");
 		let r_wheel = getV("d_wheel")/2;
 		let mu = getV("mu");
-		let omega_free = getV("motor_max_rpm_adj");
+		let omega_free = getV("motor_max_speed_adj");
 
 		w = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
 		F = G_pod*(T_in-T_clutch) / r_wheel;
@@ -196,8 +196,8 @@
 		</tr>
 		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input class="unit" data-unit="omega" id="motor_max_rpm" readonly /></td>
-			<td><input class="unit" data-unit="omega" id="motor_max_rpm_adj" readonly /></td>
+			<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly /></td>
+			<td><input class="unit" data-unit="omega" id="motor_max_speed_adj" readonly /></td>
 			<td class="unit" data-unit="omega" >[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
