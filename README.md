@@ -28,8 +28,8 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 - Transient pneumatic cylinder model
 - Barrowman stability calculator
 
-# I want to help write things! (Whether or not they're on your roadmap)
-Awesome! Let me know, fork this repo, then take a look at the [belt size source code](beltsize.html). It's got some comments about what's going on.
+# Do you want to help?
+Awesome! Let me know, fork this repo, then take a look at the [trajectory source code](trajectory.html). It's got some comments about what's going on, and isn't too overwhelming.
 
 # Documentation
 
