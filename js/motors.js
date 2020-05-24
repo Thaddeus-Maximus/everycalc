@@ -1,5 +1,6 @@
 /*
  * Motor Module (MOTOR)
+ * TODO: flesh out this library a lot more; create 'states' and standardize motor selection more
  */
 
 function MOTOR_setupMotorSelect(select_id) {

@@ -11,10 +11,23 @@ This is trying to be a suckless plotting library. I think I've accomplished that
 Depends on following:
 - General library
 - SVG(s) with elements of appropriate ids
+-- Chart: 		<svg id='${chartName}'>
+-- Axes: 		<line id='${chartName}_{x,y, and z}_axis'>      (all 2/3 are needed)
+-- Gridlines: 	<g id='${chartName}_{x,y, and z}_grid'>
+-- Plot labels: <text id='${chartName}_${channelName}_label'>   (for each channel.. even if they're hidden)
+-- Axis labels: <text id='${chartName}_${x,y, and z}_axlabels'> (all 2/3 are needed)
+-- Querybar:    <line id='${chartName}_querybar'>
+-- Plot lines:  <polyline id='${chartName}_${channelName}_line'> (for each channel)
 
 To use units:
 - Include the UNIT library
 - Make sure the axis labels are unit-ed appropriately
+- Make sure any query inputs you have are unit-ed appropriately
+
+To use queries:
+- Make a table (or div) with id '${chartName}_querytable'
+- Make a inputs with id '${chartName}_{channelName}'
+-- If plotting a multiline plot, the ids should be '${chartName}_{channelName}_{number}' (number is 1-indexed)
 
 */
 
@@ -258,7 +271,6 @@ Your SVG element should have an id (herein referred to as SVGid as it will be th
 		 number: 3, //set to 0 for single-queries without suffixes
 		 places: 4 }
 	} // if queries is undefined just ignore the query aspect algotether
-	// query boxes of format: `query_${config.chartName}_${name}_${number}`
 	// TODO: equal axis plots
 }
  */
@@ -459,10 +471,8 @@ function PLOT_focusHandler(chart, event) {
 			xq = plotScale.xH;
 		}
 		tq = convertFrom(tq, xUnit);
-	} // ok up to here for multi
-	
+	}
 	if (channels instanceof Array) {
-		// multi- case
 		for (let chi in channels) {
 			// take the red pill, and I show you how deep the rabbit hole goes
 			let xChannel  = channels[chi][config.axes.x.datasets[0]];

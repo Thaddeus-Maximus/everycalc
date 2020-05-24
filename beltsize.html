@@ -174,6 +174,12 @@
 		setError(0);		
 	}
 
+	function setTeeth(num, pos, teeth) {
+		setV(`p${num}_${pos}`, teeth, 4);
+		if (teeth<6) document.getElementById(`p${num}_${pos}`).classList.add('warning');
+		else         document.getElementById(`p${num}_${pos}`).classList.remove('warning');
+	}
+
 	function computeGeometry() {
 		let pitch = getV('pitch');
 		let p1 = getV('p1_n') * pitch / Math.PI;	
@@ -209,8 +215,8 @@
 				setV("n_teeth_s", nb, 4);
 				setV("l_s", l, 4);
 				setV("cc_s", cc, 4);
-				setV("p1_s", BELT_calculateWrap1(p1,p2,cc,pitch), 4);
-				setV("p2_s", BELT_calculateWrap2(p1,p2,cc,pitch), 4);
+				setTeeth(1, 's', BELT_calculateWrap1(p1,p2,cc,pitch));
+				setTeeth(2, 's', BELT_calculateWrap2(p1,p2,cc,pitch));
 			}
 		} else if (document.getElementById('type_timing').checked) {
 			let cc = convertFrom(getV('driver_val'), UNIT_MAP['dval'][UNIT_sys])- getV("center_add");
@@ -249,8 +255,8 @@
 				setV("n_teeth_l", nb_l, 4);
 				setV("l_l", l_l, 4);
 				setV("cc_l", cc_l, 4);
-				setV("p1_l", BELT_calculateWrap1(p1,p2,cc_l,pitch), 4);
-				setV("p2_l", BELT_calculateWrap2(p1,p2,cc_l,pitch), 4);
+				setTeeth(1, 'l', BELT_calculateWrap1(p1,p2,cc_l,pitch));
+				setTeeth(2, 'l', BELT_calculateWrap2(p1,p2,cc_l,pitch));
 			}
 
 			if (isNaN(cc_s) || cc_s <= (p1+p2)/2*1.01) {
@@ -263,8 +269,8 @@
 				setV("n_teeth_s", nb_s, 4);
 				setV("l_s", l_s, 4);
 				setV("cc_s", cc_s, 4);
-				setV("p1_s", BELT_calculateWrap1(p1,p2,cc_s,pitch), 4);
-				setV("p2_s", BELT_calculateWrap2(p1,p2,cc_s,pitch), 4);
+				setTeeth(1, 'l', BELT_calculateWrap1(p1,p2,cc_l,pitch));
+				setTeeth(2, 'l', BELT_calculateWrap2(p1,p2,cc_l,pitch));
 			}
 		} else {
 			let crossed = document.getElementById("crossed").checked;
@@ -285,6 +291,8 @@
 				setV("cc_s", getV('driver_val'), 4);
 				setV("p1_s", BELT_calculateWrap1(p1,p2,cc,1), 4);
 				setV("p2_s", BELT_calculateWrap2(p1,p2,cc,1), 4);
+				document.getElementById(`p1_s`).classList.remove('warning');
+				document.getElementById(`p1_s`).classList.remove('warning');
 			}
 		}
 		return 0;
@@ -293,6 +301,8 @@
 	function computeStrength() {
 		let teeth_1  = getV('p1_n');
 		let teeth_2  = getV('p2_n');
+		let length   = getV('l_s');
+		if (isNaN(length)) length = getV('l_l');
 		let rpm_1    = getV('rpm_1');
 		let rpm_2    = getV('rpm_2');
 		let torque_1 = getV('torque_1');
@@ -314,12 +324,15 @@
 			return;
 		}
 
-		let torque_cap_1 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * bdata['width_multipliers'][width];
-		let torque_cap_2 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * bdata['width_multipliers'][width];
+		let factor = bdata['width_multipliers'][width] * interp1D(bdata.lc_lengths, bdata.lc_factors, convertTo(length,'mm'));
+		let torque_cap_1 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * factor;
+		let torque_cap_2 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * factor;
+
+		console.log(bdata, convertTo(length, 'mm'), factor);
+
 		setV('torque_cap_1', torque_cap_1);
 		setV('torque_cap_2', torque_cap_2);
 		setV('fos_1', Math.min(torque_cap_1/torque_1, torque_cap_2/torque_2));
-		// TODO: Length correction factor
 		return 0;
 	}
 </script>

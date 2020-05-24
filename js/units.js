@@ -2,17 +2,21 @@
 Unit Module (UNIT).
 
 Please define the following:
- UNIT_MAP = <object> of structure 'input_id' => ['list','of','unit','names']
- UNIT_PLACES = <integer> (number of places)
+- UNIT_MAP = <object> of structure 'input_id' => ['list','of','unit','names']
+- UNIT_PLACES = <integer> (number of places)
 
 Please include the following in your onload script:
- UNIT_onload()
- 
-Depends on following:
+- UNIT_onload()
 
 References the following entities:
- unit_select: a <select> element containing
+- unit_select: a <select> element containing
  	<option> elements with values corresponding to indices of the unit lists in the UNIT_MAP.
+- <input> entities with class of unit, and data-unit attribute
+- other entities with class of unit, and data-unit attribute
+
+Example of usage in HTML:
+- <input class="unit" data-unit="torque" id="motor_stall_torque_adj" />
+- <span class="unit" data-unit="torque" ></span>
 
 */ 
 

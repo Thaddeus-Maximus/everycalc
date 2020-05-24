@@ -9,19 +9,6 @@ function EC_onload() {
 	setError(1);
 }
 
-/* Recommend placing a call to setError in your handler. */
-/*
-	function(e) {
-    	let key = e.keyCode ? e.keyCode : e.which;
-	   	let input = e.target;
-		setError(1);
-    	if (key==13) { // enter key
-    		compute(true);
-    	} else {
-    		compute(false);
-    	}
-    }
-*/
 function EC_setOnInput(fn) {
 	let inputs = document.getElementsByTagName('input');
 	for (index = 0; index < inputs.length; ++index) {
