@@ -1,4 +1,3 @@
-
 # [EveryCalc](https://thaddeus-maximus.github.io/swissarmyengineer/)
 A set of analysis tools for common circumstances ranging from slightly annoying, to very complex.
 
@@ -42,4 +41,3 @@ Awesome! Let me know, fork this repo, then take a look at the [belt size source 
 
 # Credits
 Using [mathjs](https://mathjs.org/) for beam calculator (as some rudimentary FEA is performed).
-
