@@ -28,26 +28,32 @@
 		'force':     	['N', 'lbf'],
 		'torque':     	['N', 'lbf'],
 
-		'kM': ['N-m/kRPM', 'in-lbf/kRPM']
+		'kM': ['N-m/kRPM', 'in-lbf/kRPM'],
+		"pct":   ["%", "%"]
 	};
 
 	function init() {
 		EC_onload();
-		MOTOR_setupMotorSelect("motortype_U");
-		MOTOR_setupMotorSelect("motortype_L");
+		MOTOR_setupMotorSelect("motor_L");
+		MOTOR_setupMotorSelect("motor_U");
 		EXP_onload();
 		UNIT_change();
 
 		EC_setOnInput(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
+				let input = e.target;
+		    	if (input.id.startsWith("G") && input.id.length == 5) {
+					calculateRatio('U');
+					calculateRatio('L');
+				}
 		    	if(key!=13) setError(1);
 		    });
 		EC_setOnKeyUp(); // default handler OK
 
 		calculateRatio('L');
 		calculateRatio('U');
-		selectMotorType('L');
-		selectMotorType('U');
+		MOTOR_selectMotor('motor_L');
+		selectUpperMotor();
 
 		compute();
 	}
@@ -233,7 +239,7 @@
 		return [res, stats];
 	}
 
-	function computeRevUp(params_pack) {
+	/*function computeRevUp(params_pack) {
 		[T_stall, omega_max, cur_free, cur_stall, I_w, omega_target, kM, omega_drop] = params_pack;
 
 		dt = 0.01;
@@ -286,13 +292,13 @@
 		};
 
 		return [res, stats];
-	}
+	}*/
 
 	let g = 9.81;
 
 	function compute(simulate) {
 		try{
-		if(document.getElementById('motortype_U').value=="slave")
+		if(document.getElementById('motor_U_select').value=="slave")
 			setV('omega_w_0_U', getV('omega_w_0_L')/getV('G_U'));
 		simulate = typeof simulate !== 'undefined' ? simulate : true;
 		if(!simulate) return; // lol you gotta simulate this
@@ -332,7 +338,7 @@
 				}
 
 			}
-			params.push(document.getElementById('motortype_U').value=="slave" ? getV("G_U"):"free");
+			params.push(document.getElementById('motor_U_select').value=="slave" ? getV("G_U"):"free");
 			[run, stats] = computeLaunch(params);
 			if (stats.v_b_exit < max_low)   {
 				max_low      = stats.v_b_exit;
@@ -467,15 +473,15 @@
 
 		G *= getV("G1B_"+pos, 1);
 		G *= getV("G2B_"+pos, 1);
-		G *= getV("G3B_"+pos, 1);
-		G *= getV("G4B_"+pos, 1);
+		//G *= getV("G3B_"+pos, 1);
+		//G *= getV("G4B_"+pos, 1);
 		G /= getV("G1A_"+pos, 1);
 		G /= getV("G2A_"+pos, 1);
-		G /= getV("G3A_"+pos, 1);
-		G /= getV("G4A_"+pos, 1);
+		//G /= getV("G3A_"+pos, 1);
+		//G /= getV("G4A_"+pos, 1);
 
 		if (pos == 'U') {
-			if (document.getElementById('motortype_U').value == 'slave') {
+			if (document.getElementById('motor_U_select').value == 'slave') {
 				setV('omega_w_0_U', getV('omega_w_0_L')/G);
 				setV('omega_w_0_U_err', getV('omega_w_0_L_err',0)/G);
 			}
@@ -484,32 +490,14 @@
 		setV("G_"+pos, G);
 	}
 
-	function selectMotorType(pos) {
-		e=document.getElementById("motortype_"+pos);
-
-		if (e.value == 'slave') {
-			document.getElementById("detail_motor_"+pos).style.display = 'none';
-			document.getElementById("omega_w_0_U").readOnly     = true;
-			document.getElementById("omega_w_0_U_err").readOnly = true;
-			return;
+	function selectUpperMotor() {
+		// TODO: fix this
+		if (document.getElementById('motor_U_select').value == 'slave') {
+			document.getElementById('detail_motor_U').style.display = 'none';
 		} else {
-			document.getElementById("omega_w_0_U").readOnly     = false;
-			document.getElementById("omega_w_0_U_err").readOnly = false;
-			document.getElementById("detail_motor_"+pos).style.display= '';
+			MOTOR_selectMotor('motor_U');
+			document.getElementById('detail_motor_U').style.display = '';
 		}
-
-		var props = ["max_speed", "stall_torque", "free_current", "stall_current"];
-		props.forEach(function(a) {
-			setV("motor_"+pos+'_'+a, MOTOR_getSpecs(e.value, a));
-			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage_"+pos)/12;
-			if (a=="stall_torque")
-				adjVal *= getV("motornum_"+pos)*getV("efficiency_"+pos)/100;
-			if (a=="free_current" || a=="stall_current" )
-				adjVal *= getV("motornum_"+pos);
-			setV("motor_"+pos+"_"+a+"_adj",adjVal);
-		});
-
-
 	}
 </script>
 
@@ -596,47 +584,36 @@
 			</table>
 			<div>
 				<span class="rowlabel">Motor</span>
-				<select class="doublewide" id="motortype_L" oninput="selectMotorType('L'); compute();"></select>
+				<select class="doublewide" id="motor_L_select" oninput="MOTOR_selectMotor('motor_L'); compute();"></select>
 				<!--<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>-->
 			</div>
 			<table id='detail_motor_L'>
 				<tr>
 					<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span> </th>
-					<td><input class='' id="motornum_L" oninput="selectMotorType('L'); compute();" value=1 /></td>
+					<td><input class='' id="motor_L_count" oninput="MOTOR_selectMotor('motor_L'); compute();" value=1 /></td>
 				</tr><tr>
-					<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-					<td><input class='' id="op_voltage_L" oninput="selectMotorType('L'); compute();" value=12 /></td>
-					<td class="unit">[V]</td>
+					<th class="rowlabel">Operating Power</th>
+					<td><input class="unit" data-unit="pct" id="motor_L_pct_power" oninput="MOTOR_selectMotor('motor_L'); compute();" value=12 /></td>
+					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-					<td><input class=''  id="efficiency_L" oninput="selectMotorType('L'); compute();" value=85 /></td>
-					<td class="unit">[%]</td>
-				</tr>
-				<tr>
-					<th></th>
-					<th class="collabel">Raw Motor</th>
-					<th class="collabel">Adjusted</th>
-					<th></th>
-				</tr>
-				<tr>
+					<td><input class='unit' data-unit="pct" id="motor_L_efficiency" oninput="MOTOR_selectMotor('motor_L'); compute();" value=85 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
 					<td><input class='unit' data-unit='omega' id="motor_L_max_speed" readonly /></td>
-					<td><input class='unit' data-unit='omega' id="motor_L_max_speed_adj" readonly /></td>
 					<td class='unit' data-unit='omega'>[RPM]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 					<td><input class='unit' data-unit='torque' id="motor_L_stall_torque" readonly /></td>
-					<td><input class='unit' data-unit='torque' id="motor_L_stall_torque_adj" readonly /></td>
 					<td class='unit' data-unit='torque'>[N-m]</td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 					<td><input id="motor_L_free_current" readonly /></td>
-					<td><input id="motor_L_free_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
 					<td><input id="motor_L_stall_current" readonly /></td>
-					<td><input id="motor_L_stall_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr>
 			</table>
@@ -654,7 +631,7 @@
 					<td><input id="G2A_L" oninput="calculateRatio('L')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G2B_L" oninput="calculateRatio('L')" /></td>
-				</tr><tr>
+				</tr><!--<tr>
 					<td><input id="G3A_L" oninput="calculateRatio('L')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G3B_L" oninput="calculateRatio('L')" /></td>
@@ -662,7 +639,7 @@
 					<td><input id="G4A_L" oninput="calculateRatio('L')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G4B_L" oninput="calculateRatio('L')" /></td>
-				</tr>
+				</tr>-->
 			</table>
 		</div>
 		<div class="odd" style='display:table-cell'>
@@ -692,7 +669,7 @@
 			</table>
 			<div>
 				<span class="rowlabel">Motor<span class="ttt">If geared to bottom, a positive number indicates spin in the reverse direction (wheels both propelling) while a negative indicates spin in the reverse direction (top wheel providing excess backspin)</span></span>
-				<select class="doublewide" id="motortype_U" oninput="selectMotorType('U'); compute();">
+				<select class="doublewide" id="motor_U_select" oninput="selectUpperMotor(); compute();">
 					<option value="slave">Geared to Bottom</option>
 				</select>
 				<!--<button type="button" onclick="collapse('motor')" id='toggle_detail_motor'>&#9660;</button>-->
@@ -700,41 +677,30 @@
 			<table id='detail_motor_U'>
 				<tr>
 					<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span> </th>
-					<td><input class='' id="motornum_U" oninput="selectMotorType('U'); compute();" value=1 /></td>
+					<td><input class='' id="motor_U_count" oninput="selectUpperMotor(); compute();" value=1 /></td>
 				</tr><tr>
-					<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-					<td><input class='' id="op_voltage_U" oninput="selectMotorType('U'); compute();" value=12 /></td>
-					<td class="unit">[V]</td>
+					<th class="rowlabel">Operating Power</th>
+					<td><input class="unit" data-unit="pct" id="motor_U_pct_power" oninput="selectUpperMotor(); compute();" value=12 /></td>
+					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-					<td><input class=''  id="efficiency_U" oninput="selectMotorType('U'); compute();" value=85 /></td>
-					<td class="unit">[%]</td>
-				</tr>
-				<tr>
-					<th></th>
-					<th class="collabel">Raw Motor</th>
-					<th class="collabel">Adjusted</th>
-					<th></th>
-				</tr>
-				<tr>
+					<td><input class='unit' data-unit="pct" id="motor_U_efficiency" oninput="selectUpperMotor(); compute();" value=85 /></td>
+					<td class="unit" data-unit="pct"></td>
+				</tr><tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
 					<td><input class='unit' data-unit='omega' id="motor_U_max_speed" readonly /></td>
-					<td><input class='unit' data-unit='omega' id="motor_U_max_speed_adj" readonly /></td>
-					<td class='unit' data-unit='omega' >[RPM]</td>
+					<td class='unit' data-unit='omega'>[RPM]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
 					<td><input class='unit' data-unit='torque' id="motor_U_stall_torque" readonly /></td>
-					<td><input class='unit' data-unit='torque' id="motor_U_stall_torque_adj" readonly /></td>
-					<td class='unit' data-unit='torque' >[N-m]</td>
+					<td class='unit' data-unit='torque'>[N-m]</td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 					<td><input id="motor_U_free_current" readonly /></td>
-					<td><input id="motor_U_free_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
 					<td><input id="motor_U_stall_current" readonly /></td>
-					<td><input id="motor_U_stall_current_adj" readonly /></td>
 					<td class="unit">[A]</td>
 				</tr>
 			</table>
@@ -752,7 +718,7 @@
 					<td><input id="G2A_U" oninput="calculateRatio('U')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G2B_U" oninput="calculateRatio('U')" /></td>
-				</tr><tr>
+				</tr><!--<tr>
 					<td><input id="G3A_U" oninput="calculateRatio('U')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G3B_U" oninput="calculateRatio('U')" /></td>
@@ -760,7 +726,7 @@
 					<td><input id="G4A_U" oninput="calculateRatio('U')" /></td>
 					<td class="tiny">:</td>
 					<td><input id="G4B_U" oninput="calculateRatio('U')" /></td>
-				</tr>
+				</tr>-->
 			</table>
 		</div>
 		<div class="output" style='display:table-cell'>

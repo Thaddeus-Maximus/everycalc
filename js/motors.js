@@ -66,16 +66,19 @@ function MOTOR_selectMotor(id, motorName) {
 	else
 		document.getElementById(id+"_select").value = motorName;
 
-	console.log(motorName);
-
 	if (motorName == 'custom') {
 		SELECTABLE_MOTOR_PROPS.forEach(function(a){
 			document.getElementById(id+"_"+a).readOnly = false;
 		});
-	} else {
+	} else if (motorName in MOTOR_specs) {
 		SELECTABLE_MOTOR_PROPS.forEach(function(a) {
 			document.getElementById(id+"_"+a).readOnly = true;
 			setV(id+"_"+a, MOTOR_getSpec(motorName, a));
+		});
+	} else {
+		SELECTABLE_MOTOR_PROPS.forEach(function(a) {
+			document.getElementById(id+"_"+a).readOnly = true;
+			setV(id+"_"+a, '***');
 		});
 	}
 }

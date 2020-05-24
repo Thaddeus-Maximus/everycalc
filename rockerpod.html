@@ -21,7 +21,8 @@
 		"torque": 		["N-m", "in-lbf"],
 		"dimension": 	["mm", "in"],
 		"speed": 		["m/s", "ft/s"],
-		"omega":        ["RPM", "RPM"]
+		"omega":        ["RPM", "RPM"],
+		"pct":   		["%", "%"]
 	}
 
 	function init() {
@@ -29,33 +30,23 @@
 		EXP_onload();
 		UNIT_change();
 
-		MOTOR_setupMotorSelect("motortype");
+		MOTOR_setupMotorSelect("motor");
 
 		EC_setOnInput(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 		    	if(key!=13) setError(1);
+
+				if (input.id.startsWith("G") && input.id.length == 3) {
+					computePreRatio();
+				}
+				if (input.id.startsWith("G") && input.id.length == 4) {
+					computePodRatio();
+				}
 		    });
 		EC_setOnKeyUp(); // default handler OK
 
-		selectMotorType();
 		computePreRatio();
 		computePodRatio();
-		compute();
-	}
-
-	function selectMotorType() {
-		e=document.getElementById("motortype");
-		var props = ["max_speed", "stall_torque", "free_current", "stall_current"];
-		props.forEach(function(a) {
-			setV("motor_"+a, MOTOR_getSpecs(e.value, a));
-			adjVal = MOTOR_getSpecs(e.value, a)*getV("op_voltage")/12;
-			if (a=="stall_torque")
-				adjVal *= getV("motornum")*getV("efficiency")/100;
-			if (a=="free_current" || a=="stall_current" )
-				adjVal *= getV("motornum");
-			setV("motor_"+a+"_adj", adjVal);
-		});
-
 		compute();
 	}
 
@@ -86,43 +77,43 @@
 
 	function compute() {
 		try{
-		let G_pod = getV("G_pod");
-		let G_pre = getV("G_pre");
-		let T_in  = G_pre*getV("motor_stall_torque_adj");
-		let T_clutch = getV("T_clutch", 0);
-		let h_pod = getV("h_pod");
-		let r_pod = getV("r_pod");
-		let r_wheel = getV("d_wheel")/2;
-		let mu = getV("mu");
-		let omega_free = getV("motor_max_speed_adj");
+			let motor = MOTOR_packMotor('motor');
+			let G_pod = getV("G_pod");
+			let G_pre = getV("G_pre");
+			let h_pod = getV("h_pod");
+			let r_pod = getV("r_pod");
+			let mu    = getV("mu");
+			let T_clutch = getV("T_clutch", 0);
+			let r_wheel  = getV("d_wheel")/2;
 
-		w = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
-		F = G_pod*(T_in-T_clutch) / r_wheel;
-		N = (T_in + F*h_pod)/w;
-		mu_ideal = F/N;
-		v = omega_free*r_wheel/G_pod/G_pre;
+			let w    = Math.sqrt(Math.pow(r_pod,2)-Math.pow(h_pod-r_wheel, 2));
+			let T_in = MOTOR_computeState(motor, "speed", 0).torque;
+			let F    = G_pod*(T_in-T_clutch) / r_wheel;
+			let N    = (T_in + F*h_pod)/w;
+			let mu_ideal = F/N;
 
-		setV("F", F);
-		setV("N", N);
-		setV("mu_ideal", mu_ideal);
-		setV("free_speed", v);
-		if (mu < mu_ideal) {
-			document.getElementById("F").classList.add('slip');
-			document.getElementById("N").classList.add('slip');
-			document.getElementById("mu_ideal").classList.add('slip');
-			setError(0, 'Computed fully; but the rocker pod is going to slip!');
+			setV("F", F);
+			setV("N", N);
+			setV("mu_ideal", mu_ideal);
+			setV("free_speed", MOTOR_computeState(motor, "torque", 0).speed*r_wheel/G_pod/G_pre);
+
+			if (mu < mu_ideal) {
+				document.getElementById("F").classList.add('slip');
+				document.getElementById("N").classList.add('slip');
+				document.getElementById("mu_ideal").classList.add('slip');
+				setError(0, 'Computed fully; but the rocker pod is going to slip!');
+			}
+			else{
+				document.getElementById("F").classList.remove('slip');
+				document.getElementById("N").classList.remove('slip');
+				document.getElementById("mu_ideal").classList.remove('slip');
+				setError(0);
+			}
+		}catch(err){
+			console.log(err);
+			setError(2,err);
+			return;
 		}
-		else{
-			document.getElementById("F").classList.remove('slip');
-			document.getElementById("N").classList.remove('slip');
-			document.getElementById("mu_ideal").classList.remove('slip');
-			setError(0);
-		}
-	}catch(err){
-		console.log(err);
-		setError(2,err);
-		return;
-	}
 	}
 </script>
 
@@ -160,59 +151,36 @@
 	<div class="even">
 		<table>
 		<tr>
-			<th class="rowlabel">Number of Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
-			<td><input id="motornum" oninput="selectMotorType()" value=1 /></td>
+			<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
+			<td><input id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
+		</tr><td class="rowlabel">Operating Power<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
+			<td><input class='narrow unit' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
+			<td class="unit" data-unit="pct"></td>
 		</tr><tr>
-			<th class="rowlabel">Voltage<span class="ttt">What voltage are the motors ran at? (assuming that the nominal motor performance is at 12V)</span></th>
-			<td><input id="op_voltage" oninput="selectMotorType()" value=12 /></td>
-			<td class="unit">[V]</td>
-		</tr><tr>
-			<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-			<td><input id="efficiency" oninput="selectMotorType()" value=85 /></td>
-			<td class="unit">[%]</td>
+			<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
+			<td><input class='narrow unit' data-unit="pct" id="motor_efficiency" oninput="MOTOR_selectMotor('motor'); compute();" value=85 /></td>
+			<td class="unit" data-unit="pct" ></td>
 		</tr>
-
 		<tr>
 			<th>Motor</th>
-			<td colspan="2"><select class="doublewide" id="motortype" oninput="selectMotorType()">
-			  
-			  <!--<option value="neo">REV NEO</option>
-			  <option value="neo550">REV NEO550</option>
-			  <option value="falcon500">VEX Falcon 500</option>
-			  <option value="cim">CIM</option>
-			  <option value="minicim">MiniCIM</option>
-			  <option value="bag">Vex BAG</option>
-			  <option value="775pro">775Pro / Redline</option>
-			  <option value="am9015">AndyMark 9015</option>
-			  <option value="neverest">AndyMark NeveRest</option>
-			  <option value="rs550">BaneBots RS-550</option>-->
+			<td colspan="2"><select class="doublewide" id="motor_select" oninput="MOTOR_selectMotor('motor'); compute();">
 			</select></td>
 		</tr>
 		<tr>
-			<th></th>
-			<th class="collabel">Raw Motor</th>
-			<th class="collabel">Adjusted</th>
-			<th></th>
-		</tr>
-		<tr>
 			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly /></td>
-			<td><input class="unit" data-unit="omega" id="motor_max_speed_adj" readonly /></td>
+			<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
 			<td class="unit" data-unit="omega" >[RPM]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly /></td>
-			<td><input class="unit" data-unit="torque" id="motor_stall_torque_adj" readonly /></td>
+			<td><input class="unit" data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
 			<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
 		</tr><tr>
 			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-			<td><input id="motor_free_current" readonly /></td>
-			<td><input id="motor_free_current_adj" readonly /></td>
+			<td><input id="motor_free_current" readonly value=1.3 /></td>
 			<td class="unit">[A]</td>
 		</tr><tr>
 			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-			<td><input id="motor_stall_current" readonly /></td>
-			<td><input id="motor_stall_current_adj" readonly /></td>
+			<td><input id="motor_stall_current" readonly value=166 /></td>
 			<td class="unit">[A]</td>
 		</tr>
 	</table>

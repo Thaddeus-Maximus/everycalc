@@ -74,10 +74,6 @@ function compute() {
 		let dt_override = getV("dt_override", undefined);
 		let r = getV("radius");
 		let m = getV("mass");
-		/*let TS = getV("motor_stall_torque_adj");
-		let wf = getV("motor_max_speed_adj");
-		let If = getV("motor_free_current_adj");
-		let Is = getV("motor_stall_current_adj");*/
 		let G = getV("G");
 		let motor = MOTOR_packMotor('motor');
 		let mu = +Infinity;
@@ -215,8 +211,6 @@ function compute() {
 
 		omega_ar.shift(); //remove the first element of this array that was there for adams-bradforth 
 
-		console.log(channels);
-
 		// draw the line plot
 		PLOT_drawLinePlot({
 			chartName: "chart",
@@ -341,7 +335,7 @@ function selectFriction() {
 					<td class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></td>
 					<td><input class='narrow' id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
 					<td></td>
-					<td class="rowlabel">% Voltage<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
+					<td class="rowlabel">Operating Power<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
 					<td><input class='narrow unit' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
 					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
@@ -355,7 +349,7 @@ function selectFriction() {
 			</table>
 			<div>
 				<span class="rowlabel">Motor</span>
-				<select class="doublewide" id="motor_select" onchange="console.log('hello?'); MOTOR_selectMotor('motor'); compute();">
+				<select class="doublewide" id="motor_select" onchange="MOTOR_selectMotor('motor'); compute();">
 				</select>
 				<button type="button" onclick="collapseDiv('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
 			</div>
