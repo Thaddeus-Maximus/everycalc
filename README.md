@@ -8,14 +8,14 @@ Inspired by the countless [JVN Calc](https://johnvneun.com/blog/2019/12/24/jvn-c
 
 # Aims Accomplished
 - Complex and targeted analysis tools to make mechatronic systems
--- Flywheel-based launchers
--- Generalized motorized mechanism
--- Belt sizing
--- Trajectory simulation
--- Rocker pods
+ - Flywheel-based launchers
+ - Generalized motorized mechanism
+ - Belt sizing
+ - Trajectory simulation
+ - Rocker pods
 
 - Basic structural analysis tools
--- Beam deflection and stress tool
+ - Beam deflection and stress tool
 
 - An o-ring groove calculator
 
