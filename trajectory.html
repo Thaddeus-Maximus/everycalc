@@ -9,6 +9,8 @@
 <script type="text/javascript" src="js/units.js"></script>
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/tolstack.js"></script>
+
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -59,18 +61,6 @@
 		compute();
 	}
 
-	function interp1D(xs, ys, xq) {
-		i;
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return ys[i-1] + (ys[i]-ys[i-1])/(xs[i]-xs[i-1])*(xq-xs[i-1]);
-	}
-
-	function interp1Dder(xs, ys, xq) {
-		i;
-		for (i=1; i<xs.length-1 && !isNaN(xs[i]) && xq>xs[i]; i++) {}
-		return (ys[i]-ys[i-1])/(xs[i]-xs[i-1]);
-	}
-
 	function convert_to_array(xyn, to) {
 		newxyn = [];
 		for(i=0;i<xyn.length;i++) {
@@ -87,94 +77,82 @@
 		return newxyn;
 	}
 
-	function computeTrajectory(params_pack) {
-		[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = params_pack;
+	let g  = 9.81;
+
+	function computeTrajectory(pp) {
+		//[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = pp;
 		
-		rho = 1.1839; // kg/m^3
-		A   = d*d*Math.PI/4;
+		let d   = pp.d_ball;
+		let m   = pp.m_ball;
+		let rho = 1.1839; // kg/m^3
+		let A   = d*d*Math.PI/4;
 
-		mu_d = NaNTo(0, 1/2*rho*A*Cd);
-		mu_l = NaNTo(0, 1/2*rho*A*Cl);
-		mu_m = NaNTo(0, Math.PI/3*rho*d*d*d*Cm);
-		omega = NaNTo(0, omega);
+		let mu_d  = NaNTo(0, 1/2*rho*A*pp.Cd);
+		let mu_l  = NaNTo(0, 1/2*rho*A*pp.Cl);
+		let mu_m  = NaNTo(0, Math.PI/3*rho*d*d*d*pp.Cm);
+		let omega = NaNTo(0, pp.omega_initial);
 
-		x=-xtarg;
-		y=y0;
-		vx=Math.cos(theta)*v;
-		vy=Math.sin(theta)*v;
-		vbar = v;
-		g=9.81;
-		xl=x; xh=x;
+		let x  = -pp.x_target;
+		let y  =  pp.y_initial;
+		let xu = x; let xl = x;
+		let vx = Math.cos(pp.theta)*pp.v_initial;
+		let vy = Math.sin(pp.theta)*pp.v_initial;
+		let vbar = pp.v_initial;
+		// ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm']
 
-		dt = xtarg/v/100;
-		res_ctr = {x:[x], y:[y]};
-		res_low = {x:[], y:[]};
-		res_high = {x:[], y:[]};
-
-		y_low=0;
-		y_high=0;
-		tof=0;
-
-		i=0;
-		t=0;
-		while(i<3000 && xh<=xtarg*0.05 && xl<=xtarg*0.05 && y>=0) {
+		let dt  = pp.x_target/vbar/100;
+		let res = {t:[0], x_C:[x], y_C:[y], ang:[pp.theta], x_L:[], y_L:[], x_U:[], y_U:[]};
+		let i=0;
+		let t=0;
+		while(i<3000 && xu<=pp.x_target*0.05 && xl<=pp.x_target*0.05 && y>=0) {
 			// Normal-tangent components
-			Tx =  vx/vbar;
-			Ty =  vy/vbar;
-			Nx = -vy/vbar;
-			Ny =  vx/vbar;
+			let Tx =  vx/vbar;
+			let Ty =  vy/vbar;
+			let Nx = -vy/vbar;
+			let Ny =  vx/vbar;
 
-			Fd = mu_d * vbar*vbar;
-			Fl = mu_l * vbar*vbar;
-			Fm = mu_m * vbar*omega;
+			let Fd = mu_d * vbar*vbar;
+			let Fl = mu_l * vbar*vbar;
+			let Fm = mu_m * vbar*omega;
 
 			vy += (-g*m - Fd*Ty + Fl*Ny + Fm*Ny)/m*dt;
 			vx += (     - Fd*Tx + Fl*Nx + Fm*Nx)/m*dt;
-			x += vx*dt;
-			y += vy*dt;
-			t += dt;
+			x  += vx*dt;
+			y  += vy*dt;
+			t  += dt;
 			vbar = Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
 
 			xl = x + d/2 * vy/vbar;
-			xh = x - d/2 * vy/vbar;
 			yl = y - d/2 * vx/vbar;
-			yh = y + d/2 * vx/vbar;
+			xu = x - d/2 * vy/vbar;
+			yu = y + d/2 * vx/vbar;
 
-			if (x>0) {
-				tof = t;
-			}
-
-			res_ctr.x.push(x);
-			res_ctr.y.push(y);
-			res_low.x.push(xl);
-			res_low.y.push(yl);
-			res_high.x.push(xh);
-			res_high.y.push(yh);
+			res.t  .push(t);
+			res.x_C.push(x);
+			res.y_C.push(y);
+			res.x_L.push(xl);
+			res.y_L.push(yl);
+			res.x_U.push(xu);
+			res.y_U.push(yu);
+			res.ang.push(Math.atan(Ty));
 
 			i+=1;
 		}
 
-		stats = {
-			'y_low':  interp1D(res_low.x,  res_low.y, 0),
-			'y_high': interp1D(res_high.x, res_high.y, 0),
-			'y_ctr':  interp1D(res_ctr.x,  res_ctr.y, 0),
-			'ang':    Math.atan(interp1DSlope(res_ctr.x,res_ctr.y, 0)),
-			'tof':    tof,
-			'sv':     v 
+		res.stats = {
+			y_L: interp1D(res.x_L, res.y_L, 0),
+			y_U: interp1D(res.x_U, res.y_U, 0),
+			y_C: interp1D(res.x_C, res.y_C, 0),
+			ang: interp1D(res.x_C, res.ang, 0),
+			tof: interp1D(res.x_L, res.t,   0),
+			sv:  vbar
 		}
 
-		return [res_low, res_ctr, res_high, stats];
+		return res;
 	}
-
-	let g = 9.81; // acceleration due to gravity
 
 	function compute() {
 		try{
-		params_list = ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'];
-		params_pack = [];
-		for (j=0; j<params_list.length; j++) {
-			params_pack.push(getV(params_list[j]));
-		}
 
 		mode = document.getElementById('mode').value;
 		var x,y,v,theta;
@@ -329,73 +307,26 @@
     		setV('x_target', x);
     	}
 
-    	computable_ids = ['charts', 'strike_height', 'strike_height_err', 'sweep_height', 'sweep_height_err', 'strike_angle', 'strike_angle_err', 'strike_v', 'strike_v_err', 'time_of_flight', 'time_of_flight_err']
-    	for (id of computable_ids) {
-	    	document.getElementById(id).classList.remove('error');    
-	    	document.getElementById(id).classList.remove('uncomputed');    
-	    	document.getElementById(id).classList.add(isNaN(v)||isNaN(x)||isNaN(y)||isNaN(theta) ? 'error':'uncomputed');
-    	}
 
-		max_low       = +Infinity;
-		max_low_stat  = {};
-		max_low_run   = {};
-		max_high      = -Infinity;
-		max_high_stat = {};
-		max_high_run  = {};
-		params_var_list  = [];
-		params_var_count = 0;
-		for (param of params_list) {
-			if (getV(param+'_err')) {
-				params_var_list.push(true);
-				params_var_count++;
-			} else {
-				params_var_list.push(false);
-			}
-		}
-		low_omega_w   = +Infinity;
-
-		for (var i=0; i<Math.pow(2, params_var_count); i++) {
-			params = [];
-			pvc = 0;
-			for (j=0; j<params_list.length; j++) {
-				if (params_var_list[j]) {
-					params.push(getV(params_list[j]) + (bitTest(i,pvc) ? 1:-1)*getV(params_list[j]+'_err'));
-					pvc ++;
-				} else {
-					params.push(getV(params_list[j]));
-				}
-			}
-			run = computeTrajectory(params);
-			if (run[3]['y_low'] < max_low)   {
-				max_low      = run[3]['y_low'];
-				max_low_run  = run[0];
-				max_low_stat = run[3];
-			}
-			if (run[3]['y_high'] > max_high) {
-				max_high      = run[3]['y_high'];
-				max_high_run  = run[2];
-				max_high_stat = run[3];
-			}
-		}
+		[extrema_vals, extrema] = TOLS_computeTolStack(computeTrajectory, 
+			['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'], 
+			['y_L', 'y_U', 'y_C', 'ang', 'tof', 'sv']);
 
 		targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP.bigdim[UNIT_sys] ) ;
-      	drawPlot(max_low_run, max_high_run, targetstuff, 
-      		(max_high_stat.y_high > getV('y_target')+getV('h_target')/2) || (max_low_stat.y_low < getV('y_target')-getV('h_target')/2));
 
-		for (id of computable_ids){
-			document.getElementById(id).classList.remove('error');    
-	    	document.getElementById(id).classList.remove('uncomputed');    	
-		}
-      	setV('strike_height',     (max_high_stat['y_ctr'] +max_low_stat['y_ctr'])/2);
-      	setV('strike_height_err', (max_high_stat['y_ctr'] -max_low_stat['y_ctr'])/2);
-      	setV('sweep_height',      (max_high_stat['y_high']+max_low_stat['y_low'])/2);
-      	setV('sweep_height_err',  (max_high_stat['y_high']-max_low_stat['y_low'])/2);
-      	setV('strike_angle',      (max_high_stat['ang']   +max_low_stat['ang'])/2);
-      	setV('strike_angle_err',  Math.abs(max_high_stat['ang']-max_low_stat['ang'])/2);
-      	setV('strike_v',      (max_high_stat['sv']   +max_low_stat['sv'])/2);
-      	setV('strike_v_err',  Math.abs(max_high_stat['sv']-max_low_stat['sv'])/2);
-      	setV('time_of_flight',    (max_high_stat['tof']   +max_low_stat['tof'])/2);
-      	setV('time_of_flight_err',Math.abs(max_high_stat['tof']-max_low_stat['tof'])/2);
+      	drawPlot(
+      		{x: extrema.y_L[0].x_L, y: extrema.y_L[0].y_L},
+      		{x: extrema.y_U[1].x_U, y: extrema.y_U[1].y_U}, 
+      		targetstuff, 
+      		(extrema_vals.y_U > getV('y_target')+getV('h_target')/2) || (extrema_vals.y_L < getV('y_target')-getV('h_target')/2));
+
+      	for (stat of ['y_C', 'ang', 'tof', 'sv']) {
+      		setV('output_'+stat, (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
+      		setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
+      	}
+      	setV('output_sweep', (extrema_vals.y_U[1] + extrema_vals.y_L[0])/2);
+      	setV('output_sweep_err', (extrema_vals.y_U[1] - extrema_vals.y_L[0])/2);
+
       }catch(err){
 		console.log(err);
 		setError(2, err);
@@ -404,20 +335,8 @@
       setError(0);
 	}
 
-	/*function cleanRun(run) {
-		for (var i=run[0].length-1; i>0; i--) {
-			if (run[0][i] < 0) {
-				yint = interp1D(run[0], run[1], 0);
-				arr = [run[0].slice(0,i-1).concat(0), run[1].slice(0,i-1).concat(yint)];
-
-				return arr;
-			}
-		} 
-	}*/
-
 	function drawPlot(low_run, high_run, targetstuff, missed) {
 		[target_x, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
-
 		PLOT_drawLinePlot({
 			multiChannelBehavior: "merge2",
 			chartName: "chart",
@@ -609,29 +528,29 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Strike Point</th>
-					<td><input class='unit' data-unit='bigdim' id='strike_height' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='bigdim' id='strike_height_err' readOnly></td>
-					<td class='unit' data-unit='bigdim' id='unit_strike_height'></td>
+					<td><input class='unit' data-unit='bigdim' id='output_y_C' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='bigdim' id='output_y_C_err' readOnly></td>
+					<td class='unit' data-unit='bigdim' ></td>
 				</tr><tr>
 					<th class='rowlabel'>Swept Zone</th>
-					<td><input class='unit' data-unit='smalldim' id='sweep_height' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='smalldim' id='sweep_height_err' readOnly></td>
-					<td class='unit' data-unit='smalldim' id='unit_sweep_height'></td>
+					<td><input class='unit' data-unit='smalldim' id='output_sweep' readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='smalldim' id='output_sweep_err' readOnly></td>
+					<td class='unit' data-unit='smalldim' ></td>
 				</tr><tr>
 					<th class="rowlabel">Angle of Strike</th>
-					<td><input class='unit' data-unit='theta' id="strike_angle" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='theta' id="strike_angle_err" readOnly></td>
-					<td class='unit' data-unit='theta' id='unit_strike_angle'></td>
+					<td><input class='unit' data-unit='theta' id="output_ang" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='theta' id="output_ang_err" readOnly></td>
+					<td class='unit' data-unit='theta' ></td>
 				</tr><tr>
 					<th class="rowlabel">Stike Velocity</th>
-					<td><input class='unit' data-unit='v' id="strike_v" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='v' id="strike_v_err" readOnly></td>
-					<td class='unit' data-unit='v' id='unit_strike_v'>[s]</td>
+					<td><input class='unit' data-unit='v' id="output_sv" readOnly></td><td class="tiny">+/-</td>
+					<td><input class='unit' data-unit='v' id="output_sv_err" readOnly></td>
+					<td class='unit' data-unit='v' ></td>
 				</tr><tr>
 					<th class="rowlabel">Time of Flight</th>
-					<td><input id="time_of_flight" readOnly></td><td class="tiny">+/-</td>
-					<td><input id="time_of_flight_err" readOnly></td>
-					<td class="unit" id='unit_time_of_flight'>[s]</td>
+					<td><input id="output_tof" readOnly></td><td class="tiny">+/-</td>
+					<td><input id="output_tof_err" readOnly></td>
+					<td class="unit" >[s]</td>
 				</tr>
 			</table>
 		</div>

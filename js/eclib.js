@@ -72,10 +72,6 @@ function NaNTo(to, x) {
 	return x;
 }
 
-function bitTest(num, bit){
-    return ((num>>bit) % 2 != 0)
-}
-
 function posatan2(X,Y) {
 	atn = Math.atan2(X,Y);
 	if (atn < 0) atn += Math.PI*2;
