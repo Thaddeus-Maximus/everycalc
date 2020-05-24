@@ -46,6 +46,7 @@
 
 		UNIT_change();
 
+		collapseTable('section'); 
 		populateMaterials();
 		document.getElementById('material').value = 'Aluminum';
 		selectMaterial();
@@ -794,7 +795,7 @@
 						</select>
 					</td>
 					<td>
-						<button type="button" onclick="collapseTable('material'); selectShape(true)" id='toggle_detail_section' class="toggle_button">&#9650;</button>
+						<button type="button" onclick="collapseTable('material'); selectShape(true)" id='toggle_detail_material' class="toggle_button">&#9650;</button>
 					</td>
 
 				</tr>
@@ -887,7 +888,7 @@
 						<button type="button" onclick="collapseTable('protips'); selectShape(true)" id='toggle_detail_protips' class="toggle_button">&#9650;</button>
 					</td>
 				</tr>
-				<tr>
+				<tr style="display: none;">
 					<td colspan=3>
 							Moments are positive counter-clockwise.<br/><br/>
 							Click on the chart to query points. <br/><br/>

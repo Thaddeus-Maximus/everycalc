@@ -1,9 +1,6 @@
 // spread library, TOLS
 // what-for figuring out how tolerance stackups end up affecting results
 
-// TODO: THIS
-
-
 
 function TOLS_bitTest(num, bit){
     return ((num>>bit) % 2 != 0)
