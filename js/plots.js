@@ -285,6 +285,7 @@ function PLOT_drawLinePlot(config, channels, handler) {
 	if (typeof config.multiChannelBehavior == 'undefined'){
 		channels_conv = {};
 		for (name in channels) {
+			if (name == 'stats') continue;
 			let label = document.getElementById(`${config.chartName}_${name}_label`);
 			let unit  = label && UNIT_MAP ? UNIT_MAP[label.dataset.unit] : undefined;
 			if (unit){

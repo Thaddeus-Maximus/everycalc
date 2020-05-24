@@ -57,6 +57,16 @@ function MOTOR_computeState(motor, from, value) {
 	return state;
 }
 
+function MOTOR_computeIdleCurrent(motor, torque_target) {
+	let stall_torque = motor.count*motor.stall_torque*motor.efficiency*motor.pct_power;
+	let max_speed = motor.max_speed*motor.pct_power;
+	let stall_current = motor.count*motor.stall_current*motor.pct_power;
+	let free_current  = motor.count*motor.free_current*motor.pct_power;
+
+	let cmd_pct = torque_target / stall_torque;
+	return (stall_current*cmd_pct-free_current*cmd_pct)*torque_target/(stall_torque*cmd_pct) + free_current*cmd_pct;
+}
+
 let MOTOR_PROPS = ['max_speed', 'free_current', 'stall_torque', 'stall_current', 'count', 'pct_power', 'efficiency'];
 let SELECTABLE_MOTOR_PROPS = ['max_speed', 'free_current', 'stall_torque', 'stall_current'];
 
