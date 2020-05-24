@@ -11,13 +11,12 @@
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/tolstack.js"></script>
 
-
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript">
-	EXP_FN_BASE = 'trajectory';
-	UNIT_MAP = {
+	EXP_FN_BASE = 'trajectory'; // filename for export utility
+	UNIT_MAP = { // map of units
 		'theta': 		['deg', 'deg', 'deg'],
 		'v':     		['m/s', 'ft/s','in/s'],
 		'bigdim':  		['m',   'ft',  'in'],
@@ -27,28 +26,30 @@
 		'omega': 	['RPM', 'RPM', 'RPM']
 	};
 
-    function selectMode() {
-    	var mode = document.getElementById('mode').value;
-    	document.getElementById('x_target').readOnly = false;
-    	if (mode=='raw') {
-    		document.getElementById('v_initial').readOnly = false;
-    		document.getElementById('theta').readOnly     = false;
-    	} else if (mode=='find_theta') {
-    		document.getElementById('v_initial').readOnly = false;
-    		document.getElementById('theta').readOnly     = true;
-    	} else if (mode=='find_v') {
-    		document.getElementById('v_initial').readOnly = true;
-    		document.getElementById('theta').readOnly     = false;
-    	} else if (mode=='find_min_v') {
-    		document.getElementById('v_initial').readOnly = true;
-    		document.getElementById('theta').readOnly     = true;
-    	} else if (mode.startsWith('find_distance')) {
-    		document.getElementById('v_initial').readOnly = false;
-    		document.getElementById('theta').readOnly     = false;
-    		document.getElementById('x_target').readOnly  = true;
-    	}
-    }
+	/* mode selection */
+	function selectMode() {
+		var mode = document.getElementById('mode').value;
+		document.getElementById('x_target').readOnly = false;
+		if (mode=='raw') {
+			document.getElementById('v_initial').readOnly = false;
+			document.getElementById('theta').readOnly     = false;
+		} else if (mode=='find_theta') {
+			document.getElementById('v_initial').readOnly = false;
+			document.getElementById('theta').readOnly     = true;
+		} else if (mode=='find_v') {
+			document.getElementById('v_initial').readOnly = true;
+			document.getElementById('theta').readOnly     = false;
+		} else if (mode=='find_min_v') {
+			document.getElementById('v_initial').readOnly = true;
+			document.getElementById('theta').readOnly     = true;
+		} else if (mode.startsWith('find_distance')) {
+			document.getElementById('v_initial').readOnly = false;
+			document.getElementById('theta').readOnly     = false;
+			document.getElementById('x_target').readOnly  = true;
+		}
+	}
 
+	/* Initialization routine run on page load */
 	function init() {
 		EC_onload();
 		EXP_onload();
@@ -77,11 +78,10 @@
 		return newxyn;
 	}
 
-	let g  = 9.81;
+	let g  = 9.81; // acceleration due to gravity
 
+	/* Compute trajectory */
 	function computeTrajectory(pp) {
-		//[v, theta, y0, xtarg, d, m, omega, Cd, Cl, Cm] = pp;
-		
 		let d   = pp.d_ball;
 		let m   = pp.m_ball;
 		let rho = 1.1839; // kg/m^3
@@ -98,7 +98,6 @@
 		let vx = Math.cos(pp.theta)*pp.v_initial;
 		let vy = Math.sin(pp.theta)*pp.v_initial;
 		let vbar = pp.v_initial;
-		// ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm']
 
 		let dt  = pp.x_target/vbar/100;
 		let res = {t:[0], x_C:[x], y_C:[y], ang:[pp.theta], x_L:[], y_L:[], x_U:[], y_U:[]};
@@ -151,190 +150,191 @@
 		return res;
 	}
 
+	/* Main computation function */
 	function compute() {
 		try{
+			mode = document.getElementById('mode').value;
+			var x,y,v,theta;
+			if (mode=='raw') {
+	    		// nothing special
+	    		x = getV('x_target');
+	    		y = getV('y_target');
+	    		theta = getV('theta');
+	    		v = getV('v_initial');
+	    	} else if (mode=='find_theta') {
+	    		x = getV('x_target');
+	    		y = getV('y_target') - getV('y_initial');
+	    		v = getV('v_initial');
 
-		mode = document.getElementById('mode').value;
-		var x,y,v,theta;
-		if (mode=='raw') {
-    		// nothing special
-    		x = getV('x_target');
-    		y = getV('y_target');
-    		theta = getV('theta');
-    		v = getV('v_initial');
-    	} else if (mode=='find_theta') {
-    		x = getV('x_target');
-    		y = getV('y_target') - getV('y_initial');
-    		v = getV('v_initial');
-
-    		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
-    		// take ballistic target, spread it open
-    		ya = theta*0.5;
-    		yb = theta*1.5;
-    		if (isNaN(theta)) {
-    			ya = 0;
-    			yb = 45*Math.PI/180;
-    		}
-    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-    		// use bisection to solve
-    		while(j<100) {
-				yc = (ya+yb)/2;
-    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-
-				if (Math.abs(fc)<getV('h_target')/100) break;
-
-				if (sign(fc) == sign(fa)){
-					fa = fc;
-					ya = yc;
-				} else {
-					fb = fc;
-					yb = yc;
-				}
-				j++;
-			}
-			theta = yc;
-    		
-    		setV('theta', theta);
-    	} else if (mode=='find_v') {
-    		x = getV('x_target');
-    		y = getV('y_target') - getV('y_initial');
-    		theta = getV('theta');
-
-    		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
-    		
-    		if (!isNaN(v)) {
-    			// take ballistic target, spread it open
-	    		ya = v*0.5;
-	    		yb = v*1.5;
-	    		params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		theta = Math.atan((Math.pow(v,2) - Math.sqrt(Math.pow(v,4)-g*(g*x*x+2*y*v*v)))/g/x);
+	    		// take ballistic target, spread it open
+	    		ya = theta*0.5;
+	    		yb = theta*1.5;
+	    		if (isNaN(theta)) {
+	    			ya = 0;
+	    			yb = 45*Math.PI/180;
+	    		}
+	    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 	    		// use bisection to solve
 	    		while(j<100) {
-					yc = (ya+yb)/2;
-	    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			yc = (ya+yb)/2;
+	    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-					if (Math.abs(fc)<getV('h_target')/100) break;
+	    			if (Math.abs(fc)<getV('h_target')/100) break;
 
-					if (sign(fc) == sign(fa)){
-						fa = fc;
-						ya = yc;
-					} else {
-						fb = fc;
-						yb = yc;
-					}
-					j++;
-				}
-				v = yc;
-    		}
-    		setV('v_initial', v);
-    	} else if (mode=='find_min_v') {
-    		x = getV('x_target');
-    		y = getV('y_target') - getV('y_initial');
+	    			if (sign(fc) == sign(fa)){
+	    				fa = fc;
+	    				ya = yc;
+	    			} else {
+	    				fb = fc;
+	    				yb = yc;
+	    			}
+	    			j++;
+	    		}
+	    		theta = yc;
+	    		
+	    		setV('theta', theta);
+	    	} else if (mode=='find_v') {
+	    		x = getV('x_target');
+	    		y = getV('y_target') - getV('y_initial');
+	    		theta = getV('theta');
 
-    		theta = Math.atan(y/x + Math.sqrt(y*y/x/x+1));
-    		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+	    		v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
+	    		
+	    		if (!isNaN(v)) {
+	    			// take ballistic target, spread it open
+	    			ya = v*0.5;
+	    			yb = v*1.5;
+	    			params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    		// use bisection to solve
+		    		while(j<100) {
+		    			yc = (ya+yb)/2;
+		    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-    		setV('theta', theta);
-    		setV('v_initial', v);
-    	} else if (mode=='find_distance_far') {
-    		// There are two positions...
-    		theta = getV('theta');
-    		v     = getV('v_initial');
-    		y     = getV('y_target') - getV('y_initial');
+		    			if (Math.abs(fc)<getV('h_target')/100) break;
 
-    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+		    			if (sign(fc) == sign(fa)){
+		    				fa = fc;
+		    				ya = yc;
+		    			} else {
+		    				fb = fc;
+		    				yb = yc;
+		    			}
+		    			j++;
+		    		}
+		    		v = yc;
+		    	}
+		    	setV('v_initial', v);
+		    } else if (mode=='find_min_v') {
+		    	x = getV('x_target');
+		    	y = getV('y_target') - getV('y_initial');
 
-    		if (!isNaN(x)) {
-    			// take ballistic target, spread it open
-	    		ya = x*0.5;
-	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		// use bisection to solve
-	    		while(j<100) {
-					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    	theta = Math.atan(y/x + Math.sqrt(y*y/x/x+1));
+		    	v     = x/Math.cos(theta)*Math.sqrt(g/2/(x*Math.tan(theta)-y));
 
-					if (Math.abs(fc)<getV('h_target')/100) break;
+		    	setV('theta', theta);
+		    	setV('v_initial', v);
+		    } else if (mode=='find_distance_far') {
+	    		// There are two positions...
+	    		theta = getV('theta');
+	    		v     = getV('v_initial');
+	    		y     = getV('y_target') - getV('y_initial');
 
-					if (sign(fc) == sign(fa)){
-						fa = fc;
-						ya = yc;
-					} else {
-						fb = fc;
-						yb = yc;
-					}
-					j++;
-				}
-				x = yc;
-    		}
+	    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) + v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
 
-    		setV('x_target', x);
-    	} else if (mode=='find_distance_near') {
-    		// There are two positions...
-    		theta = getV('theta');
-    		v     = getV('v_initial');
-    		y     = getV('y_target') - getV('y_initial');
+	    		if (!isNaN(x)) {
+	    			// take ballistic target, spread it open
+	    			ya = x*0.5;
+	    			yb = x*1.5;
+	    			params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    		// use bisection to solve
+		    		while(j<100) {
+		    			yc = (ya+yb)/2;
+		    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
 
-    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
+		    			if (Math.abs(fc)<getV('h_target')/100) break;
 
-    		if (!isNaN(x)) {
-    			// take ballistic target, spread it open
-	    		ya = x*0.5;
-	    		yb = x*1.5;
-	    		params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		// use bisection to solve
-	    		while(j<100) {
-					yc = (ya+yb)/2;
-	    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    			if (sign(fc) == sign(fa)){
+		    				fa = fc;
+		    				ya = yc;
+		    			} else {
+		    				fb = fc;
+		    				yb = yc;
+		    			}
+		    			j++;
+		    		}
+		    		x = yc;
+		    	}
 
-					if (Math.abs(fc)<getV('h_target')/100) break;
+		    	setV('x_target', x);
+		    } else if (mode=='find_distance_near') {
+	    		// There are two positions...
+	    		theta = getV('theta');
+	    		v     = getV('v_initial');
+	    		y     = getV('y_target') - getV('y_initial');
 
-					if (sign(fc) == sign(fa)){
-						fa = fc;
-						ya = yc;
-					} else {
-						fb = fc;
-						yb = yc;
-					}
-					j++;
-				}
-				x = yc;
-    		}
+	    		x = Math.cos(theta)/g*(v*v*Math.sin(theta) - v*Math.sqrt(v*v*Math.sin(theta)*Math.sin(theta) - 2*g*y));
 
-    		setV('x_target', x);
-    	}
+	    		if (!isNaN(x)) {
+	    			// take ballistic target, spread it open
+	    			ya = x*0.5;
+	    			yb = x*1.5;
+	    			params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    		// use bisection to solve
+		    		while(j<100) {
+		    			yc = (ya+yb)/2;
+		    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+
+		    			if (Math.abs(fc)<getV('h_target')/100) break;
+
+		    			if (sign(fc) == sign(fa)){
+		    				fa = fc;
+		    				ya = yc;
+		    			} else {
+		    				fb = fc;
+		    				yb = yc;
+		    			}
+		    			j++;
+		    		}
+		    		x = yc;
+		    	}
+
+		    	setV('x_target', x);
+		    }
 
 
-		[extrema_vals, extrema] = TOLS_computeTolStack(computeTrajectory, 
-			['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'], 
-			['y_L', 'y_U', 'y_C', 'ang', 'tof', 'sv']);
+		    [extrema_vals, extrema] = TOLS_computeTolStack(computeTrajectory, 
+		    	['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm'], 
+		    	['y_L', 'y_U', 'y_C', 'ang', 'tof', 'sv']);
 
-		targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP.bigdim[UNIT_sys] ) ;
+		    targetstuff  = convert_to_array([getV('x_target'), getV('y_target'), getV('h_target'), getV('x_obstacle'), getV('h_obstacle')], UNIT_MAP.bigdim[UNIT_sys] ) ;
 
-      	drawPlot(
-      		{x: extrema.y_L[0].x_L, y: extrema.y_L[0].y_L},
-      		{x: extrema.y_U[1].x_U, y: extrema.y_U[1].y_U}, 
-      		targetstuff, 
-      		(extrema_vals.y_U > getV('y_target')+getV('h_target')/2) || (extrema_vals.y_L < getV('y_target')-getV('h_target')/2));
+		    drawPlot(
+		    	{x: extrema.y_L[0].x_L, y: extrema.y_L[0].y_L},
+		    	{x: extrema.y_U[1].x_U, y: extrema.y_U[1].y_U}, 
+		    	targetstuff, 
+		    	(extrema_vals.y_U > getV('y_target')+getV('h_target')/2) || (extrema_vals.y_L < getV('y_target')-getV('h_target')/2));
 
-      	for (stat of ['y_C', 'ang', 'tof', 'sv']) {
-      		setV('output_'+stat, (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
-      		setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
-      	}
-      	setV('output_sweep', (extrema_vals.y_U[1] + extrema_vals.y_L[0])/2);
-      	setV('output_sweep_err', (extrema_vals.y_U[1] - extrema_vals.y_L[0])/2);
+		    for (stat of ['y_C', 'ang', 'tof', 'sv']) {
+		    	setV('output_'+stat, (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
+		    	setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
+		    }
+		    setV('output_sweep', (extrema_vals.y_U[1] + extrema_vals.y_L[0])/2);
+		    setV('output_sweep_err', (extrema_vals.y_U[1] - extrema_vals.y_L[0])/2);
 
-      }catch(err){
-		console.log(err);
-		setError(2, err);
-		return;      	
-      }
-      setError(0);
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;      	
+		}
+		setError(0);
 	}
 
+	/* Extra drawPlot handler, just to help draw extras like target and obstacle */
 	function drawPlot(low_run, high_run, targetstuff, missed) {
 		[target_x, target_h, target_diam, x_obstacle, h_obstacle] = targetstuff;
 		PLOT_drawLinePlot({
@@ -403,34 +403,32 @@
 		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle, h_obstacle));
 		obstacle.points.appendItem(PLOT_makePoint(svg, plotScaling, xScaling, yScaling, x_obstacle, 0));
 	}
-
 </script>
 
 <html>
-
 <!-- Make sure to call your init function on document load -->
 <!-- You can copy the topbar template here -->
 <body onload="init()">
-<div id="topbar">
-	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar-la" id='topbar_version'></div>
-	<div class="topbar-la" id='topbar_filename'></div>
-	<div class="topbar-la" id='topbar_unit'>
-		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); compute();">
-			<option value=0 >Metric</option>
-			<option value=1 selected="selected">Feet/Inches</option>
-			<option value=2>Inches</option>
-		</select>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Metric</option>
+				<option value=1 selected="selected">Feet/Inches</option>
+				<option value=2>Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Trajectory Calc</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<a id="download_frame" hidden></a>
 	</div>
-	<div class="topbar-ctr" id="topbar_title">Trajectory Calc</div>
-	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
-	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
-	<a id="download_frame" hidden></a>
-</div>
 
-<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+	<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 100%; float: left;" class="container">
 		<div class="even" style=''>
 			<table>
@@ -450,178 +448,178 @@
 				</tr>
 			</table>
 		</div>
-
 		<div style='display:table-row'>
-		<div class="odd" style='display:table-cell'>
-			<table>
-				<tr>
-					<th class='rowlabel'>Launch Angle</th>
-					<td><input class='unit' data-unit='theta' id='theta' value=30><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='theta' id='theta_err' value=''></td>
-					<td class='unit' data-unit='theta' id='unit_theta'></td>
-				</tr><tr>
-					<th class="rowlabel">Launch Velocity</th>
-					<td><input class='unit' data-unit='v' id="v_initial" value=45></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='v' id="v_initial_err" value=''></td>
-					<td class='unit' data-unit='v' id='unit_v_initial'></td>
-				</tr><tr>
-					<th class="rowlabel">Backspin</th>
-					<td><input class='unit' data-unit='omega' id="omega_initial" value=''></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id="omega_initial_err" value=''></td>
-					<td class='unit' data-unit='omega' id='unit_omega_initial'></td>
-				</tr><tr>
-					<th class='rowlabel'>Distance to Target</th>
-					<td><input class='unit' data-unit='bigdim' id='x_target' value=15></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='bigdim' id="x_target_err" value=''></td>
-					<td class='unit' data-unit='bigdim' id='unit_x_target'></td>
-				</tr><tr>
-					<th class="rowlabel">Launch Height</th>
-					<td><input class='unit' data-unit='bigdim' id="y_initial" value=1.5></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='bigdim' id="y_initial_err" value=''></td>
-					<td class='unit' data-unit='bigdim' id='unit_y_initial'></td>
-				</tr><tr>
-					<th class='rowlabel'>Projectile Diameter</th>
-					<td><input class='unit' data-unit='smalldim' id='d_ball' value=7></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='smalldim' id='d_ball_err' value=''></td>
-					<td class='unit' data-unit='smalldim' id='unit_d_ball'></td>
-				</tr><tr>
-					<th class='rowlabel'>Projectile Mass</th>
-					<td><input class='unit' data-unit='mass' id='m_ball' value=0.5></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='mass' id='m_ball_err' value=''></td>
-					<td class='unit' data-unit='mass' id='unit_m_ball'></td>
-				</tr><tr>
-					<th class="rowlabel">Drag Coefficient<span class="ttt">Lift coefficient, used to compute drag as Fdrag = 1/2*rho*A*Cd*v^2 (refer to documentation for more info)</span></th>
-					<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
-					<td><input id="Cd_err" value=''></td>
-					<td class="unit" id='unit_Cd'></td>
-				</tr><tr>
-					<th class='rowlabel'>Lift Coefficient<span class="ttt">Lift coefficient, used to compute lift as Flift = 1/2*rho*A*Cl*v^2 (refer to documentation for more info)</span></th>
-					<td><input id='Cl' value=''></td><td class="tiny">+/-</td>
-					<td><input id='Cl_err' value=''></td>
-					<td class='unit' id='unit_Cl'></td>
-				</tr><tr>
-					<th class='rowlabel'>Magnus Coefficient<span class="ttt">Magnus coefficient, used to compute lift as Fmag = pi/3*rho*d^3*Cm*v*omega (refer to documentation for more info)</span></th>
-					<td><input id='Cm' value=''></td><td class="tiny">+/-</td>
-					<td><input id='Cm_err' value=''></td>
-					<td class='unit' id='unit_Cm'></td>
-				</tr><tr>
-					<th class="rowlabel">Target Center Height</th>
-					<td><input class='unit' data-unit='bigdim' id="y_target" value=8></td>
-					<td class='unit' data-unit='bigdim' id='unit_y_target'></td>
-				</tr><tr>
-					<th class="rowlabel">Target Opening</th>
-					<td><input class='unit' data-unit='smalldim' id="h_target" value=30></td>
-					<td class='unit' data-unit='smalldim' id='unit_h_target'></td>
-				</tr><tr>
-					<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
-					<td><input class='unit' data-unit='bigdim' id="x_obstacle" value="-3"></td>
-					<td class='unit' data-unit='bigdim' id='unit_x_obstacle'></td>
-				</tr><tr>
-					<th class="rowlabel">Obstacle Height</th>
-					<td><input class='unit' data-unit='bigdim' id="h_obstacle" value="45/12"></td>
-					<td class='unit' data-unit='bigdim' id='unit_h_obstacle'></td>
-				</tr>
-			</table>
-		</div><div class="output" style='display:table-cell'>
-			<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
-			<!--<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>-->
-			<table>
-				<tr>
-					<th class='rowlabel'>Strike Point</th>
-					<td><input class='unit' data-unit='bigdim' id='output_y_C' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='bigdim' id='output_y_C_err' readOnly></td>
-					<td class='unit' data-unit='bigdim' ></td>
-				</tr><tr>
-					<th class='rowlabel'>Swept Zone</th>
-					<td><input class='unit' data-unit='smalldim' id='output_sweep' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='smalldim' id='output_sweep_err' readOnly></td>
-					<td class='unit' data-unit='smalldim' ></td>
-				</tr><tr>
-					<th class="rowlabel">Angle of Strike</th>
-					<td><input class='unit' data-unit='theta' id="output_ang" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='theta' id="output_ang_err" readOnly></td>
-					<td class='unit' data-unit='theta' ></td>
-				</tr><tr>
-					<th class="rowlabel">Stike Velocity</th>
-					<td><input class='unit' data-unit='v' id="output_sv" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='v' id="output_sv_err" readOnly></td>
-					<td class='unit' data-unit='v' ></td>
-				</tr><tr>
-					<th class="rowlabel">Time of Flight</th>
-					<td><input id="output_tof" readOnly></td><td class="tiny">+/-</td>
-					<td><input id="output_tof_err" readOnly></td>
-					<td class="unit" >[s]</td>
-				</tr>
-			</table>
-		</div>
-		<div class="even" style='display:table-cell'>
-			<table id="table_protips">
-				<tr>
-					<th class='rowlabel' colspan=2 class="toggle_button">Pro-Tips</th>
-					<td>
-						<button type="button" onclick="collapseTable('protips');" id='toggle_detail_protips'>&#9650;</button>
-					</td>
-				</tr>
-				<tr>
-					<td colspan=3>
-							When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
-							When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
-							Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.<br/><br/>
-							The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.<br/><br/>
+			<div class="odd" style='display:table-cell'>
+				<table>
+					<tr>
+						<th class='rowlabel'>Launch Angle</th>
+						<td><input class='unit' data-unit='theta' id='theta' value=30><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='theta' id='theta_err' value=''></td>
+						<td class='unit' data-unit='theta' id='unit_theta'></td>
+					</tr><tr>
+						<th class="rowlabel">Launch Velocity</th>
+						<td><input class='unit' data-unit='v' id="v_initial" value=45></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='v' id="v_initial_err" value=''></td>
+						<td class='unit' data-unit='v' id='unit_v_initial'></td>
+					</tr><tr>
+						<th class="rowlabel">Backspin</th>
+						<td><input class='unit' data-unit='omega' id="omega_initial" value=''></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='omega' id="omega_initial_err" value=''></td>
+						<td class='unit' data-unit='omega' id='unit_omega_initial'></td>
+					</tr><tr>
+						<th class='rowlabel'>Distance to Target</th>
+						<td><input class='unit' data-unit='bigdim' id='x_target' value=15></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='bigdim' id="x_target_err" value=''></td>
+						<td class='unit' data-unit='bigdim' id='unit_x_target'></td>
+					</tr><tr>
+						<th class="rowlabel">Launch Height</th>
+						<td><input class='unit' data-unit='bigdim' id="y_initial" value=1.5></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='bigdim' id="y_initial_err" value=''></td>
+						<td class='unit' data-unit='bigdim' id='unit_y_initial'></td>
+					</tr><tr>
+						<th class='rowlabel'>Projectile Diameter</th>
+						<td><input class='unit' data-unit='smalldim' id='d_ball' value=7></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='smalldim' id='d_ball_err' value=''></td>
+						<td class='unit' data-unit='smalldim' id='unit_d_ball'></td>
+					</tr><tr>
+						<th class='rowlabel'>Projectile Mass</th>
+						<td><input class='unit' data-unit='mass' id='m_ball' value=0.5></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='mass' id='m_ball_err' value=''></td>
+						<td class='unit' data-unit='mass' id='unit_m_ball'></td>
+					</tr><tr>
+						<th class="rowlabel">Drag Coefficient<span class="ttt">Lift coefficient, used to compute drag as Fdrag = 1/2*rho*A*Cd*v^2 (refer to documentation for more info)</span></th>
+						<td><input id="Cd" value=''></td><td class="tiny">+/-</td>
+						<td><input id="Cd_err" value=''></td>
+						<td class="unit" id='unit_Cd'></td>
+					</tr><tr>
+						<th class='rowlabel'>Lift Coefficient<span class="ttt">Lift coefficient, used to compute lift as Flift = 1/2*rho*A*Cl*v^2 (refer to documentation for more info)</span></th>
+						<td><input id='Cl' value=''></td><td class="tiny">+/-</td>
+						<td><input id='Cl_err' value=''></td>
+						<td class='unit' id='unit_Cl'></td>
+					</tr><tr>
+						<th class='rowlabel'>Magnus Coefficient<span class="ttt">Magnus coefficient, used to compute lift as Fmag = pi/3*rho*d^3*Cm*v*omega (refer to documentation for more info)</span></th>
+						<td><input id='Cm' value=''></td><td class="tiny">+/-</td>
+						<td><input id='Cm_err' value=''></td>
+						<td class='unit' id='unit_Cm'></td>
+					</tr><tr>
+						<th class="rowlabel">Target Center Height</th>
+						<td><input class='unit' data-unit='bigdim' id="y_target" value=8></td>
+						<td class='unit' data-unit='bigdim' id='unit_y_target'></td>
+					</tr><tr>
+						<th class="rowlabel">Target Opening</th>
+						<td><input class='unit' data-unit='smalldim' id="h_target" value=30></td>
+						<td class='unit' data-unit='smalldim' id='unit_h_target'></td>
+					</tr><tr>
+						<th class="rowlabel">Obstacle Position<span class="ttt">Position of the obstacle. Positive numbers will be relative to launch position. Negative will be relative to target.</span></th>
+						<td><input class='unit' data-unit='bigdim' id="x_obstacle" value="-3"></td>
+						<td class='unit' data-unit='bigdim' id='unit_x_obstacle'></td>
+					</tr><tr>
+						<th class="rowlabel">Obstacle Height</th>
+						<td><input class='unit' data-unit='bigdim' id="h_obstacle" value="45/12"></td>
+						<td class='unit' data-unit='bigdim' id='unit_h_obstacle'></td>
+					</tr>
+				</table>
+			</div><div class="output" style='display:table-cell'>
+				<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
+				<!--<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>-->
+				<table>
+					<tr>
+						<th class='rowlabel'>Strike Point</th>
+						<td><input class='unit' data-unit='bigdim' id='output_y_C' readOnly></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='bigdim' id='output_y_C_err' readOnly></td>
+						<td class='unit' data-unit='bigdim' ></td>
+					</tr><tr>
+						<th class='rowlabel'>Swept Zone</th>
+						<td><input class='unit' data-unit='smalldim' id='output_sweep' readOnly></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='smalldim' id='output_sweep_err' readOnly></td>
+						<td class='unit' data-unit='smalldim' ></td>
+					</tr><tr>
+						<th class="rowlabel">Angle of Strike</th>
+						<td><input class='unit' data-unit='theta' id="output_ang" readOnly></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='theta' id="output_ang_err" readOnly></td>
+						<td class='unit' data-unit='theta' ></td>
+					</tr><tr>
+						<th class="rowlabel">Stike Velocity</th>
+						<td><input class='unit' data-unit='v' id="output_sv" readOnly></td><td class="tiny">+/-</td>
+						<td><input class='unit' data-unit='v' id="output_sv_err" readOnly></td>
+						<td class='unit' data-unit='v' ></td>
+					</tr><tr>
+						<th class="rowlabel">Time of Flight</th>
+						<td><input id="output_tof" readOnly></td><td class="tiny">+/-</td>
+						<td><input id="output_tof_err" readOnly></td>
+						<td class="unit" >[s]</td>
+					</tr>
+				</table>
+			</div>
+			<div class="even" style='display:table-cell'>
+				<table id="table_protips">
+					<tr>
+						<th class='rowlabel' colspan=2 class="toggle_button">Pro-Tips</th>
+						<td>
+							<button type="button" onclick="collapseTable('protips');" id='toggle_detail_protips'>&#9650;</button>
+						</td>
+					</tr>
+					<tr>
+						<td colspan=3>
+						When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
+						When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
+						Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.<br/><br/>
+						The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.<br/><br/>
 					</td>
 				</tr>
 			</table>
 		</div>
 	</div>
 
-<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
-<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:550px; width:800px;">
-	<rect class="plot-background" id="chart_background" x=70 y=20 width=710 height=430 />
-	<g>
-	  <line id="chart_x_axis" class="plot-axis" x1=70 x2=780 y1=450 y2=450></line>
-	  <line id="chart_y_axis" class="plot-axis" x1=70 x2=70  y1=20  y2=450></line>
-	</g>
+	<!-- Plot. See js/plots.js for a detailed description on what elements must exist in this svg. -->
+	<div style="margin-left: 0px; display:table-cell;" class="container" id="charts">
+		<svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:550px; width:800px;">
+			<rect class="plot-background" id="chart_background" x=70 y=20 width=710 height=430 />
+			<g>
+				<line id="chart_x_axis" class="plot-axis" x1=70 x2=780 y1=450 y2=450></line>
+				<line id="chart_y_axis" class="plot-axis" x1=70 x2=70  y1=20  y2=450></line>
+			</g>
 
-	<g class="plot-grid" id="chart_x_grid"></g>
-	<g class="plot-grid" id="chart_y_grid"></g>
+			<g class="plot-grid" id="chart_x_grid"></g>
+			<g class="plot-grid" id="chart_y_grid"></g>
 
-	<g class="plot-labels">
-	  <text x=375 y=485 class="plot-titlelabel unit" data-unit='bigdim' id="chart_x_label">Distance [ft]</text>
+			<g class="plot-labels">
+				<text x=375 y=485 class="plot-titlelabel unit" data-unit='bigdim' id="chart_x_label">Distance [ft]</text>
 
-	  <text x=-360 y=20 class="plot-titlelabel unit" transform="rotate(270)" data-unit='bigdim' id="chart_y_label">Height [ft]</text>
-	</g>
+				<text x=-360 y=20 class="plot-titlelabel unit" transform="rotate(270)" data-unit='bigdim' id="chart_y_label">Height [ft]</text>
+			</g>
 
-	<g class="plot-axlabels" id='chart_x_axlabels'></g>
-	<g class="plot-axlabels" id='chart_y_axlabels'></g>
+			<g class="plot-axlabels" id='chart_x_axlabels'></g>
+			<g class="plot-axlabels" id='chart_y_axlabels'></g>
 
-	<polyline
-		id='chart_target_low'
-		fill="#444"
-		stroke='none'
-		opacity=1.0
-		points=""/>
-	<polyline
-		id='chart_target_high'
-		fill="#444"
-		stroke='none'
-		opacity=1.0
-		points=""/>
-	<polyline
-		id='chart_obstacle'
-		fill="#933"
-		stroke-width=2
-		stroke="#722"
-		opacity=1.0
-		points=""/>
-	<polyline
-		id='chart_y_line'
-		fill='#3a6a30'
-		stroke='#3a6a30'
-		stroke-width=2
-		fill-opacity=0.5
-		points="
-		"/>
-</svg>			
-</div>
+			<polyline
+			id='chart_target_low'
+			fill="#444"
+			stroke='none'
+			opacity=1.0
+			points=""/>
+			<polyline
+			id='chart_target_high'
+			fill="#444"
+			stroke='none'
+			opacity=1.0
+			points=""/>
+			<polyline
+			id='chart_obstacle'
+			fill="#933"
+			stroke-width=2
+			stroke="#722"
+			opacity=1.0
+			points=""/>
+			<polyline
+			id='chart_y_line'
+			fill='#3a6a30'
+			stroke='#3a6a30'
+			stroke-width=2
+			fill-opacity=0.5
+			points="
+			"/>
+		</svg>			
+	</div>
 </body>
 </html>
