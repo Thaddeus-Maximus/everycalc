@@ -28,11 +28,7 @@
 	function init() {
 		EC_onload();
 		MOTOR_setupMotorSelect("motor");
-		if(EXP_onload()) {
-			// run when export loads
-		} else {
-			// run when export does not load
-		}
+		EXP_onload();
 		MOTOR_selectMotor("motor");
 		UNIT_change();
 		EC_setOnInput(function(e) {
