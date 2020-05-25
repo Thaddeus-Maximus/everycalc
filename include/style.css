@@ -319,3 +319,39 @@ div.dropdown, table.dropdown{
 input[type=checkbox].dropdown:checked ~ div, input[type=checkbox].dropdown:checked ~ table {
     display: block !important;
 }
+
+#walkthrough_overlay {
+  position: fixed; /* Sit on top of the page content */
+  display: none; /* Hidden by default */
+  width: 100%; /* Full width (cover the whole page) */
+  height: 100%; /* Full height (cover the whole page) */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80; /* Specify a stack order in case you're using a different order for other elements */
+  fill-rule: evenodd;
+  stroke: none;
+  fill: #111;
+  opacity: 0.9;
+}
+
+#walkthrough_frame {
+  stroke: none;
+  fill: #111;
+  opacity: 0.95;
+}
+
+#walkthrough_text {
+  fill: white;
+  font-size: 20px;
+  z-index: 81;
+}
+
+#walkthrough_skip_button {
+  fill: #55a040;
+  font-size: 20px;
+  font-weight: bold;
+  text-anchor: middle;
+  cursor: pointer; /* Add a pointer on hover */
+}
