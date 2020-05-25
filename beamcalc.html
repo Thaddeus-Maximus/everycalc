@@ -17,7 +17,7 @@
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript">
-  EXP_FN_BASE = 'beam';
+	EXP_FN_BASE = 'beam'; // this is needed for persistence, too.
 	UNIT_MAP = {
 		'force':           ['N', 'lbf'],
 		'elastic_modulus': ['GPa', '10^6 psi'],
@@ -33,33 +33,31 @@
 	}
 
 	function init() {
+		// basic loading, create options dynamically
 		EC_onload();
-		EXP_onload();
-		if (typeof EXP_inputs != 'undefined') {
-			loads = document.getElementsByClassName('load');
-			for (load of loads) {
-				load.identifier = load.firstChild.getAttribute('identifier');
-			}
-			for (btn of document.getElementsByClassName('toggle_button'))
-				btn.innerHTML = "&#9650;";
+		populateMaterials();
+
+		// load persistence or exported values
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				addLoad({where: 10, amount: 0, type: 0});
+				addLoad({where: 50, amount: 0, type: 0});
+				addLoad({where: 90, amount: 100, type: 2});
+				addLoad({where: 10, amount: -10, type: 3});
+				document.getElementById('length').value = 100;
+				document.getElementById('material').value = 'Aluminum';
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
 		}
 
 		UNIT_change();
-
 		populateMaterials();
 		document.getElementById('material').value = 'Aluminum';
 		selectMaterial();
-
-		// custom code to make default inputs
-		// cookies preferred
-		if(typeof EXP_inputs == 'undefined') {
-			addLoad({where: 10, amount: 0, type: 0});
-			addLoad({where: 50, amount: 0, type: 0});
-			addLoad({where: 90, amount: 100, type: 2});
-			addLoad({where: 10, amount: -10, type: 3});
-			document.getElementById('length').value=100;
-		}
-
 		selectShape();
 		computeMOI();
 
@@ -165,7 +163,8 @@
 		document.getElementById('area').readOnly = true;
 		document.getElementById('rmax').readOnly = true;
 		document.getElementById('rmin').readOnly = true;
-		document.getElementById('section_img').src = 'include/section_' + shape + '.svg';
+		if (typeof EXP_inputs == 'undefined')
+			document.getElementById('section_img').src = 'include/section_' + shape + '.svg'; // workaround: only set the image if not exported
 		if (shape == 'custom') {
 			document.getElementById('moi').readOnly  = false;
 			document.getElementById('area').readOnly = false;
@@ -244,18 +243,17 @@
 		}
 	}
 
-	var current_load_number = 0;
 	function addLoad(params) {
 		setError(1);
-		loads = document.getElementById('loads');
-		load_div = document.createElement('div');
-		x = current_load_number;
-		current_load_number ++;
+		let loads = document.getElementById('loads');
+		let load_div = document.createElement('div');
+		x = loads.dataset.current_load_number;
+		loads.dataset.current_load_number ++;
 		load_div.innerHTML =
-		`<table identifier=${x}>
+		`<table data-load_id=${x}>
 			<tr>
 				<td>[${x}] <button onclick="removeLoad(${x}); compute();" title="Remove">-</button></td>
-				<td><select id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
+				<td><select class="dynamic-input" id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
 					<option value="pin" selected='selected' >Pinned</option>
 					<option value="fix">Fixed</option>
 					<option value="force">Force </option>
@@ -264,23 +262,23 @@
 			</tr>
 			<tr id="load_${x}_1_row">
 				<th class="rowlabel" id="load_${x}_1_label">L1</th>
-				<td><input id="load_${x}_1" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_1" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_1_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_2_row">
 				<th class="rowlabel" id="load_${x}_2_label">L2</th>
-				<td><input id="load_${x}_2" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_2" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_2_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_3_row">
 				<th class="rowlabel" id="load_${x}_3_label">L3</th>
-				<td><input id="load_${x}_3" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_3" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_3_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_4_row">
 				<th class="rowlabel" id="load_${x}_4_label">L4</th>
-				<td><input id="load_${x}_4" onchange="drawBeam()" data-unit="dimension"/></td>
+				<td><input id="load_${x}_4" class="dynamic-input" onchange="drawBeam()" data-unit="dimension"/></td>
 				<td class="unit" id="load_${x}_4_unit" data-unit="dimension"></td>
 			</tr>
 		</table>`;
-		load_div.identifier = x;
+		load_div.dataset.load_id = x;
 		load_div.classList.add(x%2 ? 'even' : 'odd');
 		load_div.classList.add('load');
 		loads.insertBefore(load_div, loads.lastChild);
@@ -352,7 +350,7 @@
 	function removeLoad(load_no) {
 		loads = document.getElementById('loads');
 		for(i=0; i<loads.children.length-1; i++) {
-			if (loads.children[i].identifier == load_no) {
+			if (loads.children[i].dataset.load_id == load_no) {
 				loads.removeChild(loads.children[i]);
 				i--;
 			}
@@ -367,6 +365,29 @@
 		delete UNIT_MAP[`load_${load_no}_3`];
 		delete UNIT_MAP[`load_${load_no}_4`];
 		compute();
+	}
+
+	function dumpDynamicPersistence() {
+		let loads = document.getElementById('loads');
+		let loads_obj = [];
+
+		for(i=0; i<loads.children.length-1; i++) {
+			let x = loads.children[i].dataset.load_id;
+			loads_obj.push({
+				where:  document.getElementById(`load_${x}_1`).value,
+				amount: document.getElementById(`load_${x}_2`).value,
+				type:   document.getElementById(`load_type_${x}`).selectedIndex
+			});
+		}
+
+		setLocalStorage('loads', JSON.stringify(loads_obj));
+	}
+
+	function loadDynamicPersistence() {
+		let loads_obj = JSON.parse(getLocalStorage('loads'));
+		for (let load of loads_obj) {
+			addLoad(load);
+		}
 	}
 
 	function populateMaterials() {
@@ -397,9 +418,7 @@
 		}
 
 	}
-</script>
 
-<script type="text/javascript">
 	//la = linearAlgebra();
 	function computeStiffnessMatrix(EI, L) {
 		var m = math.matrix([ [12,  6*L,   -12,  6*L   ],
@@ -539,7 +558,7 @@
 
 		loads = document.getElementById('loads');
 		for(i=2; i<loads.children.length-1+2; i++) {
-			x = loads.children[i-2].identifier;
+			x = loads.children[i-2].dataset.load_id;
 			type = document.getElementById(`load_type_${x}`).value;
 
 			order.push(i);
@@ -652,6 +671,8 @@
 			return;
 		}
 		setError(0);
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
 	}
 
 	function plotClickHandler(e) {
@@ -688,7 +709,7 @@
 		loads = document.getElementById('loads');
 
 		for(i=0; i<loads.children.length-1; i++) {
-			x = loads.children[i].identifier;
+			x = loads.children[i].dataset.load_id;
 			type = document.getElementById(`load_type_${x}`).value;
 
 
@@ -771,7 +792,7 @@
 	</div>
 	<div class="topbar-ctr" id="topbar_title">Beam Structural Calc</div>
 	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="document.getElementById('section_img').removeAttribute('src'); downloadPage();" id="download">Export HTML</div>
 	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
@@ -832,7 +853,7 @@
 			<table id="table_section" class="dropdown">
 				<tr>
 					<td colspan=3>
-						<center><img id='section_img' src='include/section_boxtube.svg' /></center>
+						<center><img id='section_img' /></center>
 					</td>
 				</tr>
 				<tr>
@@ -876,14 +897,14 @@
 			</table>
 		</div>
 		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><input class="dropdown" type="checkbox" id="toggle-tips"><label class="dropdown" for="toggle-tips">Show Tips</label><div class="dropdown">
-							<p>Moments are positive counter-clockwise.</p>
-							<p>Click on the chart to query points. </p>
-							<p>Click on the beam elements to query the corresponding points.</p>
-							<p>Right click on the chart near a local extrema to latch on and find the local extrema.</p>
-							<p>Moments are positive-counterclockwise.</p>
-							<p>Bending/shear extrema are at points of interest (constraints/loads).</p>
-							<p>The flexural strength and mass properties are for your usage/reference only- they aren't used in calculations.</p>
-						</div></center></div> <!-- MAKE SURE NO SPACES! NO DEAD CHLDREN! -->
+      <p>Moments are positive counter-clockwise.</p>
+      <p>Click on the chart to query points. </p>
+      <p>Click on the beam elements to query the corresponding points.</p>
+      <p>Right click on the chart near a local extrema to latch on and find the local extrema.</p>
+      <p>Moments are positive-counterclockwise.</p>
+      <p>Bending/shear extrema are at points of interest (constraints/loads).</p>
+      <p>The flexural strength and mass properties are for your usage/reference only- they aren't used in calculations.</p>
+    </div></center></div> <!-- MAKE SURE NO SPACES! NO DEAD CHLDREN! -->
 	</div>
 
 

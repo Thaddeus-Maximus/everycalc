@@ -286,6 +286,7 @@
 		return;
 	}
 	setError(0);
+	EXP_dumpPersistence();
 	}
 </script>
 
@@ -387,33 +388,33 @@ input {
 			</tr>
 			<tr id="d1_row">
 				<th class="rowlabel" id="d1_label"></th>
-				<td><input class="unit" id="d1" data-unit="dimension" ></td>
+				<td><input id="d1" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="d1_err" data-unit="dimension" ></td>
+				<td><input id="d1_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_d1" data-unit="dimension" ></td>
 			</tr><tr id="d2_row">
 				<th class="rowlabel" id="d2_label"></th>
-				<td><input class="unit" id="d2" data-unit="dimension" ></td>
+				<td><input id="d2" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="d2_err" data-unit="dimension" ></td>
+				<td><input id="d2_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_d2" data-unit="dimension" ></td>
 			</tr><tr id="d3_row">
 				<th class="rowlabel" id="d3_label"></th>
-				<td><input class="unit" id="d3" data-unit="dimension" ></td>
+				<td><input id="d3" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="d3_err" data-unit="dimension" ></td>
+				<td><input id="d3_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_d3" data-unit="dimension" ></td>
 			</tr><tr id="d4_row">
 				<th class="rowlabel" id="d4_label"></th>
-				<td><input class="unit" id="d4" data-unit="dimension" ></td>
+				<td><input id="d4" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="d4_err" data-unit="dimension" ></td>
+				<td><input id="d4_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_d4" data-unit="dimension" ></td>
 			</tr><tr id="d5_row">
 				<th class="rowlabel" id="d5_label"></th>
-				<td><input class="unit" id="d5" data-unit="dimension" ></td>
+				<td><input id="d5" data-unit="dimension" ></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="d5_err" data-unit="dimension" ></td>
+				<td><input id="d5_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_d5" data-unit="dimension" ></td>
 			</tr>
 
@@ -425,21 +426,21 @@ input {
 			</tr>
 			<tr>
 				<th class="rowlabel">Ring Width</th>
-				<td><input class="unit" id="rw"  data-unit="dimension" onkeyup="clearDashSize()"></td>
+				<td><input id="rw"  data-unit="dimension" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="rw_err" data-unit="dimension" ></td>
+				<td><input id="rw_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_rw" data-unit="dimension" ></td>
 			</tr><tr>
 				<th class="rowlabel">Ring ID</th>
-				<td><input class="unit" id="rid"  data-unit="dimension" onkeyup="clearDashSize()"></td>
+				<td><input id="rid"  data-unit="dimension" onkeyup="clearDashSize()"></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="rid_err" data-unit="dimension" ></td>
+				<td><input id="rid_err" data-unit="dimension" ></td>
 				<td class="unit" id="unit_rid" data-unit="dimension" ></td>
 			</tr><tr>
 				<th class="rowlabel">Ring OD</th>
-				<td><input class="unit" id="rod"  data-unit="dimension" readonly></td>
+				<td><input id="rod"  data-unit="dimension" readonly></td>
 				<td class="tiny">&#177;</td>
-				<td><input class="unit" id="rod_err"  data-unit="dimension" readonly></td>
+				<td><input id="rod_err"  data-unit="dimension" readonly></td>
 				<td class="unit" id="unit_rod" data-unit="dimension" ></td>
 			</tr>
 		</table>
@@ -749,15 +750,15 @@ input {
 				<td class="unit">[%]</td>
 			</tr><tr>
 				<th class="rowlabel">Clearance</th>
-				<td><input class="unit" data-unit="dimension" id="clr_min" readonly></td>
-				<td><input class="unit" data-unit="dimension" id="clr_max" readonly></td>
+				<td><input data-unit="dimension" id="clr_min" readonly></td>
+				<td><input data-unit="dimension" id="clr_max" readonly></td>
 				<td></td>
 				<td></td>
 				<td class="unit" id="unit_clr_min"></td>
 			</tr><tr id="clrm_row">
 				<th class="rowlabel">Clearance</th>
-				<td><input class="unit" data-unit="dimension" id="clrm_min" readonly></td>
-				<td><input class="unit" data-unit="dimension" id="clrm_max" readonly></td>
+				<td><input data-unit="dimension" id="clrm_min" readonly></td>
+				<td><input data-unit="dimension" id="clrm_max" readonly></td>
 				<td></td>
 				<td></td>
 				<td class="unit" id="unit_clrm_min"></td>

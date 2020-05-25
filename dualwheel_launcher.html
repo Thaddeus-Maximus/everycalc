@@ -319,6 +319,7 @@
 			return;
 		}
 		setError(0);
+		EXP_dumpPersistence();
 	}
 
 	function calculateRatio(pos) {
@@ -388,13 +389,13 @@
 			<table>
 				<tr>
 					<th class="rowlabel">Ball Diameter</th>
-					<td><input class='unit' data-unit='dim' id="d_b" value=7></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id="d_b_err" value=''></td>
+					<td><input data-unit='dim' id="d_b" value=7></td><td class="tiny">+/-</td>
+					<td><input data-unit='dim' id="d_b_err" value=''></td>
 					<td class='unit' data-unit='dim' id='unit_d_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball Mass</th>
-					<td><input class='unit' data-unit='mass' id='m_b' value=0.3><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='mass' id='m_b_err' value=''></td>
+					<td><input data-unit='mass' id='m_b' value=0.3><td class="tiny">+/-</td>
+					<td><input data-unit='mass' id='m_b_err' value=''></td>
 					<td class='unit' data-unit='mass' id='unit_m_b'></td>
 				</tr><tr>
 					<th class='rowlabel'>Ball MOI Ratio<span class="ttt">Ratio of MOI to mass times radius squared.<br/>2/5 for a solid sphere, 2/3 for a hollow sphere, 1/2 for a solid cylinder, 1 for a hollow cylinder.</span></th>
@@ -403,13 +404,13 @@
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class="rowlabel">Ball Stiffness<span class="ttt">Stiffness of the ball. This should be evaluated as a shock condition and near the amount of compression in the case of nonlinear balls (which, practically any ball will be)</span></th>
-					<td><input class='unit' data-unit='stiffness' id="k_b" value=20></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='stiffness' id="k_b_err" value=''></td>
+					<td><input data-unit='stiffness' id="k_b" value=20></td><td class="tiny">+/-</td>
+					<td><input data-unit='stiffness' id="k_b_err" value=''></td>
 					<td class='unit' data-unit='stiffness' id='unit_k_b'></td>
 				</tr><tr>
 					<th class="rowlabel">Wheel Gap</th>
-					<td><input class='unit' data-unit='dim' id="w" value=5></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id="w_err" value=''></td>
+					<td><input data-unit='dim' id="w" value=5></td><td class="tiny">+/-</td>
+					<td><input data-unit='dim' id="w_err" value=''></td>
 					<td class='unit' data-unit='dim' id='unit_w'></td>
 				</tr>
 			</table>
@@ -419,13 +420,13 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Wheel Diameter</th>
-					<td><input class='unit' data-unit='dim' id='d_L' value=6></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id='d_L_err' value=''></td>
+					<td><input data-unit='dim' id='d_L' value=6></td><td class="tiny">+/-</td>
+					<td><input data-unit='dim' id='d_L_err' value=''></td>
 					<td class='unit' id='unit_d_L'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input class='unit' data-unit='moi' id='I_L' value=4><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='moi' id="I_L_err" value=''></td>
+					<td><input data-unit='moi' id='I_L' value=4><td class="tiny">+/-</td>
+					<td><input data-unit='moi' id="I_L_err" value=''></td>
 					<td class='unit' data-unit='moi' ></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
@@ -434,8 +435,8 @@
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Flywheel Target Velocity</th>
-					<td><input class='unit' data-unit='omega' id='omega_0_L' value=3000></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='omega_0_L_err' value=''></td>
+					<td><input data-unit='omega' id='omega_0_L' value=3000></td><td class="tiny">+/-</td>
+					<td><input data-unit='omega' id='omega_0_L_err' value=''></td>
 					<td class='unit' data-unit='omega' id='unit_omega_0_L'>[-]</td>
 				</tr>
 			</table>
@@ -450,19 +451,19 @@
 					<td><input class='' id="motor_L_count" oninput="MOTOR_selectMotor('motor_L'); compute();" value=1 /></td>
 				</tr><tr>
 					<th class="rowlabel">Operating Power</th>
-					<td><input class="unit" data-unit="pct" id="motor_L_pct_power" oninput="MOTOR_selectMotor('motor_L'); compute();" value=12 /></td>
+					<td><input data-unit="pct" id="motor_L_pct_power" oninput="MOTOR_selectMotor('motor_L'); compute();" value=12 /></td>
 					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-					<td><input class='unit' data-unit="pct" id="motor_L_efficiency" oninput="MOTOR_selectMotor('motor_L'); compute();" value=85 /></td>
+					<td><input data-unit="pct" id="motor_L_efficiency" oninput="MOTOR_selectMotor('motor_L'); compute();" value=85 /></td>
 					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-					<td><input class='unit' data-unit='omega' id="motor_L_max_speed" readonly /></td>
+					<td><input data-unit='omega' id="motor_L_max_speed" readonly /></td>
 					<td class='unit' data-unit='omega'>[RPM]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-					<td><input class='unit' data-unit='torque' id="motor_L_stall_torque" readonly /></td>
+					<td><input data-unit='torque' id="motor_L_stall_torque" readonly /></td>
 					<td class='unit' data-unit='torque'>[N-m]</td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
@@ -504,13 +505,13 @@
 			<table>
 				<tr>
 					<th class='rowlabel'>Wheel Diameter</th>
-					<td><input class='unit' data-unit='dim' id='d_U' value=6></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='dim' id='d_U_err' value=''></td>
+					<td><input data-unit='dim' id='d_U' value=6></td><td class="tiny">+/-</td>
+					<td><input data-unit='dim' id='d_U_err' value=''></td>
 					<td class='unit' data-unit='dim' id='unit_d_U'></td>
 				</tr><tr>
 					<th class='rowlabel'>Wheel MOI</th>
-					<td><input class='unit' data-unit='moi'  id='I_U' value=4><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='moi'  id="I_U_err" value=''></td>
+					<td><input data-unit='moi'  id='I_U' value=4><td class="tiny">+/-</td>
+					<td><input data-unit='moi'  id="I_U_err" value=''></td>
 					<td  class='unit' data-unit='moi' id="unit_I_U"></td>
 				</tr><tr>
 					<th class="rowlabel">COF Wheel</th>
@@ -519,8 +520,8 @@
 					<td class="unit">[-]</td>
 				</tr><tr>
 					<th class='rowlabel'>Flywheel Target Velocity</th>
-					<td><input class='unit' data-unit='omega' id='omega_0_U' value=3000></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='omega_0_U_err' value=''></td>
+					<td><input data-unit='omega' id='omega_0_U' value=3000></td><td class="tiny">+/-</td>
+					<td><input data-unit='omega' id='omega_0_U_err' value=''></td>
 					<td class='unit' data-unit='omega' id='unit_omega_0_U'>[-]</td>
 				</tr>
 			</table>
@@ -537,19 +538,19 @@
 					<td><input class='' id="motor_U_count" oninput="selectUpperMotor(); compute();" value=1 /></td>
 				</tr><tr>
 					<th class="rowlabel">Operating Power</th>
-					<td><input class="unit" data-unit="pct" id="motor_U_pct_power" oninput="selectUpperMotor(); compute();" value=100 /></td>
+					<td><input data-unit="pct" id="motor_U_pct_power" oninput="selectUpperMotor(); compute();" value=100 /></td>
 					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></th>
-					<td><input class='unit' data-unit="pct" id="motor_U_efficiency" oninput="selectUpperMotor(); compute();" value=85 /></td>
+					<td><input data-unit="pct" id="motor_U_efficiency" oninput="selectUpperMotor(); compute();" value=85 /></td>
 					<td class="unit" data-unit="pct"></td>
 				</tr><tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-					<td><input class='unit' data-unit='omega' id="motor_U_max_speed" readonly /></td>
+					<td><input data-unit='omega' id="motor_U_max_speed" readonly /></td>
 					<td class='unit' data-unit='omega'>[RPM]</td>
 				</tr><tr>
 					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-					<td><input class='unit' data-unit='torque' id="motor_U_stall_torque" readonly /></td>
+					<td><input data-unit='torque' id="motor_U_stall_torque" readonly /></td>
 					<td class='unit' data-unit='torque'>[N-m]</td>
 				</tr><tr>
 					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
@@ -591,23 +592,23 @@
 			<table> <!--['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']-->
 				<tr>
 					<th class='rowlabel'>Exit Velocity</th>
-					<td><input class='unit' data-unit='v' id='output_v_b_exit' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='v' id='output_v_b_exit_err' readOnly></td>
+					<td><input data-unit='v' id='output_v_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input data-unit='v' id='output_v_b_exit_err' readOnly></td>
 					<td class='unit' data-unit='v' ></td>
 				</tr><tr>
 					<th class='rowlabel'>Exit Ball RPM</th>
-					<td><input class='unit' data-unit='omega' id='output_omega_b_exit' readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id='output_omega_b_exit_err' readOnly></td>
+					<td><input data-unit='omega' id='output_omega_b_exit' readOnly></td><td class="tiny">+/-</td>
+					<td><input data-unit='omega' id='output_omega_b_exit_err' readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><tr>
 					<th class="rowlabel">Exit Wheelspeed (Top)</th>
-					<td><input class='unit' data-unit='omega' id="output_omega_U_exit" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id="output_omega_U_exit_err" readOnly></td>
+					<td><input data-unit='omega' id="output_omega_U_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input data-unit='omega' id="output_omega_U_exit_err" readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><tr>
 					<th class="rowlabel">Exit Wheelspeed (Bottom)</th>
-					<td><input class='unit' data-unit='omega' id="output_omega_L_exit" readOnly></td><td class="tiny">+/-</td>
-					<td><input class='unit' data-unit='omega' id="output_omega_L_exit_err" readOnly></td>
+					<td><input data-unit='omega' id="output_omega_L_exit" readOnly></td><td class="tiny">+/-</td>
+					<td><input data-unit='omega' id="output_omega_L_exit_err" readOnly></td>
 					<td class='unit' data-unit='omega' ></td>
 				</tr><!--<tr>
 					<th class="rowlabel" colspan=3>Time to Revved</th>
@@ -765,43 +766,43 @@
 				<td class="unit"></td>
 			</tr><tr>
 				<th class="rowlabel">Ball Velocity</th>
-				<td><input class='unit' data-unit='v' id="chart_launch_v_b_1" readonly /></td>
-				<td><input class='unit' data-unit='v' id="chart_launch_v_b_2" readonly /></td>
+				<td><input data-unit='v' id="chart_launch_v_b_1" readonly /></td>
+				<td><input data-unit='v' id="chart_launch_v_b_2" readonly /></td>
 				<td class='unit' data-unit='v' ></td>
 			</tr><tr>
 				<th class="rowlabel">Ball Spin</th>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_b_1" readonly /></td>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_b_2" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_b_1" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_b_2" readonly /></td>
 				<td class='unit' data-unit='omega' >[A]</td>
 			</tr><tr>
 				<th class="rowlabel">Top Speed</th>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_U_1" readonly /></td>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_U_2" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_U_1" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_U_2" readonly /></td>
 				<td class='unit' data-unit='omega' ></td>
 			</tr><tr>
 				<th class="rowlabel">Bottom Speed</th>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_L_1" readonly /></td>
-				<td><input class='unit' data-unit='omega' id="chart_launch_omega_L_2" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_L_1" readonly /></td>
+				<td><input data-unit='omega' id="chart_launch_omega_L_2" readonly /></td>
 				<td class='unit' data-unit='omega' ></td>
 			</tr><tr>
 				<th class="rowlabel">Top Normal</th>
-				<td><input class='unit' data-unit='force' id="chart_launch_N_U_1" readonly /></td>
-				<td><input class='unit' data-unit='force' id="chart_launch_N_U_2" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_N_U_1" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_N_U_2" readonly /></td>
 				<td class='unit' data-unit='force' ></td>
 			</tr><tr>
 				<th class="rowlabel">Top Force</th>
-				<td><input class='unit' data-unit='force' id="chart_launch_F_U_1" readonly /></td>
-				<td><input class='unit' data-unit='force' id="chart_launch_F_U_2" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_F_U_1" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_F_U_2" readonly /></td>
 				<td class='unit' data-unit='force' ></td>
 			</tr><tr>
 				<th class="rowlabel">Bottom Normal</th>
-				<td><input class='unit' data-unit='force' id="chart_launch_N_L_1" readonly /></td>
-				<td><input class='unit' data-unit='force' id="chart_launch_N_L_2" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_N_L_1" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_N_L_2" readonly /></td>
 				<td class='unit' data-unit='force' ></td>
 			</tr><tr>
 				<th class="rowlabel">Bottom Force</th>
-				<td><input class='unit' data-unit='force' id="chart_launch_F_L_1" readonly /></td>
-				<td><input class='unit' data-unit='force' id="chart_launch_F_L_2" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_F_L_1" readonly /></td>
+				<td><input data-unit='force' id="chart_launch_F_L_2" readonly /></td>
 				<td class='unit' data-unit='force' ></td>
 			</tr>
 		</table>
