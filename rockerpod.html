@@ -27,11 +27,16 @@
 
 	function init() {
 		EC_onload();
-		EXP_onload();
-		UNIT_change();
-
 		MOTOR_setupMotorSelect("motor");
+		if(EXP_onload()) {
+			// run when export loads
+		} else {
+			// run when export does not load
+			EXP_loadPersistence();
+			MOTOR_selectMotor("motor");
+		}
 
+		UNIT_change();
 		EC_setOnInput(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 		    	if(key!=13) setError(1);
@@ -109,6 +114,7 @@
 				document.getElementById("mu_ideal").classList.remove('slip');
 				setError(0);
 			}
+			EXP_dumpPersistence();
 		}catch(err){
 			console.log(err);
 			setError(2,err);
