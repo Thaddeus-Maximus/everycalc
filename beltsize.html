@@ -29,11 +29,7 @@
 	function init() {
 		EC_onload();
 
-		if(EXP_onload()) {
-			// run when export loads
-		} else {
-			// run when export does not load
-		}
+		EXP_onload();
 
 		UNIT_change();
 		switchBeltType();

@@ -17,7 +17,7 @@
 <script id="EXP_inputs_frame" ></script>
 
 <script type="text/javascript">
-  EXP_FN_BASE = 'beam';
+	EXP_FN_BASE = 'beam'; // this is needed for persistence, too.
 	UNIT_MAP = {
 		'force':           ['N', 'lbf'],
 		'elastic_modulus': ['GPa', '10^6 psi'],
@@ -38,19 +38,20 @@
 		populateMaterials();
 
 		// load persistence or exported values
-		if(EXP_onload()) {
-			// run when export loads
-		} else if (localStorage.version == VERSION) {
-			// run when export does not load, but persistence of the correct version exists
-			loadDynamicPersistence();
-		} else {
-			// run when nothing exists (default values)
-			addLoad({where: 10, amount: 0, type: 0});
-			addLoad({where: 50, amount: 0, type: 0});
-			addLoad({where: 90, amount: 100, type: 2});
-			addLoad({where: 10, amount: -10, type: 3});
-			document.getElementById('length').value=100;
-			document.getElementById('material').value = 'Aluminum';
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				addLoad({where: 10, amount: 0, type: 0});
+				addLoad({where: 50, amount: 0, type: 0});
+				addLoad({where: 90, amount: 100, type: 2});
+				addLoad({where: 10, amount: -10, type: 3});
+				document.getElementById('length').value = 100;
+				document.getElementById('material').value = 'Aluminum';
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
 		}
 
 		UNIT_change();
@@ -157,7 +158,8 @@
 		document.getElementById('area').readOnly = true;
 		document.getElementById('rmax').readOnly = true;
 		document.getElementById('rmin').readOnly = true;
-		document.getElementById('section_img').src = 'include/section_' + shape + '.svg';
+		if (typeof EXP_inputs == 'undefined')
+			document.getElementById('section_img').src = 'include/section_' + shape + '.svg'; // workaround: only set the image if not exported
 		if (shape == 'custom') {
 			document.getElementById('moi').readOnly  = false;
 			document.getElementById('area').readOnly = false;
@@ -236,13 +238,12 @@
 		}
 	}
 
-	let current_load_number = 0; // TODO: this has gotta be problematic
 	function addLoad(params) {
 		setError(1);
 		let loads = document.getElementById('loads');
 		let load_div = document.createElement('div');
-		x = current_load_number;
-		current_load_number ++;
+		x = loads.dataset.current_load_number;
+		loads.dataset.current_load_number ++;
 		load_div.innerHTML =
 		`<table data-load_id=${x}>
 			<tr>
@@ -374,11 +375,11 @@
 			});
 		}
 
-		localStorage.loads = JSON.stringify(loads_obj);
+		setLocalStorage('loads', JSON.stringify(loads_obj));
 	}
 
 	function loadDynamicPersistence() {
-		let loads_obj = JSON.parse(localStorage.loads);
+		let loads_obj = JSON.parse(getLocalStorage('loads'));
 		for (let load of loads_obj) {
 			addLoad(load);
 		}
@@ -665,8 +666,8 @@
 			return;
 		}
 		setError(0);
-		EXP_dumpPersistence();
-		dumpDynamicPersistence();
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
 	}
 
 	function plotClickHandler(e) {
@@ -786,7 +787,7 @@
 	</div>
 	<div class="topbar-ctr" id="topbar_title">Beam Structural Calc</div>
 	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="document.getElementById('section_img').removeAttribute('src'); downloadPage();" id="download">Export HTML</div>
 	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
 	<a id="download_frame" hidden></a>
 </div>
@@ -858,7 +859,7 @@
 				</tr>
 				<tr>
 					<td colspan=3>
-						<center><img id='section_img' src='include/section_boxtube.svg' /></center>
+						<center><img id='section_img' /></center>
 					</td>
 				</tr>
 				<tr>
@@ -899,7 +900,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><table id="table_protips">
+		<div class="even" id='loads' data-current_load_number=0 ><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><table id="table_protips">
 				<tr>
 					<th class='rowlabel' colspan=2>Pro-Tips and Easter Eggs</th>
 					<td>

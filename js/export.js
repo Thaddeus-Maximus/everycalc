@@ -21,10 +21,12 @@
 function EXP_onload() {
 	if (typeof EXP_inputs !== 'undefined'){
 		unpackInputs();
-		return true;
+		return 1;
+	} else if(getLocalStorage('version') == VERSION) {
+		EXP_loadPersistence();
+		return 2;
 	} else {
-		if(localStorage.version == VERSION) EXP_loadPersistence();
-		return false;
+		return 0;
 	}
 }
 
@@ -158,44 +160,57 @@ function printPage() {
 	window.print();
 }
 
+function setLocalStorage(key, value, domain) {
+	if (typeof domain == 'undefined') domain = EXP_FN_BASE;
+	localStorage[`${domain}/${key}`] = value;
+}
+
+function getLocalStorage(key, domain) {
+	if (typeof domain == 'undefined') domain = EXP_FN_BASE;
+	return localStorage[`${domain}/${key}`];
+}
+
 // use localStorage
 function EXP_dumpPersistence() {
+	if (typeof EXP_inputs !== 'undefined') return false; // no persistence for exported files
 	let inputs  = document.getElementsByTagName('input');
 	let selects = document.getElementsByTagName('checkbox');
 
 	let dumped = {};
 	for (input of document.getElementsByTagName('input')) {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
+		
 		if (input.type == "text") {
-			localStorage[`input_${input.id}`] = input.value;
+			setLocalStorage(`inputs/${input.id}`, input.value);
 		}
 		if (input.type == "radio" || input.type == "checkbox") {
-			localStorage[`input_${input.id}`] = input.checked;
+			setLocalStorage(`inputs/${input.id}`, input.checked);
 		}
 	}
 	for (input of document.getElementsByTagName('select')) {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
-		localStorage[`input_${input.id}`] = input.value;
+		
+		setLocalStorage(`inputs/${input.id}`, input.value);
 	}
-	localStorage.version = VERSION;
+	setLocalStorage('version', VERSION);
+	return true;
 }
 
 function EXP_loadPersistence() {
 	let inputs  = document.getElementsByTagName('input');
 	let selects = document.getElementsByTagName('checkbox');
 
-	localStorage.inputs = {};
 	for (input of document.getElementsByTagName('input')) {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
 		if (input.type == "text") {
-			input.value = localStorage[`input_${input.id}`];
+			input.value = getLocalStorage(`inputs/${input.id}`);
 		}
 		if (input.type == "radio" || input.type == "checkbox") {
-			input.checked = localStorage[`input_${input.id}`];
+			input.checked = getLocalStorage(`inputs/${input.id}`);
 		}
 	}
 	for (input of document.getElementsByTagName('select')) {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
-		input.value = localStorage[`input_${input.id}`];
+		input.value = getLocalStorage(`inputs/${input.id}`);
 	}
 }
