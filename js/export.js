@@ -1,5 +1,5 @@
 /*
- * Export Module (EXP).
+ * Export and Persistence Module (EXP).
  *
  *	Please define the following:
  *	 EXP_FN_BASE = <string>
@@ -19,7 +19,13 @@
  */ 
 
 function EXP_onload() {
-	if (typeof EXP_inputs !== 'undefined') unpackInputs();
+	if (typeof EXP_inputs !== 'undefined'){
+		unpackInputs();
+		return true;
+	} else {
+		if(localStorage.version == VERSION) EXP_loadPersistence();
+		return false;
+	}
 }
 
 function packInputs() {
@@ -150,4 +156,46 @@ function printPage() {
 	/* Page print
 	   Currently just a passthrough for builtin system page printing */
 	window.print();
+}
+
+// use localStorage
+function EXP_dumpPersistence() {
+	let inputs  = document.getElementsByTagName('input');
+	let selects = document.getElementsByTagName('checkbox');
+
+	let dumped = {};
+	for (input of document.getElementsByTagName('input')) {
+		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
+		if (input.type == "text") {
+			localStorage[`input_${input.id}`] = input.value;
+		}
+		if (input.type == "radio" || input.type == "checkbox") {
+			localStorage[`input_${input.id}`] = input.checked;
+		}
+	}
+	for (input of document.getElementsByTagName('select')) {
+		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
+		localStorage[`input_${input.id}`] = input.value;
+	}
+	localStorage.version = VERSION;
+}
+
+function EXP_loadPersistence() {
+	let inputs  = document.getElementsByTagName('input');
+	let selects = document.getElementsByTagName('checkbox');
+
+	localStorage.inputs = {};
+	for (input of document.getElementsByTagName('input')) {
+		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
+		if (input.type == "text") {
+			input.value = localStorage[`input_${input.id}`];
+		}
+		if (input.type == "radio" || input.type == "checkbox") {
+			input.checked = localStorage[`input_${input.id}`];
+		}
+	}
+	for (input of document.getElementsByTagName('select')) {
+		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
+		input.value = localStorage[`input_${input.id}`];
+	}
 }
