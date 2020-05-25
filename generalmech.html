@@ -47,6 +47,14 @@ function init() {
 		let key = e.keyCode ? e.keyCode : e.which;
 		let input = e.target;
 
+		if(input.id == 'toggle-gratio'){
+			collapseGearRatio();
+			calcRatio();
+			compute();
+		}
+	  	
+	  	if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
+
     	// if a key is pressed, invalidate current results
     	setError(1);
 
@@ -285,7 +293,7 @@ function calcRatio() {
 
 /* show/hide the gear ratio calculator */
 function collapseGearRatio() {
-	let open = collapseDiv('gratio');
+	let open = document.getElementById('toggle-gratio').checked;
 	document.getElementById('G').readOnly = open;
 	if(open) calcRatio();
 }
@@ -347,13 +355,12 @@ function selectFriction() {
 					<td class="unit" data-unit="pct" ></td>
 				</tr>
 			</table>
-			<div>
-				<span class="rowlabel">Motor</span>
-				<select class="doublewide" id="motor_select" onchange="MOTOR_selectMotor('motor'); compute();">
-				</select>
-				<button type="button" onclick="collapseDiv('motor')" id='toggle_detail_motor' class="toggle_button">&#9660;</button>
-			</div>
-			<table id='detail_motor' style='display:none;'>
+			<span class="rowlabel">Motor</span>
+			<select class="doublewide" id="motor_select" onchange="MOTOR_selectMotor('motor'); compute();">
+			</select>
+			<input class="dropdown" type="checkbox" id="toggle-motor">
+			<label class="dropdown" for="toggle-motor">V</label>
+			<table id='detail_motor' class="dropdown">
 				<tr>
 					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
 					<td><input class="unit" data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
@@ -374,12 +381,11 @@ function selectFriction() {
 			</table>
 		</div>
 		<div class="odd">
-			<div>
-				<span class='rowlabel bold'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
-				<input id="G"/>
-				<button type="button" onclick="collapseGearRatio();" id='toggle_detail_gratio' class="toggle_button">&#9660;</button>
-			</div>
-			<table id='detail_gratio' style="display:none;">
+			<span class='rowlabel bold'>Gear Ratio<span class="ttt">The overall gear ratio. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></span>
+			<input id="G"/>
+			<input class="dropdown" type="checkbox" id="toggle-gratio">
+			<label class="dropdown" for="toggle-gratio">V</label>
+			<table id='detail_gratio' class="dropdown">
 				<tr>
 					<td><input id="G1A" value=12 /></td>
 					<td class="tiny">:</td>
@@ -510,24 +516,20 @@ function selectFriction() {
 			</table>
 		</div>
 		<div class="even">
-			<span class="rowlabel">Protips</span>
-			<button type="button" onclick="collapseDiv('protips')" id='toggle_detail_protips' class="toggle_button">&#9660;</button>
-			<table id='detail_protips'  style='display:none;'>
-				<tr>
-					<td>
-						The calculator can be used for any mechanism. For a drivetrain, plug in wheel radius, robot mass, and nothing for load (unless you're pushing something). For an arm, plug in the radius to the center of mass, arm's mass, and the effective load at the center of gravity. For an elevator, plug in pulley radius, elevator mass, and the elevator load (weight minus any counterbalancing). Reverse the load to go 'down'.<br/><br/>
-						Click on the chart to probe points!<br/><br/>
-						The gear ratio has a dropdown that can be used to compute ratios from gearsets. Otherwise you can collapse it and plug in a gear ratio directly.<br/><br/>
-						The simulator uses auto-time-stepping based on the initial acceleration. It's best to specify an end condition. If your mechanism is extremely snappy, it's probably geared really, really low- so it will put the motor near free speed, which is generally undesirable.<br/><br/>
-						You can input arithmetic anywhere. But only input symbolic math (with variables) in the end condition and load equation boxes.
-					</td>
-				</tr>
-			</table>
+			<input class="dropdown" type="checkbox" id="toggle-tips">
+			<label class="dropdown" for="toggle-tips">Show Tips</label>
+			<div class="dropdown">
+				<p>The calculator can be used for any mechanism. For a drivetrain, plug in wheel radius, robot mass, and nothing for load (unless you're pushing something). For an arm, plug in the radius to the center of mass, arm's mass, and the effective load at the center of gravity. For an elevator, plug in pulley radius, elevator mass, and the elevator load (weight minus any counterbalancing). Reverse the load to go 'down'.</p>
+				<p>Click on the chart to probe points!</p>
+				<p>The gear ratio has a dropdown that can be used to compute ratios from gearsets. Otherwise you can collapse it and plug in a gear ratio directly.</p>
+				<p>The simulator uses auto-time-stepping based on the initial acceleration. It's best to specify an end condition. If your mechanism is extremely snappy, it's probably geared really, really low- so it will put the motor near free speed, which is generally undesirable.</p>
+				<p>You can input arithmetic anywhere. But only input symbolic math (with variables) in the end condition and load equation boxes.</p>
+			</div>
 		</div>
-		<div class="odd">
-			Variable reference for use in expressions
-			<button type="button" onclick="collapseDiv('varref')" id='toggle_detail_varref' class="toggle_button">&#9660;</button>
-			<table id='detail_varref' style='display:none;'>
+		<div class="odd" >
+			<input class="dropdown" type="checkbox" id="toggle-varref">
+			<label class="dropdown" for="toggle-varref">Show Variable Reference</label>
+			<table class="dropdown">
 				<tr><th class='rowlabel'>G</th><td class="unit">[-]</td><td>Overall gear ratio</td></tr>
 				<tr><th class='rowlabel'>m</th><td class="unit" data-unit="mass">[kg]</td><td>Mass</td></tr>
 				<tr><th class='rowlabel'>I</th><td class="unit" data-unit="moi"></td><td>MOI</td></tr>
