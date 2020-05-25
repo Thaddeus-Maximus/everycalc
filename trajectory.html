@@ -553,22 +553,14 @@
 				</table>
 			</div>
 			<div class="even" style='display:table-cell'>
-				<table id="table_protips">
-					<tr>
-						<th class='rowlabel' colspan=2 class="toggle_button">Pro-Tips</th>
-						<td>
-							<button type="button" onclick="collapseTable('protips');" id='toggle_detail_protips'>&#9650;</button>
-						</td>
-					</tr>
-					<tr>
-						<td colspan=3>
-						When the chart background is yellow, computation is needed; hit enter or press compute.</br/><br/>
-						When the chart background is red, the current combination of inputs cannot be solved for.<br/><br/>
-						Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.<br/><br/>
-						The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.<br/><br/>
-					</td>
-				</tr>
-			</table>
+				<input class="dropdown" type="checkbox" id="toggle-tips">
+				<label class="dropdown" for="toggle-tips">Show Tips</label>
+				<div class="dropdown" style="width: 300px">
+					<p>When the chart background is yellow, computation is needed; hit enter or press compute.</p>
+					<p>When the chart background is red, the current combination of inputs cannot be solved for.</p>
+					<p>Check out the different solver modes- this calculator can find release angle, distance, or velocity given other parameters.</p>
+					<p>The "Find Minimum Velocity" mode ignores air resistance, so will not be accurate with those parameters.</p>
+				</div>
 		</div>
 	</div>
 

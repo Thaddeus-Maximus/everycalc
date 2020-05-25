@@ -15,6 +15,8 @@ function EC_setOnInput(fn) {
 	    inputs[index].oninput = typeof fn == 'undefined' ?
 	    	function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
+	    		let input = e.target;
+	    		if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
 		    	if(key!=13) setError(1);
 			}
 		: fn;
@@ -113,37 +115,6 @@ function setError(code, msg) {
 		msg = DEFAULT_ERR_MSGS[code];
 	topbar_box.children[0].innerHTML=ERR_CODES[code];
 	topbar_box.children[1].innerHTML=msg;
-}
-
-
-// Collapsing Functions
-
-function collapseDiv(id) {
-	el = document.getElementById('detail_'+id);
-	btn = document.getElementById('toggle_detail_'+id);
-	
-	if(el.style['display'] != 'none') {
-		el.style['display'] = 'none';
-		btn.innerHTML = "&#9660";
-		return false; // close
-	} else {
-		el.style['display'] = 'inherit';
-		btn.innerHTML = "&#9650";
-		return true; // open
-	}
-}
-
-function collapseTable(id) {
-	tbl = document.getElementById('table_'+id);
-
-	btn = document.getElementById('toggle_detail_'+id);
-	if(tbl.rows[1].style['display'] != 'none') {
-		for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'none';
-		btn.innerHTML = "&#9660";
-	} else {
-		for(i=1;i<tbl.rows.length;i++) tbl.rows[i].style['display'] = 'table-row';
-		btn.innerHTML = "&#9650";
-	}
 }
 
 function parseMath(expr, variables) {

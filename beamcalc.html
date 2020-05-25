@@ -55,7 +55,8 @@
 		}
 
 		UNIT_change();
-		collapseTable('section'); 
+		populateMaterials();
+		document.getElementById('material').value = 'Aluminum';
 		selectMaterial();
 		selectShape();
 		computeMOI();
@@ -69,6 +70,10 @@
 		EC_setOnInput(function(e) {
 	    	let key = e.keyCode ? e.keyCode : e.which;
 	    	let input = e.target;
+	    	if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
+	    	if(input.id.startsWith('section_')) {
+	    		computeMOI();
+	    	}
 			if(key!=13) setError(1);
 	    });
 		EC_setOnKeyUp(); // default handler OK
@@ -95,7 +100,7 @@
 			h = getV('section_2');
 			t = getV('section_3');
 			rmax = rmin = h/2;
-			area = w*h - (w-2*t)*(w-2*t);
+			area = w*h - (w-2*t)*(h-2*t);
 			moi = (w*Math.pow(h,3) - (w-2*t)*Math.pow(h-2*t,3))/12;
 		} else if (shape == 'angle') {
 			a = getV('section_1');
@@ -803,21 +808,15 @@
 				</tr>
 			</table>
 		</div>
+			
 		<div class="odd">
-			<table id="table_material">
-
-				<tr>
-					<th class='rowlabel'>Material</th>
-					<td colspan>
-						<select id="material" onchange="selectMaterial(); compute();">
-							<option value="custom">Custom</option>
-						</select>
-					</td>
-					<td>
-						<button type="button" onclick="collapseTable('material'); selectShape(true)" id='toggle_detail_material' class="toggle_button">&#9650;</button>
-					</td>
-
-				</tr>
+			<label class="bold rowlabel">Material</label>
+			<select id="material" onchange="selectMaterial(); compute();">
+				<option value="custom">Custom</option>
+			</select>
+			<input class="dropdown" type="checkbox" id="toggle-material">
+			<label class="dropdown" for="toggle-material">V</label>
+			<table id="table_material" class="dropdown">
 				<tr>
 					<th class='rowlabel'>Flexural Modulus</th>
 					<td><input id='elastic_modulus' data-unit='elastic_modulus' value=69 /></td>
@@ -838,25 +837,20 @@
 			</table>
 		</div>
 		<div class="even">
-			<table id="table_section">
-				<tr>
-					<th class='rowlabel'>Cross-Section</th>
-					<td>
-						<select id="section" onchange="selectShape(); compute();">
-							<option value="rndbar" selected='selected'>Round Bar</option>
-							<option value="boxbar">Rect. Bar</option>
-							<option value="boxtube">Box Tube</option>
-							<option value="channel">Channel</option>
-							<option value="rndtube">Round Tube</option>
-							<option value="angle">Angle</option>
-							<option value="hex">Hexagon</option>
-							<option value="custom">Custom</option>
-						</select>
-					</td>
-					<td>
-						<button type="button" onclick="collapseTable('section'); selectShape(true)" id='toggle_detail_section' class="toggle_button">&#9650;</button>
-					</td>
-				</tr>
+			<label class='bold rowlabel'>Cross-Section</label>
+			<select id="section" onchange="selectShape(); compute();">
+				<option value="rndbar" selected='selected'>Round Bar</option>
+				<option value="boxbar">Rect. Bar</option>
+				<option value="boxtube">Box Tube</option>
+				<option value="channel">Channel</option>
+				<option value="rndtube">Round Tube</option>
+				<option value="angle">Angle</option>
+				<option value="hex">Hexagon</option>
+				<option value="custom">Custom</option>
+			</select>
+			<input class="dropdown" type="checkbox" id="toggle-section">
+			<label class="dropdown" for="toggle-section">V</label>
+			<table id="table_section" class="dropdown">
 				<tr>
 					<td colspan=3>
 						<center><img id='section_img' /></center>
@@ -878,7 +872,9 @@
 					<th class='rowlabel'>Bottom Height<span class="ttt">Distance from neutral axis to bottom of section</span></th>
 					<td><input id='rmin' data-unit='dimension' readonly /></td>
 					<td class='unit' data-unit='dimension'></td>
-				</tr><tr id='section_1_row'>
+				</tr>
+			</table><table id="table_section_input">
+				<tr id='section_1_row'>
 					<th class='rowlabel' id='section_1_label'>D1</th>
 					<td><input id='section_1' data-unit='dimension' value=5 /></td>
 					<td class='unit' data-unit='dimension'></td>
@@ -900,25 +896,15 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads' data-current_load_number=0 ><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><table id="table_protips">
-				<tr>
-					<th class='rowlabel' colspan=2>Pro-Tips and Easter Eggs</th>
-					<td>
-						<button type="button" onclick="collapseTable('protips'); selectShape(true)" id='toggle_detail_protips' class="toggle_button">&#9650;</button>
-					</td>
-				</tr>
-				<tr style="display: none;">
-					<td colspan=3>
-							Moments are positive counter-clockwise.<br/><br/>
-							Click on the chart to query points. <br/><br/>
-							Click on the beam elements to query the corresponding points.<br/><br/>
-							Right click on the chart near a local extrema to latch on and find the local extrema.<br/><br/>
-							Moments are positive-counterclockwise.<br/><br/>
-							Bending/shear extrema are at points of interest (constraints/loads). <br/><br/>
-							The flexural strength and mass properties are for your usage/reference only- they aren't used in calculations.
-					</td>
-				</tr>
-			</table></center></div> <!-- MAKE SURE NO SPACES! NO DEAD CHLDREN! -->
+		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><input class="dropdown" type="checkbox" id="toggle-tips"><label class="dropdown" for="toggle-tips">Show Tips</label><div class="dropdown">
+      <p>Moments are positive counter-clockwise.</p>
+      <p>Click on the chart to query points. </p>
+      <p>Click on the beam elements to query the corresponding points.</p>
+      <p>Right click on the chart near a local extrema to latch on and find the local extrema.</p>
+      <p>Moments are positive-counterclockwise.</p>
+      <p>Bending/shear extrema are at points of interest (constraints/loads).</p>
+      <p>The flexural strength and mass properties are for your usage/reference only- they aren't used in calculations.</p>
+    </div></center></div> <!-- MAKE SURE NO SPACES! NO DEAD CHLDREN! -->
 	</div>
 
 

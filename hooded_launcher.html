@@ -40,10 +40,7 @@
 		UNIT_change();
 		MOTOR_selectMotor('motor');
 
-		EC_setOnInput(function(e) {
-		    	var key = e.keyCode ? e.keyCode : e.which;
-		    	if(key!=13) setError(1);
-		    });
+		EC_setOnInput(); // default handler OK
 		EC_setOnKeyUp(); // default handler OK
 
 		calcRatio();
@@ -573,32 +570,12 @@
 			</table>
 		</div>
 		<div class="even" style='display:table-cell'>
-			<table id="table_protips">
-				<tr>
-					<th class='rowlabel' colspan=2>Pro-Tips</th>
-					<td>
-						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						Yellow: Not computed. Press enter on a field or press the compute button.<br/>
-						Green: Computed, no issues.<br/>
-						Red: An error has occurred with the results.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						The plot displays the run with the highest exit velocity, and lowest exit velocity.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						Click on the plot to probe particular points for values.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						The settling distance (where the values of everything evens out and stops changing)<br/>is marked on the plot at the black vertical lines.
-					</td>
-				</tr>
-			</table>
+			<input class="dropdown" type="checkbox" id="toggle-tips">
+			<label class="dropdown" for="toggle-tips">Show Tips</label>
+			<div class="dropdown" style="width: 300px">
+				<p>The plot displays the run with the highest exit velocity, and lowest exit velocity.</p>
+				<p>Click on the plot to probe particular points for values.</p>
+			</div>
 		</div>
 	</div>
 </div>

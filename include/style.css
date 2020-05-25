@@ -287,3 +287,35 @@ button {
 #topbar_status {
   background-color: #b5e0a0;
 }
+
+input[type=checkbox].dropdown {
+  display: none;
+}
+label.dropdown{
+  box-sizing: border-box;
+  display: inline-block;
+  background-color: #eec;
+  cursor: pointer;
+  text-align: center;
+  padding: 2px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin-left: 2px;
+  margin-right: 2px;
+  border: 1px solid #aaa;
+
+  -webkit-user-select: none; /* Safari */        
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE10+/Edge */
+  user-select: none; /* Standard */
+}
+
+input[type=checkbox].dropdown:checked ~ label {
+    background-color: #3D88BD;
+}
+div.dropdown, table.dropdown{
+    display: none;
+}
+input[type=checkbox].dropdown:checked ~ div, input[type=checkbox].dropdown:checked ~ table {
+    display: block !important;
+}
