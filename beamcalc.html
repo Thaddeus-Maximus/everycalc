@@ -33,34 +33,29 @@
 	}
 
 	function init() {
+		// basic loading, create options dynamically
 		EC_onload();
-		EXP_onload();
-		if (typeof EXP_inputs != 'undefined') {
-			loads = document.getElementsByClassName('load');
-			for (load of loads) {
-				load.identifier = load.firstChild.getAttribute('identifier');
-			}
-			for (btn of document.getElementsByClassName('toggle_button'))
-				btn.innerHTML = "&#9650;";
-		}
-
-		UNIT_change();
-
-		collapseTable('section'); 
 		populateMaterials();
-		document.getElementById('material').value = 'Aluminum';
-		selectMaterial();
 
-		// custom code to make default inputs
-		// cookies preferred
-		if(typeof EXP_inputs == 'undefined') {
+		// load persistence or exported values
+		if(EXP_onload()) {
+			// run when export loads
+		} else if (localStorage.version == VERSION) {
+			// run when export does not load, but persistence of the correct version exists
+			loadDynamicPersistence();
+		} else {
+			// run when nothing exists (default values)
 			addLoad({where: 10, amount: 0, type: 0});
 			addLoad({where: 50, amount: 0, type: 0});
 			addLoad({where: 90, amount: 100, type: 2});
 			addLoad({where: 10, amount: -10, type: 3});
 			document.getElementById('length').value=100;
+			document.getElementById('material').value = 'Aluminum';
 		}
 
+		UNIT_change();
+		collapseTable('section'); 
+		selectMaterial();
 		selectShape();
 		computeMOI();
 
@@ -241,18 +236,18 @@
 		}
 	}
 
-	var current_load_number = 0;
+	let current_load_number = 0; // TODO: this has gotta be problematic
 	function addLoad(params) {
 		setError(1);
-		loads = document.getElementById('loads');
-		load_div = document.createElement('div');
+		let loads = document.getElementById('loads');
+		let load_div = document.createElement('div');
 		x = current_load_number;
 		current_load_number ++;
 		load_div.innerHTML =
-		`<table identifier=${x}>
+		`<table data-load_id=${x}>
 			<tr>
 				<td>[${x}] <button onclick="removeLoad(${x}); compute();" title="Remove">-</button></td>
-				<td><select id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
+				<td><select class="dynamic-input" id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
 					<option value="pin" selected='selected' >Pinned</option>
 					<option value="fix">Fixed</option>
 					<option value="force">Force </option>
@@ -261,23 +256,23 @@
 			</tr>
 			<tr id="load_${x}_1_row">
 				<th class="rowlabel" id="load_${x}_1_label">L1</th>
-				<td><input id="load_${x}_1" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_1" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_1_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_2_row">
 				<th class="rowlabel" id="load_${x}_2_label">L2</th>
-				<td><input id="load_${x}_2" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_2" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_2_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_3_row">
 				<th class="rowlabel" id="load_${x}_3_label">L3</th>
-				<td><input id="load_${x}_3" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td><input id="load_${x}_3" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
 				<td class="unit" id="load_${x}_3_unit" data-unit="dimension"></td>
 			</tr><tr id="load_${x}_4_row">
 				<th class="rowlabel" id="load_${x}_4_label">L4</th>
-				<td><input id="load_${x}_4" onchange="drawBeam()" data-unit="dimension"/></td>
+				<td><input id="load_${x}_4" class="dynamic-input" onchange="drawBeam()" data-unit="dimension"/></td>
 				<td class="unit" id="load_${x}_4_unit" data-unit="dimension"></td>
 			</tr>
 		</table>`;
-		load_div.identifier = x;
+		load_div.dataset.load_id = x;
 		load_div.classList.add(x%2 ? 'even' : 'odd');
 		load_div.classList.add('load');
 		loads.insertBefore(load_div, loads.lastChild);
@@ -349,7 +344,7 @@
 	function removeLoad(load_no) {
 		loads = document.getElementById('loads');
 		for(i=0; i<loads.children.length-1; i++) {
-			if (loads.children[i].identifier == load_no) {
+			if (loads.children[i].dataset.load_id == load_no) {
 				loads.removeChild(loads.children[i]);
 				i--;
 			}
@@ -364,6 +359,29 @@
 		delete UNIT_MAP[`load_${load_no}_3`];
 		delete UNIT_MAP[`load_${load_no}_4`];
 		compute();
+	}
+
+	function dumpDynamicPersistence() {
+		let loads = document.getElementById('loads');
+		let loads_obj = [];
+
+		for(i=0; i<loads.children.length-1; i++) {
+			let x = loads.children[i].dataset.load_id;
+			loads_obj.push({
+				where:  document.getElementById(`load_${x}_1`).value,
+				amount: document.getElementById(`load_${x}_2`).value,
+				type:   document.getElementById(`load_type_${x}`).selectedIndex
+			});
+		}
+
+		localStorage.loads = JSON.stringify(loads_obj);
+	}
+
+	function loadDynamicPersistence() {
+		let loads_obj = JSON.parse(localStorage.loads);
+		for (let load of loads_obj) {
+			addLoad(load);
+		}
 	}
 
 	function populateMaterials() {
@@ -394,9 +412,7 @@
 		}
 
 	}
-</script>
 
-<script type="text/javascript">
 	//la = linearAlgebra();
 	function computeStiffnessMatrix(EI, L) {
 		var m = math.matrix([ [12,  6*L,   -12,  6*L   ],
@@ -536,7 +552,7 @@
 
 		loads = document.getElementById('loads');
 		for(i=2; i<loads.children.length-1+2; i++) {
-			x = loads.children[i-2].identifier;
+			x = loads.children[i-2].dataset.load_id;
 			type = document.getElementById(`load_type_${x}`).value;
 
 			order.push(i);
@@ -649,6 +665,8 @@
 			return;
 		}
 		setError(0);
+		EXP_dumpPersistence();
+		dumpDynamicPersistence();
 	}
 
 	function plotClickHandler(e) {
@@ -685,7 +703,7 @@
 		loads = document.getElementById('loads');
 
 		for(i=0; i<loads.children.length-1; i++) {
-			x = loads.children[i].identifier;
+			x = loads.children[i].dataset.load_id;
 			type = document.getElementById(`load_type_${x}`).value;
 
 
@@ -881,7 +899,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><button id='compute_btn' onclick='compute()'>Compute</button><table id="table_protips">
+		<div class="even" id='loads'><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><table id="table_protips">
 				<tr>
 					<th class='rowlabel' colspan=2>Pro-Tips and Easter Eggs</th>
 					<td>

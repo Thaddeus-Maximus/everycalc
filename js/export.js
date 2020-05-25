@@ -19,8 +19,13 @@
  */ 
 
 function EXP_onload() {
-	if (typeof EXP_inputs !== 'undefined'){unpackInputs(); return true;}
-	else { return false; }
+	if (typeof EXP_inputs !== 'undefined'){
+		unpackInputs();
+		return true;
+	} else {
+		if(localStorage.version == VERSION) EXP_loadPersistence();
+		return false;
+	}
 }
 
 function packInputs() {
@@ -172,6 +177,7 @@ function EXP_dumpPersistence() {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
 		localStorage[`input_${input.id}`] = input.value;
 	}
+	localStorage.version = VERSION;
 }
 
 function EXP_loadPersistence() {
