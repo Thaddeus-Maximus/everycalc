@@ -206,7 +206,7 @@ function EXP_loadPersistence() {
 			input.value = getLocalStorage(`inputs/${input.id}`);
 		}
 		if (input.type == "radio" || input.type == "checkbox") {
-			input.checked = getLocalStorage(`inputs/${input.id}`);
+			input.checked = getLocalStorage(`inputs/${input.id}`) == "true" ? true:false;
 		}
 	}
 	for (input of document.getElementsByTagName('select')) {
