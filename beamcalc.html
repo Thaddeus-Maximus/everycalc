@@ -784,21 +784,15 @@
 				</tr>
 			</table>
 		</div>
+			
 		<div class="odd">
-			<table id="table_material">
-
-				<tr>
-					<th class='rowlabel'>Material</th>
-					<td colspan>
-						<select id="material" onchange="selectMaterial(); compute();">
-							<option value="custom">Custom</option>
-						</select>
-					</td>
-					<td>
-						<button type="button" onclick="collapseTable('material'); selectShape(true)" id='toggle_detail_material' class="toggle_button">&#9650;</button>
-					</td>
-
-				</tr>
+			<label class="bold rowlabel">Material</label>
+			<select id="material" onchange="selectMaterial(); compute();">
+				<option value="custom">Custom</option>
+			</select>
+			<input class="dropdown" type="checkbox" id="toggle-material">
+			<label class="dropdown" for="toggle-material">Details</label>
+			<table id="table_material" class="dropdown">
 				<tr>
 					<th class='rowlabel'>Flexural Modulus</th>
 					<td><input id='elastic_modulus' data-unit='elastic_modulus' value=69 /></td>

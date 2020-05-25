@@ -287,3 +287,26 @@ button {
 #topbar_status {
   background-color: #b5e0a0;
 }
+
+input[type=checkbox].dropdown {
+  display: none;
+}
+label.dropdown{
+  box-sizing: border-box;
+  display: inline-block;
+  background-color: #eee;
+  cursor: pointer;
+  text-align: center;
+  padding: 2px;
+  border: 1px solid #aaa;
+}
+
+input[type=checkbox].dropdown:checked ~ label {
+    background-color: #3D88BD;
+}
+div.dropdown, table.dropdown{
+    display: none;
+}
+input[type=checkbox].dropdown:checked ~ div, input[type=checkbox].dropdown:checked ~ table {
+    display: block !important;
+}
