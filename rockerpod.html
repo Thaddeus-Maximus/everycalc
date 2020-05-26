@@ -10,6 +10,7 @@
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -23,8 +24,31 @@
 		"speed": 		["m/s", "ft/s"],
 		"omega":        ["RPM", "RPM"],
 		"pct":   		["%", "%"]
-	}
-
+	};
+	WALK_STEPS = [
+		{poi: 'user_inputs_motor',
+		 desc: 'Select motor...',
+		 halign: 'left',
+		 valign: 'below'
+		},
+		{poi: 'user_inputs_gearing',
+		 desc: 'Plug in before-pod and after-pod ratios..',
+		 halign: 'left'
+		},
+		{poi: 'user_inputs',
+		 desc: 'Plug in geometric variables...',
+		 halign: 'left'
+		},
+		{poi: 'outputs',
+		 desc: 'Computed information appears here.',
+		 halign: 'left'
+		},
+		{
+			poi:'mu_ideal_row',
+			desc: 'If this is larger than the wheel coefficient, the pod will slip, not dig.'
+		}];
+</script>
+<script type="text/javascript">
 	function init() {
 		EC_onload();
 		MOTOR_setupMotorSelect("motor");
@@ -47,6 +71,7 @@
 		computePreRatio();
 		computePodRatio();
 		compute();
+		WALK_onload();
 	}
 
 	function computePreRatio() {
@@ -143,109 +168,117 @@
 	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
 	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
 	<a id="download_frame" hidden></a>
-</div>
+</div>	
 
+<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+	<path id="walkthrough_frame" ></path>
+	<text id="walkthrough_text" ></text>
+	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+</svg>
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 	<div class="even">
-		<table>
-		<tr>
-			<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
-			<td><input id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
-		</tr><td class="rowlabel">Operating Power<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
-			<td><input class='narrow' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
-			<td class="unit" data-unit="pct"></td>
-		</tr><tr>
-			<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
-			<td><input class='narrow' data-unit="pct" id="motor_efficiency" oninput="MOTOR_selectMotor('motor'); compute();" value=85 /></td>
-			<td class="unit" data-unit="pct" ></td>
-		</tr>
-		<tr>
-			<th>Motor</th>
-			<td colspan="2"><select class="doublewide" id="motor_select" oninput="MOTOR_selectMotor('motor'); compute();">
-			</select></td>
-		</tr>
-		<tr>
-			<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-			<td><input data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
-			<td class="unit" data-unit="omega" >[RPM]</td>
-		</tr><tr>
-			<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-			<td><input data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
-			<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
-		</tr><tr>
-			<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-			<td><input id="motor_free_current" readonly value=1.3 /></td>
-			<td class="unit">[A]</td>
-		</tr><tr>
-			<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-			<td><input id="motor_stall_current" readonly value=166 /></td>
-			<td class="unit">[A]</td>
-		</tr>
-	</table>
-</div><div class="odd">
-		<table>
-		<tr>
-			<th class="rowlabel" colspan=3>Overall Gear Ratio<span class="ttt">Gear ratio of both gearbox before rocker and in pod</span></th>
-			<td colspan=3><input id="G_comb" readonly/></td>
-		</tr><tr>
-			<th class="rowlabel">Pre-Pod Gear Ratio<span class="ttt">The gear ratio before the rocker pod. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
-			<td class="tiny"></td>
-			<td><input id="G_pre" readonly/></td>
-			<th class="rowlabel">Pod Gear Ratio<span class="ttt">The gear ratio in the rocker pod. Negative ratios are ratios where the direction is not reversed between input and output. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
-			<td class="tiny"></td>
-			<td><input id="G_pod" readonly/></td>
-		</tr><tr>
-			<td><input id="G1A" oninput="computePreRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G1B" oninput="computePreRatio()" /></td>
-			<td><input id="G1AP" oninput="computePodRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G1BP" oninput="computePodRatio()" /></td>
-		</tr><tr>
-			<td><input id="G2A" oninput="computePreRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G2B" oninput="computePreRatio()" /></td>
-			<td><input id="G2AP" oninput="computePodRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G2BP" oninput="computePodRatio()" /></td>
-		</tr><tr>
-			<td><input id="G3A" oninput="computePreRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G3B" oninput="computePreRatio()" /></td>
-			<td><input id="G3AP" oninput="computePodRatio()" /></td>
-			<td class="tiny">:</td>
-			<td><input id="G3BP" oninput="computePodRatio()" /></td>
-		</tr>
-	</table>
-</div><div class="even">
-	<table>
-		<tr>
-			<th class="rowlabel">Clutch Torque<span class="ttt">The torque of the clutch/brake on the rocker pod (linking the input torque more directly to the pod), providing additional resistance and thus dig-in at the cost of propulsive force. <i>Leave blank if no such clutch.</i></span></th>
-				<td><input data-unit="torque" id="T_clutch" oninput="compute()" /></td>
-				<td class="unit" data-unit="torque" ></td>
-		</tr><tr>
-			<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
-				<td><input data-unit="dimension" id="r_pod" oninput="compute()" /></td>
-				<td class="unit" data-unit="dimension" id="unit_r_pod"></td>
-		</tr><tr>
-			<th class="rowlabel">Pod Pivot Height<span class="ttt">Distance from ground to pod's pivot point</span></th>
-				<td><input data-unit="dimension" id="h_pod" oninput="compute()" /></td>
-				<td class="unit" data-unit="dimension" id="unit_h_pod"></td>
-		</tr><tr>
-			<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
-				<td><input data-unit="dimension" id="d_wheel" oninput="compute()" /></td>
-				<td class="unit" data-unit="dimension" id="unit_d_wheel"></td>
-		</tr><tr>
-			<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction</span></th>
-				<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
-		</tr>
-	</table>
-</div>
+		<table id="user_inputs_motor">
+			<tr>
+				<th class="rowlabel"># Motors<span class="ttt">How many motors do you have in total for this mechanism (assuming they're identical, and geared together)</span></th>
+				<td><input id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></td>
+			</tr><td class="rowlabel">Operating Power<span class="ttt">What percentage of nominal voltage are motors ran at?</span></td>
+				<td><input class='narrow' data-unit="pct" id="motor_pct_power" oninput="MOTOR_selectMotor('motor'); compute();" value=100 /></td>
+				<td class="unit" data-unit="pct"></td>
+			</tr><tr>
+				<td class="rowlabel">Efficiency<span class="ttt">Efficiency of the transmission</span></td>
+				<td><input class='narrow' data-unit="pct" id="motor_efficiency" oninput="MOTOR_selectMotor('motor'); compute();" value=85 /></td>
+				<td class="unit" data-unit="pct" ></td>
+			</tr>
+			<tr>
+				<th>Motor</th>
+				<td colspan="2"><select class="doublewide" id="motor_select" oninput="MOTOR_selectMotor('motor'); compute();">
+				</select></td>
+			</tr>
+			<tr>
+				<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+				<td><input data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
+				<td class="unit" data-unit="omega" >[RPM]</td>
+			</tr><tr>
+				<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+				<td><input data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
+				<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
+			</tr><tr>
+				<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+				<td><input id="motor_free_current" readonly value=1.3 /></td>
+				<td class="unit">[A]</td>
+			</tr><tr>
+				<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+				<td><input id="motor_stall_current" readonly value=166 /></td>
+				<td class="unit">[A]</td>
+			</tr>
+		</table>
+	</div>
+	<div class="odd">
+		<table id="user_inputs_gearing">
+			<tr>
+				<th class="rowlabel" colspan=3>Overall Gear Ratio<span class="ttt">Gear ratio of both gearbox before rocker and in pod</span></th>
+				<td colspan=3><input id="G_comb" readonly/></td>
+			</tr><tr>
+				<th class="rowlabel">Pre-Pod Gear Ratio<span class="ttt">The gear ratio before the rocker pod. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
+				<td class="tiny"></td>
+				<td><input id="G_pre" readonly/></td>
+				<th class="rowlabel">Pod Gear Ratio<span class="ttt">The gear ratio in the rocker pod. Negative ratios are ratios where the direction is not reversed between input and output. Larger than 1 is a reduction, smaller is a RPM increase. Empty cells are assumed to be 1. You can either blank out all the cells, and plug in a number in the top right one, or build a ratio by typing in the number of teeth on each gear (or belts/sprockets) starting from the motor.</span></th>
+				<td class="tiny"></td>
+				<td><input id="G_pod" readonly/></td>
+			</tr><tr>
+				<td><input id="G1A" oninput="computePreRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G1B" oninput="computePreRatio()" /></td>
+				<td><input id="G1AP" oninput="computePodRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G1BP" oninput="computePodRatio()" /></td>
+			</tr><tr>
+				<td><input id="G2A" oninput="computePreRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G2B" oninput="computePreRatio()" /></td>
+				<td><input id="G2AP" oninput="computePodRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G2BP" oninput="computePodRatio()" /></td>
+			</tr><tr>
+				<td><input id="G3A" oninput="computePreRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G3B" oninput="computePreRatio()" /></td>
+				<td><input id="G3AP" oninput="computePodRatio()" /></td>
+				<td class="tiny">:</td>
+				<td><input id="G3BP" oninput="computePodRatio()" /></td>
+			</tr>
+		</table>
+	</div>
+	<div class="even">
+		<table id="user_inputs">
+			<tr>
+				<th class="rowlabel">Clutch Torque<span class="ttt">The torque of the clutch/brake on the rocker pod (linking the input torque more directly to the pod), providing additional resistance and thus dig-in at the cost of propulsive force. <i>Leave blank if no such clutch.</i></span></th>
+					<td><input data-unit="torque" id="T_clutch" oninput="compute()" /></td>
+					<td class="unit" data-unit="torque" ></td>
+			</tr><tr>
+				<th class="rowlabel">Pod Radius<span class="ttt">Distance from pivot point to wheel's axle</span></th>
+					<td><input data-unit="dimension" id="r_pod" oninput="compute()" /></td>
+					<td class="unit" data-unit="dimension" id="unit_r_pod"></td>
+			</tr><tr>
+				<th class="rowlabel">Pod Pivot Height<span class="ttt">Distance from ground to pod's pivot point</span></th>
+					<td><input data-unit="dimension" id="h_pod" oninput="compute()" /></td>
+					<td class="unit" data-unit="dimension" id="unit_h_pod"></td>
+			</tr><tr>
+				<th class="rowlabel">Wheel Diameter<span class="ttt">Diameter of wheel</span></th>
+					<td><input data-unit="dimension" id="d_wheel" oninput="compute()" /></td>
+					<td class="unit" data-unit="dimension" id="unit_d_wheel"></td>
+			</tr><tr>
+				<th class="rowlabel">Coefficient of Friction<span class="ttt">Coefficient of friction</span></th>
+					<td><input id="mu" oninput="compute()" /></td></td><td class="unit">[-]</td>
+			</tr>
+		</table>
+	</div>
 
 <div class="output">
-	<table>
+	<table id="outputs">
 		<tr>
 			<th class="rowlabel">Slide Stall Force<span class="ttt">The amount of propulsive force the pod will produce</span></th>
 				<td><input data-unit="force" id="F" readonly /></td></td>
@@ -254,7 +287,7 @@
 			<th class="rowlabel">Normal Stall Force<span class="ttt">The amount of normal force the pod produces when operating. Excessive amounts may cause whatever holds back the pod to lift away.</span></th>
 				<td><input data-unit="force" id="N" readonly /></td></td>
 				<td class="unit" data-unit="force" id="unit_N"></td>
-		</tr><tr>
+		</tr><tr id="mu_ideal_row">
 			<th class="rowlabel">F/N<span class="ttt">Ratio of F to N; the effective frictional coefficient of the pod. If this is larger than the actual coefficient of friction, the pod will slip rather than dig in (cells will highlight orange to display this)</span></th>
 				<td><input id="mu_ideal" readonly /></td></td><td class="unit">[-]</td>
 		</tr><tr>

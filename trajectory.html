@@ -10,6 +10,7 @@
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/tolstack.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -25,6 +26,48 @@
 		'mass': 	['kg', 'lbm', 'lbm'],
 		'omega': 	['RPM', 'RPM', 'RPM']
 	};
+	WALK_STEPS = [
+		{poi: 'modeselect_row',
+		 desc: 'Select solver mode here.',
+		 halign: 'left',
+		 valign: 'below'
+		},
+		{poi: 'user_inputs',
+		 desc: 'Plug in values with uncertainties here.',
+		 halign: 'left',
+		 valign: 'below'
+		},
+		{poi: 'computed_outputs',
+		 desc: 'Shot characteristics, and their uncertainties, will be computed here.',
+		 halign: 'center',
+		 valign: 'below'
+		},
+		{poi: 'chart',
+		 desc: 'This plot shows the swept zone of the ball at highest and lowest target hitpoints.',
+		 halign: 'left',
+		 valign: 'top'
+		},
+		{poi: 'toggle_tips_label',
+		 desc: 'More tips and notes are here in the box, and in tooltips on labels!',
+		 halign: 'center',
+		 valign: 'below'
+		}];
+</script>
+<script type="text/javascript">
+	/* Initialization routine run on page load */
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
+		selectMode();
+
+		EC_setOnInput(); // default handler OK
+		EC_setOnKeyUp(); // default handler OK
+
+		compute();
+
+		WALK_onload();
+	}
 
 	/* mode selection */
 	function selectMode() {
@@ -47,19 +90,6 @@
 			document.getElementById('theta').readOnly     = false;
 			document.getElementById('x_target').readOnly  = true;
 		}
-	}
-
-	/* Initialization routine run on page load */
-	function init() {
-		EC_onload();
-		EXP_onload();
-		UNIT_change();
-		selectMode();
-
-		EC_setOnInput(); // default handler OK
-		EC_setOnKeyUp(); // default handler OK
-
-		compute();
 	}
 
 	function convert_to_array(xyn, to) {
@@ -426,32 +456,36 @@
 		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
 		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
 		<a id="download_frame" hidden></a>
-	</div>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
 
 	<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 100%; float: left;" class="container">
-		<div class="even" style=''>
-			<table>
-				<tr>
-					<td class="rowlabel">
-						Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
-					</td><td>
-						<select id="mode" onchange="selectMode(); compute();" class="doublewide">
-							<option value="raw" selected='selected'>Blind Adjustment</option>
-							<option value="find_theta">Find Angle</option>
-							<option value="find_v">Find Velocity</option>
-							<option value="find_min_v">Find Minimum Velocity</option>
-							<option value="find_distance_near">Find Near Distance</option>
-							<option value="find_distance_far" >Find Far Distance</option>
-						</select>
-					</td>
-				</tr>
-			</table>
-		</div>
 		<div style='display:table-row'>
 			<div class="odd" style='display:table-cell'>
-				<table>
+				<table id="user_inputs">
+					<tr id="modeselect_row">
+						<td class="rowlabel">
+							Mode: <span class="ttt">How the solver should be ran.<br/>Blind: allows full control of all fields.<br/> Find theta/velocity will find the angle or velocity needed given the other parameter.<br/>Find Minimum will find the minimum velocity needed and the corresponding angle.</span>
+						</td><td colspan=3>
+							<select id="mode" onchange="selectMode(); compute();" class="doublewide">
+								<option value="raw" selected='selected'>Blind Adjustment</option>
+								<option value="find_theta">Find Angle</option>
+								<option value="find_v">Find Velocity</option>
+								<option value="find_min_v">Find Minimum Velocity</option>
+								<option value="find_distance_near">Find Near Distance</option>
+								<option value="find_distance_far" >Find Far Distance</option>
+							</select>
+						</td>
+					</tr>
+
 					<tr>
 						<th class='rowlabel'>Launch Angle</th>
 						<td><input data-unit='theta' id='theta' value=30><td class="tiny">+/-</td>
@@ -521,9 +555,8 @@
 					</tr>
 				</table>
 			</div><div class="output" style='display:table-cell'>
-				<button type="button" onclick="compute()" id="compute_btn">Compute!</button>
 				<!--<input type="checkbox" id="equal_axes" Name="equal_axes" onchange="compute(true)" checked> <label for="equal_axes">Equal Plot Axes</label>-->
-				<table>
+				<table id="computed_outputs">
 					<tr>
 						<th class='rowlabel'>Strike Point</th>
 						<td><input data-unit='bigdim' id='output_y_C' readOnly></td><td class="tiny">+/-</td>
@@ -553,8 +586,8 @@
 				</table>
 			</div>
 			<div class="even" style='display:table-cell'>
-				<input class="dropdown" type="checkbox" id="toggle-tips">
-				<label class="dropdown" for="toggle-tips">Show Tips</label>
+				<input class="dropdown" type="checkbox" id="toggle_tips">
+				<label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label>
 				<div class="dropdown" style="width: 300px">
 					<p>When the chart background is yellow, computation is needed; hit enter or press compute.</p>
 					<p>When the chart background is red, the current combination of inputs cannot be solved for.</p>

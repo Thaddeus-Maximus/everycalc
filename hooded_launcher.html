@@ -11,6 +11,7 @@
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/tolstack.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -32,6 +33,38 @@
 		'kM': ['N-m/kRPM', 'in-lbf/kRPM'],
 		"pct":   ["%", "%"]
 	};
+	WALK_STEPS = [{
+			poi: 'user_input_ball',
+			desc: 'Input details about the ball...',
+			valign: 'bottom',
+			halign: 'left'
+		},{
+			poi: 'user_input_wheel',
+			desc: 'Input details about the wheel...',
+			valign: 'bottom',
+			halign: 'middle'
+		},{
+			poi: 'computed_outputs',
+			desc: 'Exit parameters are calculated.',
+			valign: 'bottom',
+			halign: 'right'
+		},{
+			poi: 'chart_launch',
+			desc: "The ball's journey through the shooter is plotted here."
+		},{
+			poi: 'chart_launch',
+			desc: 'Click on the plot for more details.'
+		},{
+			poi: 'chart_rev',
+			desc: "The wheel's revving up is plotted here."
+		},{
+			poi: 'toggle_tips_label',
+			desc: 'More notes are in this box, and tooltips.',
+			halign: 'right',
+			valign: 'bottom'
+		}];
+</script>
+<script type="text/javascript">
 
 	function init() {
 		EC_onload();
@@ -46,6 +79,7 @@
 		calcRatio();
 
 		compute();
+		WALK_onload();
 	}
 
 	function computeLaunch(pp) {
@@ -357,28 +391,35 @@
 <!-- Make sure to call your init function on document load -->
 <!-- You can copy the topbar template here -->
 <body onload="init()">
-<div id="topbar">
-	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar-la" id='topbar_version'></div>
-	<div class="topbar-la" id='topbar_filename'></div>
-	<div class="topbar-la" id='topbar_unit'>
-		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); compute();">
-			<option value=0 >Metric</option>
-			<option value=1 selected="selected">English</option>
-		</select>
-	</div>
-	<div class="topbar-ctr" id="topbar_title">Hood and Wheel Pitcher</div>
-	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
-	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
-	<a id="download_frame" hidden></a>
-</div>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Metric</option>
+				<option value=1 selected="selected">English</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Hood and Wheel Pitcher</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="width: 100%; float: left;" class="container">
 	<div style='display:table-row'>
-		<div class="odd" style='display:table-cell'>
+		<div class="odd" style='display:table-cell' id="user_input_ball">
 			<table>
 				<tr> <!--['d_b', 'm_b', 'moi_rat_b', 'k_b', 'w',
 			'd_w', 'I_w', 'mu_w', 'omega_w_0',
@@ -445,7 +486,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" style='display:table-cell'>
+		<div class="even" style='display:table-cell' id="user_input_wheel">
 			<div>
 				<span class="rowlabel">Motor</span>
 				<select class="doublewide" id="motor_select" oninput="MOTOR_selectMotor('motor'); compute();"></select>
@@ -517,8 +558,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="output" style='display:table-cell'>
-			<center><button type="button" onclick="compute()" id="compute_btn">Compute!</button></center>
+		<div class="output" style='display:table-cell' id="computed_outputs">
 			<table>
 				<tr>
 					<th class='rowlabel'>Exit Velocity</th>
@@ -570,8 +610,8 @@
 			</table>
 		</div>
 		<div class="even" style='display:table-cell'>
-			<input class="dropdown" type="checkbox" id="toggle-tips">
-			<label class="dropdown" for="toggle-tips">Show Tips</label>
+			<input class="dropdown" type="checkbox" id="toggle_tips">
+			<label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label>
 			<div class="dropdown" style="width: 300px">
 				<p>The plot displays the run with the highest exit velocity, and lowest exit velocity.</p>
 				<p>Click on the plot to probe particular points for values.</p>

@@ -11,6 +11,7 @@
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/orings.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -19,7 +20,26 @@
 	EXP_FN_BASE = 'oring';
 	UNIT_MAP = {
 		'dimension': ['mm', 'in'] // ezpz
-	}
+	};
+	WALK_STEPS = [{
+			poi: 'type',
+			desc: 'Select the gland type...',
+			valign: 'bottom'
+		},{
+			poi: 'user_inputs',
+			desc: 'Plug in gland dimensions...',
+			valign: 'bottom'
+		},{
+			poi: 'dashsize',
+			desc: 'Standard o-ring sizes can be input here.'
+		},{
+			poi: 'computed_outputs',
+			desc: 'Min and max values are calculated here.',
+			valign: 'bottom',
+			halign: 'right'
+		}];
+</script>
+<script type="text/javascript">
 
 	function init() {
 		EC_onload();
@@ -58,9 +78,8 @@
 		    };
 		}
 	    
-
 		selectGlandType();
-		document.getElementById('topbar_version').innerHTML = VERSION;
+		WALK_onload();
 	}
 
 	function selectDashSize() {
@@ -352,30 +371,37 @@ input {
 <!-- Make sure to call your init function on document load -->
 <!-- You can copy the topbar template here -->
 <body onload="init()">
-<div id="topbar">
-	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar-la" id='topbar_version'></div>
-	<div class="topbar-la" id='topbar_filename'></div>
-	<div class="topbar-la" id='topbar_unit'>
-		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); compute();">
-			<option value=0 >Millimeters</option>
-			<option value=1 selected="selected">Inches</option>
-		</select>
-	</div>
-	<div class="topbar-ctr" id="topbar_title">O-Ring Gland Calculator</div>
-	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
-	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
-	<a id="download_frame" hidden></a>
-</div>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">O-Ring Gland Calculator</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 
 <div style='display:table-row'>
 	<div class="odd" style='display:table-cell'>
-		<table>
+		<table id="user_inputs">
 			<tr>
 				<td colspan=5 style="text-align:center;">
 					<select id="type" onchange="selectGlandType(); compute();" class="doublewide" >
@@ -698,7 +724,7 @@ input {
 		</svg>
 	</div>
 	<div class="output" style="margin-left: 0px; display:table-cell;">
-		<table>
+		<table id="computed_outputs">
 			<tr>
 				<th class="rowlabel">Application</th>
 				<td colspan=4>

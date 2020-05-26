@@ -9,6 +9,7 @@
 <script type="text/javascript" src="js/units.js"></script>
 <script type="text/javascript" src="js/belts.js"></script>
 <script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -24,7 +25,28 @@
 		// 'driver_val': 	['mm', 'in'], // this may make more sense to just handle with a computeFrom later on since it changes from teeth to length
 		'dval': 		['mm', 'in']
 	};
-
+	WALK_STEPS = [{
+			poi: 'belt_type',
+			desc: 'Select whether using timing or polybelt...',
+			valign: 'bottom'
+		},{
+			poi: 'th_pitch',
+			desc: 'Plug in timing belt tooth pitch...'
+		},{
+			poi: 'tr_basic_inputs',
+			desc: 'Plug in pulley teeth and target center distance...'
+		},{
+			poi: 'src_label',
+			desc: 'Select which belt sizes to pick from...'
+		},{
+			poi: 'results_table',
+			desc: 'Calculated belt size and center distances...'
+		},{
+			poi: 'strength_div',
+			desc: 'Strength can also be computed.'
+		}];
+</script>
+<script type="text/javascript">
 	// initialization function; hooked to onload
 	function init() {
 		EC_onload();
@@ -57,6 +79,8 @@
 		selectVendor();
 		selectDriver();
 		compute();
+
+		WALK_onload();
 	}
 
 	function selectVendor() {
@@ -352,24 +376,30 @@
 <!-- Make sure to call your init function on document load -->
 <!-- You can copy the topbar template here -->
 <body onload="init()">
-<div id="topbar">
-	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar-la" id='topbar_version'></div>
-	<div class="topbar-la" id='topbar_filename'></div>
-	<div class="topbar-la" id='topbar_unit'>
-		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); compute();">
-			<option value=0 >Millimeters</option>
-			<option value=1 selected="selected">Inches</option>
-		</select>
-	</div>
-	<div class="topbar-ctr" id="topbar_title">Belt/Pulley Sizing</div>
-	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
-	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
-	<a id="download_frame" hidden></a>
-</div>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Belt/Pulley Sizing</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
 
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left;" class="container">
 	<div class="even">
@@ -400,7 +430,7 @@
 				<th class="collabel">Pulley 1</th>
 				<th class="collabel">Pulley 2</th>
 				<th class="collabel" colspan=2>Calculate By</th>
-			</tr><tr>
+			</tr><tr id="tr_basic_inputs">
 				<th class="rowlabel" id="no_teeth_1"># Teeth</th>
 				<th><input id="p1_n" value=24 /></th>
 				<th><input id="p2_n" value=18 /></th>
