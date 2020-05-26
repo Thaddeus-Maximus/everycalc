@@ -11,6 +11,7 @@
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/tolstack.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -32,6 +33,40 @@
 		'kM': ['N-m/kRPM', 'in-lbf/kRPM'],
 		"pct":   ["%", "%"]
 	};
+	WALK_STEPS = [{
+			poi: 'user_input_ball',
+			desc: 'Input details about the ball...',
+			valign: 'bottom',
+			halign: 'left'
+		},{
+			poi: 'user_input_wheel_L',
+			desc: 'Input details about the lower wheel...',
+			valign: 'bottom',
+			halign: 'middle'
+		},{
+			poi: 'user_input_wheel_U',
+			desc: 'And the upper wheel.',
+			valign: 'bottom',
+			halign: 'middle'
+		},{
+			poi: 'computed_outputs',
+			desc: 'Exit parameters are calculated.',
+			valign: 'bottom',
+			halign: 'right'
+		},{
+			poi: 'chart_launch',
+			desc: "The ball's journey through the shooter is plotted here."
+		},{
+			poi: 'chart_launch',
+			desc: 'Click on the plot for more details.'
+		},{
+			poi: 'toggle_tips_label',
+			desc: 'More notes are in this box, and tooltips.',
+			halign: 'right',
+			valign: 'bottom'
+		}];
+</script>
+<script type="text/javascript">
 
 	function init() {
 		EC_onload();
@@ -43,6 +78,7 @@
 		EC_setOnInput(function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 				let input = e.target;
+	    		if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
 		    	if (input.id.startsWith("G") && input.id.length == 5) {
 					calculateRatio('U');
 					calculateRatio('L');
@@ -61,6 +97,7 @@
 		selectUpperMotor();
 
 		compute();
+		WALK_onload();
 	}
 
 	function computeLaunch(pp) {
@@ -364,28 +401,35 @@
 <!-- Make sure to call your init function on document load -->
 <!-- You can copy the topbar template here -->
 <body onload="init()">
-<div id="topbar">
-	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
-	<div class="topbar-la" id='topbar_version'></div>
-	<div class="topbar-la" id='topbar_filename'></div>
-	<div class="topbar-la" id='topbar_unit'>
-		<!-- Required for unit library. You could also put this in the calculator main body -->
-		<select id="unit_select" onchange="UNIT_change(); compute();">
-			<option value=0 >Metric</option>
-			<option value=1 selected="selected">English</option>
-		</select>
-	</div>
-	<div class="topbar-ctr" id="topbar_title">Hood and Wheel Pitcher</div>
-	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
-	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
-	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
-	<a id="download_frame" hidden></a>
-</div>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Metric</option>
+				<option value=1 selected="selected">English</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Hood and Wheel Pitcher</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="width: 100%; float: left;" class="container">
 	<div style='display:table-row'>
-		<div class="odd" style='display:table-cell'>
+		<div class="odd" style='display:table-cell' id='user_input_ball'>
 			<table>
 				<tr>
 					<th class="rowlabel">Ball Diameter</th>
@@ -415,7 +459,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" style='display:table-cell'>
+		<div class="even" style='display:table-cell' id='user_input_wheel_L'>
 			<center>Bottom Wheel</center>
 			<table>
 				<tr>
@@ -500,7 +544,7 @@
 				</tr>-->
 			</table>
 		</div>
-		<div class="odd" style='display:table-cell'>
+		<div class="odd" style='display:table-cell' id='user_input_wheel_U'>
 			<center>Top Wheel</center>
 			<table>
 				<tr>
@@ -587,7 +631,7 @@
 				</tr>-->
 			</table>
 		</div>
-		<div class="output" style='display:table-cell'>
+		<div class="output" style='display:table-cell' id='computed_outputs'>
 			<center><button type="button" onclick="compute()" id="compute_btn">Compute!</button></center>
 			<table> <!--['v_b_exit', 'omega_b_exit', 'omega_L_exit', 'omega_U_exit']-->
 				<tr>
@@ -634,36 +678,12 @@
 			</table>
 		</div>
 		<div class="even" style='display:table-cell'>
-			<table id="table_protips">
-				<tr>
-					<th class='rowlabel' colspan=2>Pro-Tips</th>
-					<td>
-						<button type="button" onclick="collapse('protips'); shape_select(true)" id='toggle_detail_protips'>&#9650;</button>
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						Yellow: Not computed. Press enter on a field or press the compute button.<br/>
-						Green: Computed, no issues.<br/>
-						Red: An error has occurred with the results.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						The plot displays the run with the highest exit velocity, and lowest exit velocity.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						Click on the plot to probe particular points for values.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						The settling distance (where the values of everything evens out and stops changing)<br/>is marked on the plot at the black vertical lines.
-					</td>
-				</tr><tr>
-					<td colspan=3>
-						Take a look at the tooltip for frictional blurring...
-					</td>
-				</tr>
-			</table>
+			<input class="dropdown" type="checkbox" id="toggle_tips">
+			<label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label>
+			<div class="dropdown" style="width: 300px">
+				<p>The plot displays the run with the highest exit velocity, and lowest exit velocity.</p>
+				<p>Click on the plot to probe particular points for values.</p>
+			</div>
 		</div>
 	</div>
 </div>

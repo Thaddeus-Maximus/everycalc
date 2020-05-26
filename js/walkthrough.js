@@ -4,8 +4,8 @@ How to use:
 
 1. Put this SVG element in your document's body:
 
-<svg id="walkthrough_overlay">
-	<path id="walkthrough_frame" onclick="WALK_nextStep()" ></path>
+<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+	<path id="walkthrough_frame" ></path>
 	<text id="walkthrough_text" ></text>
 	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
 </svg>
@@ -24,9 +24,10 @@ WALK_STEPS = [
 
 function WALK_onload() {
 	if (getLocalStorage('walkthrough') != VERSION)
-		WALK_disable();
-	else
 		WALK_enable();
+	else
+		WALK_disable();
+	setLocalStorage('walkthrough', VERSION);
 }
 
 function WALK_disable() {
@@ -74,7 +75,7 @@ function WALK_nextStep() {
 		switch(halign) {
 			case 'left':
 			case 'start':
-				text.setAttribute('x', (poi.left));
+				text.setAttribute('x', (poi.left+4));
 				text.setAttribute('text-anchor', 'start');
 				break;
 			case 'center':
@@ -84,7 +85,7 @@ function WALK_nextStep() {
 				break;
 			case 'right':
 			case 'end':
-				text.setAttribute('x', (poi.right));
+				text.setAttribute('x', (poi.right-4));
 				text.setAttribute('text-anchor', 'end');
 		}
 		switch(valign) {
@@ -101,7 +102,7 @@ function WALK_nextStep() {
 		button.style.display='none';
 	} else {
 		extent.setAttribute('d',  `M0,0 H${width} V${height} H0`);
-		text.innerHTML = "Welcome to EveryCalc. Click on the black for tutorial.";
+		text.innerHTML = "Welcome to EveryCalc. Click anywhere for tutorial.";
 		text.setAttribute('x', width/2);
 		text.setAttribute('y', height/2);
 		text.setAttribute('text-anchor', 'middle');

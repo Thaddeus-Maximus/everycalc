@@ -29,25 +29,31 @@
 	WALK_STEPS = [
 		{poi: 'modeselect_row',
 		 desc: 'Select solver mode here.',
-		 halign: 'left'
+		 halign: 'left',
+		 valign: 'below'
 		},
 		{poi: 'user_inputs',
 		 desc: 'Plug in values with uncertainties here.',
-		 halign: 'left'
+		 halign: 'left',
+		 valign: 'below'
 		},
 		{poi: 'computed_outputs',
 		 desc: 'Shot characteristics, and their uncertainties, will be computed here.',
-		 halign: 'center'
+		 halign: 'center',
+		 valign: 'below'
 		},
 		{poi: 'chart',
 		 desc: 'This plot shows the swept zone of the ball at highest and lowest target hitpoints.',
-		 halign: 'left'
+		 halign: 'left',
+		 valign: 'top'
 		},
 		{poi: 'toggle_tips_label',
 		 desc: 'More tips and notes are here in the box, and in tooltips on labels!',
-		 halign: 'center'
+		 halign: 'center',
+		 valign: 'below'
 		}];
-
+</script>
+<script type="text/javascript">
 	/* Initialization routine run on page load */
 	function init() {
 		EC_onload();
@@ -454,8 +460,8 @@
 		<a id="download_frame" hidden></a>
 	</div>	
 
-	<svg id="walkthrough_overlay">
-		<path id="walkthrough_frame" onclick="WALK_nextStep()" ></path>
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
 		<text id="walkthrough_text" ></text>
 		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
 	</svg>

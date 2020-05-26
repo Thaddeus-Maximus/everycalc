@@ -12,6 +12,7 @@
 <script type="text/javascript" src="js/plots.js"></script>
 <script type="text/javascript" src="js/math.js"></script>
 <script type="text/javascript" src="js/materials.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame" ></script>
@@ -31,7 +32,46 @@
 		'mass':      ['kg',  'lbm'],
 		'stress':    ['MPa', 'psi']
 	}
-
+	WALK_STEPS = [{
+			poi: 'user_input_material',
+			desc: 'Select material.',
+			halign: 'left',
+			valign: 'below'
+		},{
+			poi: 'user_input_section',
+			desc: 'Define cross-section.',
+			halign: 'left',
+			valign: 'below'
+		},{
+			poi: 'loads',
+			desc: 'Define loads and constraints.',
+			halign: 'left',
+			valign: 'above'
+		},{
+			poi: 'addLoad_btn',
+			desc: 'More loads can be added.',
+			halign: 'left',
+			valign: 'above'
+		},{
+			poi: 'chart_background',
+			desc: 'Deflection diagram will appear here.'
+		},{
+			poi: 'chart_background',
+			desc: 'Click on the graph to poll particular points for values.'
+		},{
+			poi: 'beam_background',
+			desc: 'Loads and constraints are visualized here.'
+		},{
+			poi: 'beam_background',
+			desc: 'You can also click on parts of the beam to probe them.'
+		},{
+			poi: 'toggle_tips_label',
+			desc: 'More notes are here in this box and tooltips.',
+			halign: 'left',
+			valign: 'above'
+		}];
+</script>
+<script type="text/javascript">
 	function init() {
 		// basic loading, create options dynamically
 		EC_onload();
@@ -64,6 +104,7 @@
 		registerCallbacks();
 
 		compute();
+		WALK_onload();
 	}
 
 	function registerCallbacks() {
@@ -773,7 +814,6 @@
 	}
 </script>
 
-
 <html>
 
 <!-- Make sure to call your init function on document load -->
@@ -794,8 +834,15 @@
 	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
 	<div class="topbar-ra selectable" onclick="document.getElementById('section_img').removeAttribute('src'); downloadPage();" id="download">Export HTML</div>
 	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
 	<a id="download_frame" hidden></a>
-</div>
+</div>	
+
+<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+	<path id="walkthrough_frame" ></path>
+	<text id="walkthrough_text" ></text>
+	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="width: 275px; float: left;" class="container">
@@ -809,7 +856,7 @@
 			</table>
 		</div>
 			
-		<div class="odd">
+		<div class="odd" id="user_input_material">
 			<label class="bold rowlabel">Material</label>
 			<select id="material" onchange="selectMaterial(); compute();">
 				<option value="custom">Custom</option>
@@ -836,7 +883,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even">
+		<div class="even" id="user_input_section">
 			<label class='bold rowlabel'>Cross-Section</label>
 			<select id="section" onchange="selectShape(); compute();">
 				<option value="rndbar" selected='selected'>Round Bar</option>
@@ -896,7 +943,7 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads' data-current_load_number=0><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><input class="dropdown" type="checkbox" id="toggle-tips"><label class="dropdown" for="toggle-tips">Show Tips</label><div class="dropdown">
+		<div class="even" id='loads' data-current_load_number=0><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><input class="dropdown" type="checkbox" id="toggle_tips"><label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label><div class="dropdown">
       <p>Moments are positive counter-clockwise.</p>
       <p>Click on the chart to query points. </p>
       <p>Click on the beam elements to query the corresponding points.</p>
@@ -938,6 +985,8 @@
 	</g>
 
 	<!-- non-standard beam stuff -->
+
+	<rect opacity=0 class="plot-background" id="beam_background" x=60 y=500 width=575 height=100 />
 	<g class="beam">
 	  <line id="chart_beam" class="beam" x1=70 x2=625 y1=550 y2=550 ></line>
 	</g>
@@ -989,7 +1038,7 @@
 	<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
 </svg>
 
-<div class="output-plot" id ="chart_querytable" style='display:none;'>
+	<div class="output-plot" id ="chart_querytable" style='display:none;'>
 		<table>
 			<tr>
 				<th class="rowlabel">Queried Position<span class="ttt">Query a position on the graph by clicking (and optionally dragging) a point.</span></th>
@@ -999,7 +1048,6 @@
 				<th class="rowlabel">Deflection</th>
 				<td><input id="chart_q" data-unit='deflection' readonly /></td>
 				<td class="unit" data-unit='deflection'></td>
-			</tr><tr>
 				<th class="rowlabel">Slope</th>
 				<td><input id="chart_t" data-unit='slope' readonly /></td>
 				<td class="unit" data-unit='slope'></td>
@@ -1007,24 +1055,20 @@
 				<th class="rowlabel">Bending Moment</th>
 				<td><input id="chart_m" data-unit='torque' readonly /></td>
 				<td class="unit" data-unit='torque'></td>
+				<th class="rowlabel">Bending Stress @ Top/Bottom<span class="ttt">Positive is tension</span></th>
+				<td><input id="query_stress_bend_top" data-unit='stress' readonly /></td>
+				<td><input id="query_stress_bend_bot" data-unit='stress' readonly /></td>
+				<td class="unit" data-unit='stress'></td>
 			</tr><tr>
 				<th class="rowlabel">Shear Force<span class="ttt">Note: Shear force at a load/constraint is not properly defined. Query before and after.</span></th>
 				<td><input id="chart_s" data-unit='force' readonly /></td>
 				<td class="unit" data-unit='force'></td>
-			</tr><tr>
-				<th class="rowlabel">Bending Stress @ Top<span class="ttt">Positive is tension</span></th>
-				<td><input id="query_stress_bend_top" data-unit='stress' readonly /></td>
-				<td class="unit" data-unit='stress'></td>
-			</tr><tr>
-				<th class="rowlabel">Bending Stress @ Bottom<span class="ttt">Positive is tension</span></th>
-				<td><input id="query_stress_bend_bot" data-unit='stress' readonly /></td>
-				<td class="unit" data-unit='stress'></td>
-			</tr><tr>
 				<th class="rowlabel">Shear Stress @ Center</th>
 				<td><input id="query_stress_shear" data-unit='stress' readonly /></td>
 				<td class="unit" data-unit='stress'></td>
 			</tr>
-		</div>
+		</table>
+	</div>
 
 </div>
 </body>

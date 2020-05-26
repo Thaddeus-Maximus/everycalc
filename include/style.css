@@ -75,7 +75,7 @@ th {
 
 select, input {
   border: 1px solid #aaa;
-  width: 80px;
+  width: 65px;
   margin: 1px;
   padding: 1px;
 }
@@ -87,7 +87,7 @@ input {
   background-color: #ffe;
 }
 input.narrow  {
-  width: 45px;
+  width: 40px;
 }
 input[readonly] {
   background-color: #ccd;
@@ -339,7 +339,7 @@ input[type=checkbox].dropdown:checked ~ div, input[type=checkbox].dropdown:check
 #walkthrough_frame {
   stroke: none;
   fill: #111;
-  opacity: 0.95;
+  opacity: 0.98;
 }
 
 #walkthrough_text {
