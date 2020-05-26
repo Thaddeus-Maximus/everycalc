@@ -310,7 +310,6 @@
       	]);
 
 		for (stat of ['v_b_exit', 'omega_b_exit', 'omega_w_exit', 'theta_b_exit']) {
-			console.log(stat);
       		setV('output_'+stat,        (extrema_vals[stat][1] + extrema_vals[stat][0])/2);
       		setV('output_'+stat+'_err', (extrema_vals[stat][1] - extrema_vals[stat][0])/2);
       	}

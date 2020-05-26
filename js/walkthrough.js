@@ -23,11 +23,13 @@ WALK_STEPS = [
  */
 
 function WALK_onload() {
-	if (getLocalStorage('walkthrough') != VERSION)
+	if (getLocalStorage('walkthrough') != VERSION && typeof EXP_inputs == 'undefined')
 		WALK_enable();
 	else
 		WALK_disable();
-	setLocalStorage('walkthrough', VERSION);
+	try{
+		setLocalStorage('walkthrough', VERSION);
+	}catch(err){}
 }
 
 function WALK_disable() {
