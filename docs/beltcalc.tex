@@ -50,9 +50,9 @@
 		Belts are pretty easy to use and calculate the appropriate distances for. When this center distance is calculated and manufactured properly, they should not require adjustment.
 	\end{abstract}
 	
-	
+	\section{Geometry Definition}
 	\begin{figure}[H]
-	\begin{tikzpicture}[x=0.5in,y=0.5in]
+	\begin{tikzpicture}[x=0.7in,y=0.7in]
 		\draw[ultra thick] (0,0) circle (0.5);
 		\draw[ultra thick] (3,0) circle (1);
 		\draw[ultra thick] (-.08333, .4930) -- (2.83333, .9860);
@@ -62,7 +62,7 @@
 	\end{figure}
 
 	\begin{figure}[H]
-	\begin{tikzpicture}[x=1.0in,y=1.0in]
+	\begin{tikzpicture}[x=1.3in,y=1.3in]
 		\draw[black, ultra thick] (-.08333, .4930) -- (2.83333, .9860) arc (99.594:-99.594:1) -- (-.08333, -.4930) arc (260.406:99.594:0.5) -- cycle;
 		\draw[red, ultra thick, ->] (0,0) -- (-.08333, .4930) node[pos=0.5, left]{$r_1$};
 		\draw[red, ultra thick, ->] (3,0) -- (2.83333, .9860) node[pos=0.75, left]{$r_2$};
@@ -89,20 +89,20 @@
 	\begin{align}
 		d_1 = 2 r_1 \\
 		d_2 = 2 r_2 \\
-		sin(\theta) = \frac{r_2 - r_1}{C}
+		\text{sin}(\theta) = \frac{r_2 - r_1}{C}
 	\end{align}
 
 	The total length of the pulley $L$ can be expressed as:
 
 	\begin{align}
 		L = 2 <\mbox{straight segment}> + <\mbox{arc for pulley 1}> + <\mbox{arc for pulley 2}> \nonumber \\
-		L = 2 \frac{C}{cos(\theta)} + r_1 (\pi - 2 \theta) + r_2 (\pi + 2 \theta)
+		L = 2 \frac{C}{\text{cos}(\theta)} + r_1 (\pi - 2 \theta) + r_2 (\pi + 2 \theta)
 	\end{align}
 
 	The trig identity for the cosine of an arcsine will be helpful:
 
 	\begin{align}
-		cos(asin(x)) = \sqrt{1 - x^2}
+		\text{cos}(\text{asin}(x)) = \sqrt{1 - x^2}
 	\end{align}
 
 	Putting this all together lets us determine the total belt length in terms of pitch diameters $d_1$, $d_2$, and the center-center distance $C$:
@@ -113,10 +113,11 @@
 
 	This equation isn't easy to analytically solve for $C$ in terms of $d_1$, $d_2$, and $L$. \href{https://www.wolframalpha.com/input/?i=solve+L+%3D+2*D%2Fsqrt%281-%28%28d2-d1%29%2F2%2FD%29%5E2%29+%2B+d1%2F2*%28pi-2*theta%29+%2B+%28d2%2F2%29*%28pi%2B2*theta%29}{\underline{WolframAlpha yields}} a solution, though it is quite atrocious. I found that it's best to use a numeric algorithm (such as \href{https://en.wikipedia.org/wiki/Bisection_method}{\underline{bisection}}, which my calculator uses).
 	
+	\section{Crossed Belts}
 	The same approach can be taken with a crossed drive belt (which is used in order to reverse direction of rotation).
 
 	\begin{figure}[H]
-	\begin{tikzpicture}[x=1.0in,y=1.0in]
+	\begin{tikzpicture}[x=1.3in,y=1.3in]
 		\draw[black, ultra thick] (.25, .433) -- (2.5, -.866) arc (-120:120:1) -- (.25, -.433) arc (300:60:0.5) -- cycle;
 		\draw[gray, ultra thick]   (0,0) -- (3, 0);
 		\draw[red, ultra thick, ->]   (3,0) -- (2.5, .866) node[pos=0.35, left]{$r_1$};
@@ -131,11 +132,11 @@
 	The belt angle now is
 
 	\begin{align}
-		sin(theta) = \frac{r_2 + r_1}{C} 
+		\text{sin}(theta) = \frac{r_2 + r_1}{C} 
 	\end{align}
 
 	\begin{align}
-		L = 2 \frac{C}{cos(\theta)} + r_1 (\pi + 2 \theta) + r_2 (\pi + 2 \theta)
+		L = 2 \frac{C}{\text{cos}(\theta)} + r_1 (\pi + 2 \theta) + r_2 (\pi + 2 \theta)
 	\end{align}
 
 	Resulting in:
@@ -144,18 +145,32 @@
 		L = \frac{2 C}{\sqrt{1 - (\frac{d_2 + d_1}{2 C})^2}} + \frac{d_1 + d_2}{2} (\pi + 2 \theta)
 	\end{align}
 
-	\section*{Belt Strength Calculation}
+	\section{Belt Strength Calculation}
 
 	Belt strength is calculated from the tables in the \href{https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf}{\underline{Gates Light Power and Precision Manual}}.
+
+	\begin{figure}[H]
+	\includegraphics[width=\textwidth]{beltrating_a.png}
+	\includegraphics[width=\textwidth]{beltrating_b.png}
+	\caption{Exemplary data from the Gates manual.}
+	\end{figure}
 
 	These tables list allowable pulley torque $T(\omega, N)$ as a function of RPM $\omega$ and pulley teeth $N$. Note that 6 teeth should be in engagement.
 	2-D interpolation is used to determine values on the in-betweens.
 	Tabulated values outside the bounds are extrapolated. Omitted values are presumed to be zero.
-	The multiplier factors are used to determine strength of different width belts.
+
+	\begin{align}
+		T_{base} &= \text{interp2D}(\{N\}, \{\omega\}, [T], N_{sprocket}, \omega_{sprocket}) \\
+		K_{length} &= \text{interp1D}(\{L\}, \{K_{lengths}\}, \{L_{belt}\}) \\
+		K_{width} &= \text{lookup}(\{w\}, \{K_{widths}\}, \{w_{belt}\}) \\
+		T_{rated,\ sprocket} &= K_{length} \times K_{width} \times T_{base}
+	\end{align}
+
+	It should also be noted that the number of teeth engaged with the pulley is recommended to be no less than 6.
 
 	\newpage
 
-	\section*{Validation}
+	\section{Validation}
 
 	Results of my EveryCalc belt tool have been compared to \href{https://www.wcproducts.com/how-to-belts/}{\underline{West Coast Products' Belt Calculator}}.
 

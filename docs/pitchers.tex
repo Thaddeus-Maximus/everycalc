@@ -56,9 +56,8 @@
 
 		Unfortunately, they are somewhat of a mystery, with design essentially relegated to trial-and-error rather than intuitive understanding or numerical simulation. This paper aims to change that.
 	\end{abstract}
-	\newpage
 	
-	\section*{Hooded Pitcher}
+	\section{Hooded Pitcher}
 	
 	Consider the following \textit{hooded} pitcher. A wheel (red) is spun up to an initial RPM, and then a ball (blue) is introduced between it and an arced hood (black), which is concentric with the wheel.
 
@@ -89,7 +88,7 @@
 		\item $\theta$, the angle between inlet and outlet
 	\end{asparaenum}
 
-	What makes this work? The ball is accelerated as the wheel makes contact with the ball. The hood provides constraint, keeping the ball from simply spinning. Free-body diagrams may make this more clear.
+	The ball is accelerated as the wheel makes contact with the ball. The hood provides constraint, keeping the ball from simply spinning. Free-body diagrams may make this more clear.
 
 	\begin{figure}[H]
 	\begin{tikzpicture}[x=1.3in, y=1.3in]
@@ -152,14 +151,14 @@
 		\alpha_{w}	&= - F_w \frac{d_w}{2 I_w}
 	\end{align}
 
-	Where does the normal force come from? Well, it comes from the ball's compression! But the ball is also accelerating along the axis of the compression, making this not quite straightforward.
+	The normal force comes from the compression of the ball and wheel. But the ball is also accelerating along the axis of the compression, making this not quite straightforward. To help simplify, we'll also assume an infinitely rigid wheel (which is often a valid assumption).
 
 	\begin{figure}[H]
 	\begin{tikzpicture}[x=1.5in, y=1.5in]
 		\draw[decoration={aspect=0.3, segment length=5mm, amplitude=5mm,coil},decorate] (-1,0) -- (+1,0);
 		\draw[->, ultra thick] (-1.6,0) -- (-1.1,0) node[pos=0.5, above]{$N_h$};
 		\draw[->, ultra thick] (+1.6,0) -- (+1.1,0) node[pos=0.5, above]{$N_w$};
-		\draw[->, ultra thick] (0,0.3) -- (-0.5,0.3) node[pos=0, right]{$m_b a_{b,r}$};
+		\draw[->, ultra thick] (0,0.3) -- (-0.5,0.3) node[pos=0, right]{$m_b a_{b,r} = m_b v_b^2 / R$};
 	\end{tikzpicture}
 	\caption{Massed spring model of the ball.}
 	\end{figure}
@@ -170,16 +169,18 @@
 		N_w = k_b \delta - \frac{m_b a_{b,r}}{2} = k_b \delta - \frac{m_b v_b^2}{2 R}
 	\end{align}
 
-	\textit{Side takeaway: As the ball accelerates through the hood, it lifts off the wheel. This effect is magnified with a smaller arc radius.}
+	\textit{Observation: As the ball accelerates through the hood, it lifts off the wheel until $N_w = 0$. This effect is magnified with a smaller arc radius.}
+
+	\section{Developing a Friction Model}
 
 	We can relate the normal forces to the frictional or tangential forces with a basic coloumb friction model. More sophisticated models are probably more accurate, but the intent of this model is to provide intuitively understandable results and general guidelines which should be followed up by real-world testing, so this is an appropriate model.
 
 	\begin{align}
-		F_h \leq \mu_h N_h \ & sign(0 - v_{b,top}) \\
-		F_w \leq \mu_w N_w \ & sign(v_{w,surf} - v_{b,bottom})
+		F_h \leq \mu_h N_h \ & \text{sign}(0 - v_{b,top}) \\
+		F_w \leq \mu_w N_w \ & \text{sign}(v_{w,surf} - v_{b,bottom})
 	\end{align}
 
-	Anyone who's simulated anything can immediately see the glaring problem here- sign functions have glaring discontinuities. There are many strategies to solve this. Here's what I've come up with.
+	Implementing this verbatim poses serious simulation problems. The simulation will oscillate back and forth between a positive and negative sign function, potentially crashing. There are many strategies to solve this problem, usually by solving accuracy of the math or investing in a complex solver. However, our case can be simplified algebraically up front, which will help make a much more stable solver.
 
 	First, recognize that the sign associated with the wheel should either be positive or zero. The ball isn't going to start over-spinning with the wheel.
 	Second, recognize that the spin of the ball should never exceed the speed of the ball such that the top of the ball travels backwards, so its sign should be negative or zero.
@@ -215,16 +216,22 @@
 		F_h = F_w \frac{\frac{w^2}{4 I_b} - \frac{1}{m_b}}{\frac{w^2}{4 I_b} + \frac{1}{m_b}} 
 	\end{align}
 
-	in the case of no hood slip. In these cases, the force of one is directly proportional to the other. This means that when both hood and wheel stop slipping,
+	in the case of no hood slip. In these cases, the force of one is directly proportional to the other;
+	\begin{align}
+		F_h = K_1 F_w \\
+		F_w = K_2 F_h
+	\end{align}
+
+	This means that when both hood and wheel stop slipping,
 
 	\begin{align}
-		F_h = F_w = 0
+		F_h = F_w = 0 \text{ if } K_1 \neq K_2 \neq 0
 	\end{align}
 
 	But how is state determined? We simply go back to the sign equations.
 	\begin{align}
-		\textit{top attached when } 0 \leq v_{b} - \omega_{b} \frac{w}{2} \\
-		\textit{bottom attached when } \omega_{w} \frac{d_w}{2} \leq v_{b} + \omega_{b} \frac{w}{2}
+		\textit{top attached when }& 0 \leq v_{b} - \omega_{b} \frac{w}{2} \\
+		\textit{bottom attached when }& \omega_{w} \frac{d_w}{2} \leq v_{b} + \omega_{b} \frac{w}{2}
 	\end{align}
 
 	This developed friction model can be summarized with this pseudocode, which would be ran every iteration of the simulation loop.
@@ -266,7 +273,7 @@
 		\textit{when} \ u_b &\geq \theta R \ \textit{terminate}
 	\end{align}
 
-\section*{Dual-Wheel Pitchers}
+\section{Dual-Wheel Pitchers}
 
 Dual wheel pitchers are a little more complex as the effective gap is not constant during the ball's motion, and the wheel's normal forces contribute to ball acceleration. However, the basic strategy remains the same.
 
@@ -376,7 +383,7 @@ As for the flywheel, there are two cases: the flywheels are separately powered a
 	\alpha_{L,free}	&= - F_L \frac{d_L}{2 I_L}
 \end{align}
 
-In the linked case, a torque constrains the two wheels.
+In the linked case, a gear ratio $G$ constrains the two wheels, which imparts torque $T_w$.
 
 \begin{figure}[H]
 	\begin{tikzpicture}[x=1.3in, y=1.3in]
@@ -406,8 +413,8 @@ This leads to the torque balance
 The two wheels are coupled by a gear reduction $G$.
 
 \begin{align}
-	\alpha_L = \alpha_T * G \\
-	- T_L * G = T_T
+	\alpha_L = \alpha_T G \\
+	- T_L G = T_T
 \end{align}
 
 Solving these four equations yields
@@ -526,14 +533,14 @@ State is determined as
 		\textit{when} \ x > x_end \ \textit{terminate}
 	\end{align}
 
-\section*{Hybrid Pitchers}
+\section{Hybrid Pitchers}
 An interesting design proliferated during the FRC 2020 season, consisting of a hooded pitcher with an extra set of 'afterburner' wheels where the hood would terminate. This could be modeled fairly easily (I simply haven't gotten to it yet). I may transfer the calculator into a single one consisting of only the hybrid pitcher, as hooded and dual-wheel pitchers could be considered just special cases.
 
-\section*{Sanity Checks}
+\section{Sanity Checks}
 	These are new analysis techniques so there is no prior art to compare to. However, we can still perform some sanity checks.
 
 	\begin{figure}[H]
-		\includegraphics[width=0.99\textwidth]{validation/hood_EC_A.png}
+		\includegraphics[width=\textwidth]{validation/hood_EC_A.png}
 		\caption{Hooded Flywheel Calculator - Exemplary Case}
 	\end{figure}
 
@@ -545,17 +552,19 @@ An interesting design proliferated during the FRC 2020 season, consisting of a h
 
 	Numerically in this case,
 	\begin{align}
-		31.766 \frac{\text{ft}}{\text{s}} + 1456 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{5}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} = 2426.6 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{6}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} \\
-		63.5310 \frac{\text{ft}}{\text{s}} \approx 63.5282 \frac{\text{ft}}{\text{s}} .
+		31.766 \frac{\text{ft}}{\text{s}} + 1456 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{5}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} &= 2426.6 \ \text{RPM} \times \frac{2 \pi / 60 \text{rad/s}}{\text{RPM}} \times \frac{6}{2} \text{in} \times \frac{\text{ft}}{12 \text{in}} \\
+		63.5310 \frac{\text{ft}}{\text{s}} &\approx 63.5282 \frac{\text{ft}}{\text{s}} .
 	\end{align}
 
-	Is the wheel drop realistic? Let's look at the lost energy. There's definitely some losses as the ball interaction has friction, but let's look at it.
+	Is the wheel drop realistic? Let's look at the lost energy. There's definitely some losses as the ball interaction has friction, but let's quantify it.
 
 	\begin{align}
 		E = m_b v_b^2 + I_b \omega_b^2 + I_w \omega_w^2 \\
-		E_{init} = 4 \text{$lbm\ in^2$} \times (3000 \text{RPM})^2 = 115.5 \text{J} \\
-		E_{final} = 0.3 \text{lbm} \times (31.766 \text{ft/s})^2 + \frac{2}{5} 0.3 \text{lbm} (\frac{5 \text{in}}{2})^2 \times (1456 \text{RPM})^2 + 4 \text{$lbm\ in^2$} \times (2426 \text{RPM})^2 = 93.45 \text{J} \\
-		\eta = \frac{E_{final}}{E_{init}} = \frac{93.45 \text{J}}{115.5 \text{J}} = 80.9 \% 
+		E_{init} = 4 \text{$lbm\ in^2$} \times (3000 \text{RPM})^2 &= 115.5 \text{J} \\
+		E_{final} = 0.3 \text{lbm} \times (31.766 \text{ft/s})^2 \nonumber \\
+		+ \frac{2}{5} 0.3 \text{lbm} (\frac{5 \text{in}}{2})^2 \times (1456 \text{RPM})^2 \nonumber \\
+		+ 4 \text{$lbm\ in^2$} \times (2426 \text{RPM})^2 &= 93.45 \text{J} \\
+		\eta = \frac{E_{final}}{E_{init}} = \frac{93.45 \text{J}}{115.5 \text{J}} &= 80.9 \% 
 	\end{align}
 
 	That's an efficiency less than 100\% (good, physics didn't break), and it isn't dreadfully low (signalling that there isn't too much slippage).
@@ -563,9 +572,9 @@ An interesting design proliferated during the FRC 2020 season, consisting of a h
 	The rev-up simulation does have some prior art to compare to, luckily. We can run basically the exact same simulation in the simple mechanism calculator.
 
 	\begin{figure}[H]
-		\includegraphics[width=0.9\textwidth]{validation/hood_ECrev_A.png}
+		\includegraphics[width=\textwidth]{validation/hood_ECrev_A.png}
 		\caption{Revving up a 4 $lbm\ in^2$ flywheel with a single NEO motor.}
 	\end{figure}
 
-	This shows it takes 0.154 seconds to rev up- nearly the same as the 0.153 in the previous example. Note that the efficiency is specified as 100 percent- this is because the rev-up calculator instead uses a bearing friction value that the general mechanism calculator doesn't have.
+	This shows it takes 0.154 seconds to rev up, nearly the same as the 0.153 in the previous example. Note that the efficiency is specified as 100 percent, as the rev-up calculator instead uses a different bearing friction value that the general mechanism calculator doesn't have.
 \end{document}
