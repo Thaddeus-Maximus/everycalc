@@ -50,7 +50,7 @@
 		Belts are pretty easy to use and calculate the appropriate distances for. When this center distance is calculated and manufactured properly, they should not require adjustment.
 	\end{abstract}
 	
-	
+	\section{Geometry Definition}
 	\begin{figure}[H]
 	\begin{tikzpicture}[x=0.5in,y=0.5in]
 		\draw[ultra thick] (0,0) circle (0.5);
@@ -89,20 +89,20 @@
 	\begin{align}
 		d_1 = 2 r_1 \\
 		d_2 = 2 r_2 \\
-		sin(\theta) = \frac{r_2 - r_1}{C}
+		\text{sin}(\theta) = \frac{r_2 - r_1}{C}
 	\end{align}
 
 	The total length of the pulley $L$ can be expressed as:
 
 	\begin{align}
 		L = 2 <\mbox{straight segment}> + <\mbox{arc for pulley 1}> + <\mbox{arc for pulley 2}> \nonumber \\
-		L = 2 \frac{C}{cos(\theta)} + r_1 (\pi - 2 \theta) + r_2 (\pi + 2 \theta)
+		L = 2 \frac{C}{\text{cos}(\theta)} + r_1 (\pi - 2 \theta) + r_2 (\pi + 2 \theta)
 	\end{align}
 
 	The trig identity for the cosine of an arcsine will be helpful:
 
 	\begin{align}
-		cos(asin(x)) = \sqrt{1 - x^2}
+		\text{cos}(\text{asin}(x)) = \sqrt{1 - x^2}
 	\end{align}
 
 	Putting this all together lets us determine the total belt length in terms of pitch diameters $d_1$, $d_2$, and the center-center distance $C$:
