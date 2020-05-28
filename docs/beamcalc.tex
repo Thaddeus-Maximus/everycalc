@@ -61,7 +61,7 @@
 		\{F\} = [K]\{q\} .
 	\end{align}
 
-	Where ${F}$ is the \textit{load vector}, $[K]$ is the \textit{stiffness matrix}, and ${q}$ is the \textit{displacement vector}. This may be recognized as simply a matrix form of a spring equation- which it is! The FE model works by splitting a large component into several small springs (\textit{elements}) with endpoints (\textit{nodes}).
+	Where ${F}$ is the \textit{load vector}, $[K]$ is the \textit{stiffness matrix}, and ${q}$ is the \textit{displacement vector}. This may be recognized as simply a matrix form of a spring equation $F = k \delta$, which it is! The FE model works by splitting a large component into several small springs (\textit{elements}) with endpoints (\textit{nodes}).
 
 	There are a few methods to solve this equation. One simple one is to multiply both sides by the matrix inverse (since there is no direct equivalent of division with matrices). This method does not scale well- but it works with the few elements we will need for this calculator.
 
@@ -165,7 +165,7 @@
 		\end{Bmatrix}
 	\end{align}
 
-	We're getting close to a problem we can solve! We've linked the nodes together, but we now need to constrain them. These beams are currently floating in space- we need to anchor them otherwise our displacements are meaningless (and, the matrix $[K]$ is singular and unsolvable). For example, let's apply the constraint that node 1 is fixed; that is, $u_1$ = 0. As a result, the associated column in $[K]$ (the first column) does not matter. Any loads applied to the node also do not matter since they would be absorbed by the fixed constraint. This allows us to remove columns and rows 1 of the stiffness matrix, degrees of freedom 1, and load 1, changing our equation to:
+	We've linked the nodes together, but we now need to constrain them. These beams are currently floating in space- we need to anchor them otherwise our displacements are meaningless (furthermore, the matrix $[K]$ would be singular and unsolvable). For example, let's apply the constraint that node 1 is fixed; that is, $u_1$ = 0. As a result, the associated column in $[K]$ (the first column) does not matter. Any loads applied to the node also do not matter since they would be absorbed by the fixed constraint. This allows us to remove columns and rows 1 of the stiffness matrix, degrees of freedom 1, and load 1, changing our equation to:
 
 	\[
 	\begin{pspicture} 
@@ -206,7 +206,7 @@
 
 	At this point we could plug in values $F_2$ and $F_3$, and solve with the matrix inverse method.
 
-	\section{Applying to Beams}
+	\section{Application to Beams}
 
 	Let's show how this would work with a beam. Consider the following example:
 	
@@ -401,7 +401,7 @@
 		\{F\} = [K]\{q\} .
 	\end{align}
 
-	Getting deflection at particular points (not nodes) will be more involved and require the use of \textit{shape functions}. In the derivation of the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one degree of freedom to the displacement field in an element. By combining these displacement fields, we can determine the total displacement field.
+	Getting deflection at particular points (not nodes) will be more involved and require the use of \textit{shape functions}. In the derivation of the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one \textit{nodal} degree of freedom to the displacement \textit{field} in an element. By combining these displacement fields, we can determine the total displacement field.
 
 	\begin{figure}[H]
 		\includegraphics[width=0.5\textwidth]{hermite.png}
@@ -412,10 +412,10 @@
 
 	\begin{align}
 		N = \begin{Bmatrix}
-				\frac{1}{4} (1-\zeta^2 (2+\zeta) \\
-				\frac{L}{8} (1-\zeta)^2 (\zeta+1) \\
-				\frac{1}{4} (1+\zeta)^2 (2-\zeta) \\
-				\frac{L}{8} (1+\zeta)^2 (\zeta-1) 
+				1/4 (1-\zeta^2 (2+\zeta) \\
+				L/8 (1-\zeta)^2 (\zeta+1) \\
+				1/4 (1+\zeta)^2 (2-\zeta) \\
+				L/8 (1+\zeta)^2 (\zeta-1) 
 		\end{Bmatrix}^T
 	\end{align}
 
@@ -432,10 +432,10 @@
 	\begin{align}
 		v = \{N\} \{q\} =
 		\begin{Bmatrix}
-				\frac{1}{4} (1-\zeta^2 (2+\zeta) \\
-				\frac{L}{8} (1-\zeta)^2 (\zeta+1) \\
-				\frac{1}{4} (1+\zeta)^2 (2-\zeta) \\
-				\frac{L}{8} (1+\zeta)^2 (\zeta-1) 
+				1/4 (1-\zeta^2 (2+\zeta) \\
+				L/8 (1-\zeta)^2 (\zeta+1) \\
+				1/4 (1+\zeta)^2 (2-\zeta) \\
+				L/8 (1+\zeta)^2 (\zeta-1) 
 		\end{Bmatrix}^T 
 		\begin{Bmatrix}
 			v_1 \\
@@ -489,24 +489,24 @@
 	\begin{align}
 		\frac{d \{N\}}{d x}     =
 		\begin{Bmatrix}
-				\frac{3}{4} (\zeta^2-1) \frac{2}{L} \\
-				\frac{L}{8} (3 \zeta^2-2 \zeta - 1) \frac{2}{L} \\
-			   -\frac{3}{4} (\zeta^2-1) \frac{2}{L} \\
-				\frac{L}{8} (3 \zeta^2+2 \zeta -1) \frac{2}{L}
+				3/4 (\zeta^2-1) 2/L \\
+				L/8 (3 \zeta^2-2 \zeta - 1) 2/L \\
+			    3/4 (\zeta^2-1) 2/L \\
+				L/8 (3 \zeta^2+2 \zeta -1) 2/L
 		\end{Bmatrix}^T &
 		\frac{d^2 \{N\}}{d x^2} =
 		\begin{Bmatrix}
-				\frac{6 \zeta}{L^2} \\
-				\frac{3 \zeta-1}{L} \\
-			   -\frac{6 \zeta}{L^2} \\
-				\frac{3 \zeta+1}{L}
+				(6 \zeta)/L^2 \\
+				(3 \zeta-1)/L \\
+			   -(6 \zeta)/L^2 \\
+				(3 \zeta+1)/L
 		\end{Bmatrix}^T &
 		\frac{d^3 \{N\}}{d x^3} =
 		\begin{Bmatrix}
-				\frac{12}{L^3} \\
-				\frac{6}{L^2} \\
-			   -\frac{12}{L^3} \\
-				\frac{6}{L^2}
+				12/L^3 \\
+				6/L^2 \\
+			   -12/L^3 \\
+				6/L^2
 		\end{Bmatrix}^T 
 	\end{align}
 
@@ -538,7 +538,7 @@
 		v &= c_1 x^3 + c_2 x^2 + c_3 x + c_4 
 	\end{align}
 
-	The shape of $v$ under the assumptions of constant $E$ and $I$ with only point loads is a cubic polynomial. This has four degrees of freedom. What else has four degrees of freedom? Our elements! Using beam elements provides a sufficient quantity of degrees of freedom to provide exact analytical solutions to problems where Euler-Bernoulli beam theory is appropriate, and require point loads and constant cross sections. This may sound restrictive, but encompasses nearly all applications of beams, which is why they are such a powerful modeling tool even in full-blown FE applications.
+	The shape of $v$ under the assumptions of constant $E$ and $I$ with only point loads is a cubic polynomial, a function with four degrees of freedom. What else has four degrees of freedom? Our elements! Using beam elements provides a sufficient quantity of degrees of freedom to provide exact analytical solutions to problems where Euler-Bernoulli beam theory is appropriate, and require point loads and constant cross sections. This may sound restrictive, but encompasses nearly all applications of beams, which is why they are such a powerful modeling tool even in full-blown FE applications.
 
 	\newpage
 	\section{Validation Examples}
@@ -551,7 +551,7 @@
 		\includegraphics[width=0.5\textwidth]{beam_case1_schematic.png}
 	\end{figure}
 
-	Let $E = 69 GPa$, $L = 100 mm$, round bar with $d = 5 mm$, $F = 200 N$, $a = 60mm$.
+	Let $E = 69 GPa$ (aluminum), $L = 100 mm$, round bar with $d = 5 mm$, $F = 200 N$, $a = 60mm$.
 
 	\begin{align}
 		I = \frac{\pi}{64} d^4 = \frac{\pi}{64} (0.100 m)^4 = 3.06796 \times 10^{-11} m^4
@@ -573,7 +573,7 @@
 		\includegraphics[width=0.5\textwidth]{beam_case2_schematic.png}
 	\end{figure}
 
-	Let $E = 27557 ksi$, $L = 6 in$, box bar with $w = 0.5 in$, $h = 2in$, $M = 1200 ft-lbf$.
+	Let $E = 27557 ksi$ (steel), $L = 6 in$, box bar with $w = 0.5 in$, $h = 2in$, $M = 1200 ft-lbf$.
 
 	\begin{align}
 		I = \frac{1}{12} b h^3 = 1/3 \ in^4
