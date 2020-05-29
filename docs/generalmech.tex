@@ -148,7 +148,15 @@
 		I_{sys}    = m r^2
 	\end{align}
 
-	\section*{Steady-State Calculations}
+	\section{Current Limit}
+
+	\begin{align}
+		V_{motor} = V_{battery} - I_{motor}(\omega_m, \frac{V_{motor}}{V_{motor,nominal}}) R \\
+		V_{motor} = V_{battery} - [(I_{stall} - I_{free})\frac{\omega_{m} - \omega_{free}}{\omega_{free}} + I_{free}] \frac{V_{motor}}{V_{motor,nominal}} R \\
+		V_{motor} = \frac{V_{battery} + R (I_{stall}-I_{free}) \frac{\omega_m}{\omega_{free}}}{1 + \frac{R}{V_{motor,nominal}} I_{stall}}
+	\end{align}
+
+	\section{Steady-State Calculations}
 	A fair bit of information can be gained from steady-state analysis, so EveryCalc produces these numbers as well. The first is the free speed, given as
 
 	\begin{align}
@@ -163,7 +171,7 @@
 
 	The running speed can be found at the steady-state condition of $T_g = M_{resist}$. Currently, $M_{resist}$ is evaluated at all parameters being zero, though the use of a numerical method such as bisection could be used to make this a more interesting number.
 
-	\section*{Validation}
+	\section{Validation}
 	Validation and verification are important aspects in trusting a tools' accuracy. This can be done either to test results or prior art. I would love to obtain test data for sprint distances (and it would be simple to obtain) but currently no such data exists. As such I will compare my results to a couple pre-existing tools.
 
 	\newpage
