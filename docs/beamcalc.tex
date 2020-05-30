@@ -211,7 +211,7 @@
 	Let's show how this would work with a beam. Consider the following example:
 	
 	\begin{figure}[H]
-	\begin{tikzpicture}[x=1.0in,y=1.0in]
+	\begin{tikzpicture}[x=1.2in,y=1.2in]
 		\draw[gray] (0, 0.05) -- (0, 0.3) node[pos=1, above]{$0$};
 		\draw[gray] (1, 0.05) -- (1, 0.3) node[pos=1, above]{$L$};
 		\draw[gray] (2, 0.05) -- (2, 0.3) node[pos=1, above]{$2L$};
@@ -392,7 +392,6 @@
 
 	At this point, the matrix equation could be solved to achieve the nodal displacement vector. Afterwards, the resulting displacement matrix could be used with the unconstrained stiffness matrix to determine the loads at the constraints. This tells us everything we could want to know about what is happening at the nodes, but what about inbetween them?
 
-	\newpage
 	\section{Post Processing and Shape Functions}
 
 	One simple output from the FE model would be the reaction loads. These would be the struck-out entries of the load vector $\{F\}$. The entire load vector could be found by simply computing 
@@ -404,7 +403,7 @@
 	Getting deflection at particular points (not nodes) will be more involved and require the use of \textit{shape functions}. In the derivation of the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one \textit{nodal} degree of freedom to the displacement \textit{field} in an element. By combining these displacement fields, we can determine the total displacement field.
 
 	\begin{figure}[H]
-		\includegraphics[width=0.5\textwidth]{hermite.png}
+		\includegraphics[width=0.7\textwidth]{hermite.png}
 		\caption{Hermite shape functions}
 	\end{figure}
 
@@ -510,7 +509,22 @@
 		\end{Bmatrix}^T 
 	\end{align}
 
-	\newpage
+	\section{Generalization}
+	How does this get generalized to different, arbitrary, and variable scenarios?
+
+	\begin{asparaitem}
+		\item All of the loads and constraints are gathered and binned by type. Each load is given a node id.
+		\item The position along the beam for each load or constraint is stored by node id.
+		\item The node ids are sorted by the order of positions.
+		\item Close nodes (those that are within 1/100 of the beam length) are merged so that the corresponding load/constraints share the same node id. The old node id and position is deleted.
+		\item Beam elements are produced between the first and second node, second and third, and so forth.
+		\item The force matrix is populated with forces
+		\item Direct assembly is performed on the beam elements
+		\item Degrees of freedom corresponding to the node ids where pinned/fixed nodes exist are struck and removed from the stiffness and force matrices.
+		\item The matrix system of equations is solved
+		\item The resulting nodal displacements are used in conjunction with the shape functions to interpolate a displacement field.
+	\end{asparaitem}
+
 	\section{Sanity Check: are the Shape Functions Appropriate?}
 
 	Usually finite element methods are used as approximations by employing the use of many, many elements to approximate the true displacement field. Beam elements, though, are somewhat unique in that \textit{under certain circumstances} they will model the underlying diplacement field exactly. Let's return to Euler-Bernoulli beam theory. This theory states that the displacement field $q$ can be represented as 
@@ -540,11 +554,11 @@
 
 	The shape of $v$ under the assumptions of constant $E$ and $I$ with only point loads is a cubic polynomial, a function with four degrees of freedom. What else has four degrees of freedom? Our elements! Using beam elements provides a sufficient quantity of degrees of freedom to provide exact analytical solutions to problems where Euler-Bernoulli beam theory is appropriate, and require point loads and constant cross sections. This may sound restrictive, but encompasses nearly all applications of beams, which is why they are such a powerful modeling tool even in full-blown FE applications.
 
-	\newpage
 	\section{Validation Examples}
 
 	Comparison to analytical solutions is a necessary component when validating any FE model. \href{https://mechanicalc.com/reference/beam-deflection-tables}{\underline{MechaniCalc}} has some good analytical solutions I will compare to.
 
+	\newpage
 	\subsection{Cantilevered, Intermediate Load}
 
 	\begin{figure}[H]
