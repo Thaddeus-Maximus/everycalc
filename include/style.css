@@ -311,7 +311,8 @@ label.dropdown{
 }
 
 input[type=checkbox].dropdown:checked ~ label {
-    background-color: #3D88BD;
+    background-color: #999;
+    border: 1px solid #333;
 }
 div.dropdown, table.dropdown{
     display: none;

@@ -206,10 +206,14 @@ function PLOT_drawTicks(chartName, axis, plotScaling, axisScaling, margin) {
 }
 
 function PLOT_makePoint(svg, plotScaling, xScaling, yScaling, xq, yq) {
-	var pt = svg.createSVGPoint();
-	pt.x = plotScaling.xL + (plotScaling.xH-plotScaling.xL)/(xScaling.fH-xScaling.fL)*(xq-xScaling.fL);
-	pt.y = plotScaling.yL + (plotScaling.yH-plotScaling.yL)/(yScaling.fH-yScaling.fL)*(yq-yScaling.fL);
-	return pt;
+	try{
+		var pt = svg.createSVGPoint();
+		pt.x = plotScaling.xL + (plotScaling.xH-plotScaling.xL)/(xScaling.fH-xScaling.fL)*(xq-xScaling.fL);
+		pt.y = plotScaling.yL + (plotScaling.yH-plotScaling.yL)/(yScaling.fH-yScaling.fL)*(yq-yScaling.fL);
+		return pt;
+	}catch(err){
+		return false;
+	}
 }
 
 /*
@@ -411,14 +415,15 @@ function PLOT_drawLinePlot(config, channels, handler) {
 		let fScl  = config.datasets[name].scaling
 
 		for (i in xChnl) {
-			lines[name].points.appendItem(PLOT_makePoint(
+			let pt = PLOT_makePoint(
 				config.dom.svg,
 				config.scaling,
 				xScl,
 				fScl,
 				xChnl[i],
 				fChnl[i]
-			));
+			);
+			if (pt) lines[name].points.appendItem(pt);
 		}
 	}
 
