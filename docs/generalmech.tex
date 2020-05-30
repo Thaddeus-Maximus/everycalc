@@ -57,11 +57,11 @@
 	\begin{figure}[H] \centering
 	\begin{tikzpicture}[x=4.0in,y=2.0in]
 	  %\fill[lightgray] (1.0,0)--(0,1.0)--(0,0)--cycle;
-	  \draw[black] (-0.1,0)--(1.1,0) node[pos=0.3,below]{\bf Speed $\omega$, RPM};
-	  \draw[black] (0,-0.1)--(0,1.1) node[pos=0.9,above,rotate=90,teal]{\bf $T$, N-m}
+	  \draw[black] (-0.05,0)--(1.05,0) node[pos=0.5,below]{Speed $\omega$, RPM};
+	  \draw[black] (0,-0.05)--(0,1.1) node[pos=0,below]{Stall} node[pos=0.9,above,rotate=90,teal]{\bf $T$, N-m}
 	  node[pos=0.65,above,rotate=90,RawSienna]{\bf $I$, A};
-	  \draw[black] (1,-0.1)--(1,1.1) node[pos=0.24,below,rotate=90,red]{\bf $P$, W}
-	  node[pos=0.61,below,rotate=90,blue]{\bf Efficiency $\eta$, \%};
+	  \draw[black] (1,-0.05)--(1,1.1) node[pos=0,below]{Free} node[pos=0.4,below,rotate=90,red]{\bf $P$, W}
+	  node[pos=0.73,below,rotate=90,blue]{Efficiency $\eta$, \%};
 
 	  \draw[teal, ultra thick] (1.0,0)--(0,1.0);
 	  \draw[RawSienna, ultra thick] (1.0,0.1)--(0,0.8);
@@ -86,14 +86,14 @@
 	Multiple, $N$ motors could be connected to a gear ratio $G$.
 
 	\begin{align}
-		T_{g}(\omega_{g}) &= N \ G \ T_m(G \omega_{g}) \\
-		I_{g}(\omega_{g}) &= N I_m(T_{g} / G)
+		T_{g}(\omega_{g}) &= N \ G \ T_m(G \omega_{g}) \ \eta_g \\
+		I_{g}(\omega_{g}) &= N \ I_m(T_{g} / G)
 	\end{align}
 
 	The torque might be limited by a clutch, or by some other friction interface (such as carpet against a wheel). The gearbox also may have non-perfect efficiency, so an efficiency factor can be applied here.
 
 	\begin{align}
-		T_{g}(\omega_{g}) = min \left\{
+		T_{g}(\omega_{g}) = \text{min} \left\{
 	        \begin{array}{ll}
 	        	N \ G \ T_m(G \omega_{g}) \eta_{g} \\
 	            N \mu r
@@ -140,20 +140,40 @@
 		\omega_g(t=0) = \theta_g(t=0) = 0 
 	\end{align}
 
-	This could be adapted to the case of a linear mechanism by
+	This could be adapted to the case of a linear mechanism by substituting
 	\begin{align}
-		M_{resist} = r F_{resist} \\
-		\omega_g   = v / r \\
-		\theta_g   = x / r \\
-		I_{sys}    = m r^2
+		M_{resist} &= r F_{resist} \\
+		\omega_g   &= v / r \\
+		\theta_g   &= x / r \\
+		I_{sys}    &= m r^2
 	\end{align}
 
-	\section{Current Limit}
+	\section{Electrical System and Current Limit}
+
+	Let's return to our motor model, and pad it out to include the effects of reduced voltage at the motor terminals.
+	\begin{align} \label{eq:motor_torque_curve}
+		T_m &= T_{m,stall} \frac{V_{m}}{V_{nominal}} \frac{\omega_{m,free} \frac{V_{m}}{V_{nominal}}-\omega_m}{\omega_{m,free} \frac{V_{m}}{V_{nominal}}} \\
+		I_m &= (I_{m,stall} - I_{m,free}) \frac{T_m}{T_{m,stall}} + I_{m,free} \frac{V_{m}}{V_{nominal}} \\
+		I_m  &= (I_{m,stall} - I_{m,free}) \frac{V_{m}}{V_{nominal}} \frac{\omega_{m,free} \frac{V_{m}}{V_{nominal}}-\omega_m}{\omega_{m,free} \frac{V_{m}}{V_{nominal}}} + I_{m,free} \frac{V_{m}}{V_{nominal}} \\
+	\end{align}
+
+	Next we consider the voltage on the motor as a result of voltage drop from system resistance $R$, when $\omega$ is the known.
+	\begin{align}
+		V_{m} = V_{battery} - I_{m}(\omega_m, \frac{V_{m}}{V_{nominal}}) R \\
+		V_{m} = V_{battery} - [(I_{stall} - I_{free})\frac{\omega_{free}\frac{V_{m}}{V_{nominal}} - \omega_{m} }{\omega_{free}\frac{V_{m}}{V_{nominal}}} + I_{free}] \frac{V_{m}}{V_{nominal}} R \\
+		V_{m} = \frac{V_{battery} + R (I_{stall}-I_{free}) \frac{\omega_m}{\omega_{free}}}{1 + \frac{R}{V_{nominal} I_{stall}} }
+	\end{align}
+
+	The current can then be found from the previous equations
 
 	\begin{align}
-		V_{motor} = V_{battery} - I_{motor}(\omega_m, \frac{V_{motor}}{V_{motor,nominal}}) R \\
-		V_{motor} = V_{battery} - [(I_{stall} - I_{free})\frac{\omega_{m} - \omega_{free}\frac{V_{motor}}{V_{motor,nominal}}}{\omega_{free}\frac{V_{motor}}{V_{motor,nominal}}} + I_{free}] \frac{V_{motor}}{V_{motor,nominal}} R \\
-		V_{motor} = \frac{V_{battery} + R (I_{stall}-I_{free}) \frac{\omega_m}{\omega_{free}}}{1 + \frac{R}{V_{motor,nominal}} I_{stall}}
+		I_m  &= (I_{m,stall} - I_{m,free}) \frac{V_{m}}{V_{nominal}} \frac{\omega_{m,free} \frac{V_{m}}{V_{nominal}}-\omega_m}{\omega_{m,free} \frac{V_{m}}{V_{nominal}}} + I_{m,free} \frac{V_{m}}{V_{nominal}} \nonumber
+	\end{align}
+
+	If the current found is over the current limit, the current can be set to the current limit, and we can solve backwards. 
+
+	\begin{align}
+		V_{m} = V_{battery} - R I_{m}
 	\end{align}
 
 	\section{Steady-State Calculations}
