@@ -185,6 +185,10 @@
 		try{
 			mode = document.getElementById('mode').value;
 			var x,y,v,theta;
+			params_pack = {};
+			for (param of ['v_initial', 'theta', 'y_initial', 'x_target', 'd_ball', 'm_ball', 'omega_initial', 'Cd', 'Cl', 'Cm']) {
+				params_pack[param] = getV(param);
+			}
 			if (mode=='raw') {
 	    		// nothing special
 	    		x = getV('x_target');
@@ -204,12 +208,12 @@
 	    			ya = 0;
 	    			yb = 45*Math.PI/180;
 	    		}
-	    		params_pack[1] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    		params_pack[1] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    		params_pack.theta = ya; fa = computeTrajectory(params_pack).stats.y_C - getV('y_target');
+	    		params_pack.theta = yb; fb = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 	    		// use bisection to solve
-	    		while(j<100) {
+	    		for(let j=0; j<100; j++) {
 	    			yc = (ya+yb)/2;
-	    			params_pack[1] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack.theta = yc; fc = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 
 	    			if (Math.abs(fc)<getV('h_target')/100) break;
 
@@ -220,7 +224,6 @@
 	    				fb = fc;
 	    				yb = yc;
 	    			}
-	    			j++;
 	    		}
 	    		theta = yc;
 	    		
@@ -236,12 +239,12 @@
 	    			// take ballistic target, spread it open
 	    			ya = v*0.5;
 	    			yb = v*1.5;
-	    			params_pack[0] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    			params_pack[0] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack.v_initial = ya; fa = computeTrajectory(params_pack).stats.y_C - getV('y_target');
+	    			params_pack.v_initial = yb; fb = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 		    		// use bisection to solve
-		    		while(j<100) {
+		    		for(let j=0; j<100; j++) {
 		    			yc = (ya+yb)/2;
-		    			params_pack[0] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    			params_pack.v_initial = yc; fc = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 
 		    			if (Math.abs(fc)<getV('h_target')/100) break;
 
@@ -252,7 +255,6 @@
 		    				fb = fc;
 		    				yb = yc;
 		    			}
-		    			j++;
 		    		}
 		    		v = yc;
 		    	}
@@ -278,12 +280,12 @@
 	    			// take ballistic target, spread it open
 	    			ya = x*0.5;
 	    			yb = x*1.5;
-	    			params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    			params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack.x_target = ya; fa = computeTrajectory(params_pack).stats.y_C - getV('y_target');
+	    			params_pack.x_target = yb; fb = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 		    		// use bisection to solve
-		    		while(j<100) {
+		    		for(let j=0; j<100; j++) {
 		    			yc = (ya+yb)/2;
-		    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    			params_pack.x_target = yc; fc = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 
 		    			if (Math.abs(fc)<getV('h_target')/100) break;
 
@@ -294,7 +296,6 @@
 		    				fb = fc;
 		    				yb = yc;
 		    			}
-		    			j++;
 		    		}
 		    		x = yc;
 		    	}
@@ -312,12 +313,12 @@
 	    			// take ballistic target, spread it open
 	    			ya = x*0.5;
 	    			yb = x*1.5;
-	    			params_pack[3] = ya; fa = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
-	    			params_pack[3] = yb; fb = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+	    			params_pack.x_target = ya; fa = computeTrajectory(params_pack).stats.y_C - getV('y_target');
+	    			params_pack.x_target = yb; fb = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 		    		// use bisection to solve
-		    		while(j<100) {
+		    		for(let j=0; j<100; j++) {
 		    			yc = (ya+yb)/2;
-		    			params_pack[3] = yc; fc = computeTrajectory(params_pack)[3].y_ctr - getV('y_target');
+		    			params_pack.x_target = yc; fc = computeTrajectory(params_pack).stats.y_C - getV('y_target');
 
 		    			if (Math.abs(fc)<getV('h_target')/100) break;
 
@@ -328,7 +329,6 @@
 		    				fb = fc;
 		    				yb = yc;
 		    			}
-		    			j++;
 		    		}
 		    		x = yc;
 		    	}
