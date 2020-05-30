@@ -38,28 +38,36 @@ function MOTOR_computeState(motor, from, value) {
 		let max_speed = motor.max_speed;
 		let stall_current = motor.count*motor.stall_current;
 		let free_current  = motor.count*motor.free_current;
+		let vfrac = null; let spdfrac = null;
 		switch(from) {
 			case 'speed':
 				state.voltage = (motor.battery_voltage + motor.wire_resistance*(stall_current-free_current)*value/max_speed)/(1+motor.wire_resistance*stall_current/motor.voltage);
-				let vfrac   = state.voltage/motor.voltage;
-				let spdfrac = (max_speed*vfrac-value)/max_speed*vfrac;
-				state.current = vfrac*((stall_current-free_current)*spdfrac + free_current);
+				vfrac     = state.voltage/motor.voltage;
+				spdfrac   = (max_speed*vfrac-value)/max_speed/vfrac;
+				state.current = ((stall_current-free_current)*spdfrac + free_current);
 				if (state.current > motor.current_limit) {
 					// solve forwards now
 					state.current = motor.current_limit;
-					state.voltage = (state.current + (stall_current-free_current)*value/max_speed)/stall_current*motor.voltage;
+					state.voltage = motor.battery_voltage - motor.wire_resistance*state.current;
 					vfrac   = state.voltage/motor.voltage;
-					spdfrac = (max_speed*vfrac-value)/max_speed*vfrac;
+					spdfrac = (max_speed*vfrac-value)/max_speed/vfrac;
 				}
-				state.torque  = vfrac*(stall_torque*spdfrac);
+				state.torque  = (state.current-free_current)/(stall_current-free_current)*stall_torque;
 				state.speed   = value;
 				break;
 			case 'torque':
+				state.torque  = value;
+				state.current = ((state.torque-0)/(stall_torque)*(stall_current-free_current) + free_current);
+				state.voltage = motor.battery_voltage - motor.wire_resistance*state.current;
+				vfrac = state.voltage/motor.voltage;
+				state.speed   = (state.voltage/motor.voltage*stall_torque-state.torque)/stall_torque*max_speed;
+				break;
 			case 'current':
-				state.voltage = NaN;
-				state.current = NaN;
-				state.torque  = NaN;
-				state.speed   = NaN;
+				state.current = Math.min(motor.current_limit, value);
+				state.voltage = motor.battery_voltage - motor.wire_resistance*state.current;
+				vfrac = state.voltage/motor.voltage;
+				state.torque  = (state.current-free_current)/(stall_current-free_current)*stall_torque;
+				state.speed   = (state.voltage/motor.voltage*stall_torque-state.torque)/stall_torque*max_speed;
 				break;
 		}
 	} else {
@@ -68,17 +76,17 @@ function MOTOR_computeState(motor, from, value) {
 		let stall_current = motor.count*motor.stall_current;
 		let free_current  = motor.count*motor.free_current;
 		switch(from) {
-			case 'torque':
-				state.voltage = motor.voltage;
-				state.current = (stall_current-free_current)*value/stall_torque + free_current;
-				state.torque  = value;
-				state.speed   = max_speed - value*max_speed/stall_torque;
-				break;
 			case 'speed':
 				state.voltage = motor.voltage;
 				state.current = (stall_current-free_current)*(max_speed-value)/max_speed + free_current;
 				state.torque  = (stall_torque)*(max_speed-value)/max_speed;
 				state.speed   = value;
+				break;
+			case 'torque':
+				state.voltage = motor.voltage;
+				state.current = (stall_current-free_current)*value/stall_torque + free_current;
+				state.torque  = value;
+				state.speed   = max_speed - value*max_speed/stall_torque;
 				break;
 			case 'current':
 				state.voltage = motor.voltage;

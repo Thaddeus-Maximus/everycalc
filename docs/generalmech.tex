@@ -152,7 +152,7 @@
 
 	\begin{align}
 		V_{motor} = V_{battery} - I_{motor}(\omega_m, \frac{V_{motor}}{V_{motor,nominal}}) R \\
-		V_{motor} = V_{battery} - [(I_{stall} - I_{free})\frac{\omega_{m} - \omega_{free}}{\omega_{free}} + I_{free}] \frac{V_{motor}}{V_{motor,nominal}} R \\
+		V_{motor} = V_{battery} - [(I_{stall} - I_{free})\frac{\omega_{m} - \omega_{free}\frac{V_{motor}}{V_{motor,nominal}}}{\omega_{free}\frac{V_{motor}}{V_{motor,nominal}}} + I_{free}] \frac{V_{motor}}{V_{motor,nominal}} R \\
 		V_{motor} = \frac{V_{battery} + R (I_{stall}-I_{free}) \frac{\omega_m}{\omega_{free}}}{1 + \frac{R}{V_{motor,nominal}} I_{stall}}
 	\end{align}
 

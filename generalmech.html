@@ -48,6 +48,9 @@
 			poi: 'user_input_traction',
 			desc: 'Traction limiting should be used for drivetrains...'
 		},{
+			poi: 'user_input_electrical',
+			desc: 'Simultion of voltage drop and current limiting can be done...'
+		},{
 			poi: 'user_input_radius',
 			desc: "Plug in the effective radius of your mechanism (arm length, wheel radius, or spool radius)..."
 		},{
@@ -106,6 +109,9 @@
 			if (input.id.startsWith("G") && input.id.length == 3) {
 				calcRatio();
 			}
+			if (input.type == 'checkbox') {
+				compute();
+			}
 		});
 		EC_setOnKeyUp(); // default handler is OK
 
@@ -138,8 +144,6 @@
 			simulate_electrical = document.getElementById("enable_electrical_sys").checked;
 			if (simulate_electrical) {
 				motor = MOTOR_packElectricalMotor('motor');
-			} else {
-				motor = MOTOR_packMotor('motor');
 			}
 
 			let load_expr = document.getElementById("load").value;
@@ -175,9 +179,14 @@
 			setV("theor_stall_force",    stall_state.torque*G/r);
 			setV("theor_stall_current",  stall_state.current, 2);
 
-			let traction_state = MOTOR_computeState(motor, 'torque', Mres/G);
-			setV("theor_traction_force",    traction_state.torque*G/r);
-			setV("theor_traction_current",  traction_state.current, 2);
+			if (isFinite(mu*N*r/G)) {
+				let traction_state = MOTOR_computeState(motor, 'torque', mu*N*r/G);
+				setV("theor_traction_force",    traction_state.torque*G/r);
+				setV("theor_traction_current",  traction_state.current, 2);
+			} else {
+				setV("theor_traction_force",    '-');
+				setV("theor_traction_current",  '-');
+			}
 
 			// encoder computations
 			enc_plc = document.getElementById('encoder_placement').value;
@@ -225,8 +234,11 @@
 				if (i > 5000 || parseMath(end_expr, variables)) break;
 
 				let motor_state = MOTOR_computeState(motor, 'speed', omega_ar[omega_ar.length-1]*G);
-				let T = Math.min(motor_state.torque*G, N*mu*r);
-				    motor_state = MOTOR_computeState(motor, 'torque', T/G);
+				if (motor_state.torque*G > N*mu*r){
+				    motor_state = MOTOR_computeState(motor, 'torque', N*mu*r/G);
+				}
+				let T = motor_state.torque*G;
+				//console.log(motor_state);
 
 				Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
 
@@ -383,7 +395,7 @@
 		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
 	</svg>
 	<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="width: 350px; float: left; display:table-cell;" class="container">
+	<div style="float: left; display:table-cell;" class="container">
 		<div class="even" id="user_input_motor">
 			<table>
 				<tr>
@@ -493,11 +505,11 @@
 		</div>
 		<div class="even" id="user_input_electrical">
 			<input class="dropdown" type="checkbox" id="enable_electrical_sys" onclick="compute();" >
-			<label class="dropdown" for="enable_electrical_sys">Enable Electrical System</label>
+			<label class="dropdown" for="enable_electrical_sys">Enable Electrical Simulation</label>
 
 			<table id='detail_electrical' style='display:none;'>
 				<tr>
-					<th class="rowlabel">Current Limit<span class="ttt">Inflict a current limit? Applies to the sum of all motor inputs. Leave empty to disable.</span></th>
+					<th class="rowlabel">Current Limit<span class="ttt">Impose a current limit? Applies to the sum of all motor inputs. Leave empty to disable.</span></th>
 					<td><input id="motor_current_limit" value=100 /></td>
 					<td class="unit" >[A]</td>
 				</tr><tr>
@@ -679,14 +691,14 @@
 				<th class="rowlabel">Queried Time<span class="ttt">Query a time on the graph by clicking (and optionally dragging) a point. Timepoint represented by a vertical bar.</span></th>
 				<td><input id="chart_t" readonly /></td>
 				<td class="unit">[s]</td>
-			</tr><tr>
-				<th class="rowlabel">Timestep</th>
 				<td><input id="chart_INDEX" readonly /></td>
-				<td class="unit"></td>
+				<td class="unit">iterations</td>
 			</tr><tr>
-				<th class="rowlabel">Current</th>
+				<th class="rowlabel">Electrical</th>
 				<td><input id="chart_cur" readonly /></td>
 				<td class="unit">[A]</td>
+				<td><input id="chart_voltage" readonly /></td>
+				<td class="unit">[V]</td>
 			</tr><tr>
 				<th class="rowlabel">Position</th>
 				<td><input data-unit="distance" id="chart_d" readonly /></td>
@@ -711,10 +723,6 @@
 				<td class="unit" data-unit="force" id="unit_chart_f"></td>
 				<td><input data-unit="torque" id="chart_T" readonly /></td>
 				<td class="unit" data-unit="torque" id="unit_chart_T"></td>
-			</tr><tr>
-				<th class="rowlabel">Motor Voltage<span class="ttt">Voltage seen by the motor.</span></th>
-				<td><input id="chart_voltage" readonly /></td>
-				<td class="unit" ></td>
 			</tr>
 		</table>
 	</div>
