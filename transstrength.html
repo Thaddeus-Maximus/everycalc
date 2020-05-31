@@ -361,18 +361,18 @@
 						<td colspan=2 class="collabel">Belt</td>
 					</tr><tr>
 						<td class="rowlabel">Series</td>
-						<td><select class="dynamic-input" id="transmission_${x}_series" >
+						<td><select class="dynamic-input" id="transmission_${x}_series" onchange="selectBeltSeries(${x}); compute();" >
 							<option value="htd" selected>HTD</option>
 							<option value="gt2">GT2</option>
 							<option value="gt3">GT3</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Pitch</td>
-						<td><select class="dynamic-input" id="transmission_${x}_pitch" >
+						<td><select class="dynamic-input" id="transmission_${x}_pitch" onchange="selectBeltPitch(${x}); compute();">
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Width</td>
-						<td><select class="dynamic-input" id="transmission_${x}_width" >
+						<td><select class="dynamic-input" id="transmission_${x}_width" onchange="compute();">
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Teeth</td>
@@ -430,21 +430,25 @@
 						<td><input class="dynamic-input" id="transmission_${x}_ratio" readonly /></td>
 						<td></td>
 					</tr><tr>
-						<td class="rowlabel">Output/Capacity</td>
+						<td class="rowlabel">Torque Output</td>
 						<td><input class="dynamic-input" id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
-						<td>/</td>
-						<td><input class="dynamic-input" id="transmission_${x}_torque_cap" data-unit="torque" readonly /></td>
-						<td class="unit" data-unit="torque" ></td>
+						<td></td><td class="unit" data-unit="torque" ></td>
 					</tr><tr>
-						<td class="rowlabel">Factor of Safety </td>
-						<td><input class="dynamic-input" id="transmission_${x}_fos" readonly /></td>
+						<td class="rowlabel">Gear FOS</td>
+						<td><input class="dynamic-input" id="transmission_${x}_g_fos" readonly /></td>
 						<td>@</td>
-						<td><input class="dynamic-input" id="transmission_${x}_fos_pos" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_g_fos_pos" readonly /></td>
+					</tr><tr>
+						<td class="rowlabel">Shaft FOS</td>
+						<td><input class="dynamic-input" id="transmission_${x}_s_fos" readonly /></td>
+						<td>@</td>
+						<td><input class="dynamic-input" id="transmission_${x}_s_fos_pos" readonly /></td>
 					</tr>
 				</table>
 				`;
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
+				selectBeltSeries(x);
 				break;
 			case 'chain':
 				container.innerHTML =`
@@ -633,6 +637,38 @@
 		setError(1);
 	}
 
+	function selectBeltSeries(x) {
+		let series = document.getElementById(`transmission_${x}_series`).value;
+		let pitch  = document.getElementById(`transmission_${x}_pitch`);
+		let oldPitch = pitch.value;
+		pitch.innerHTML = '';
+
+		for (num of BELT_PITCHES[series]) {
+			let opt = document.createElement('option');
+			opt.innerHTML = num;
+			opt.value = num;
+			if(oldPitch == num) opt.selected = true;
+			pitch.appendChild(opt);
+		}
+		selectBeltPitch(x);
+	}
+
+	function selectBeltPitch(x) {
+		let series = document.getElementById(`transmission_${x}_series`).value;
+		let pitch  = document.getElementById(`transmission_${x}_pitch`).value;
+		let width  = document.getElementById(`transmission_${x}_width`);
+		let oldWidth = width.value;
+		width.innerHTML = '';
+
+		for (num in BELT_RATINGS[series+'_'+pitch].width_multipliers) {
+			let opt = document.createElement('option');
+			opt.innerHTML = num;
+			opt.value = num;
+			if(oldWidth == num) opt.selected = true;
+			width.appendChild(opt);
+		}
+	}
+
 	let LEWIS_FACTORS = {
 		teeth: [10,11,12,13,14,15,16,17,18,19,20,22,24,26,28,30,32,34,36,38,40,45,50,55,60,65,70,75,80,90,100,150,200,300,+Infinity],
 		14.5: [.176, .192, .210, .223, .236, .245, .255, .264, .270, .277, .283, .292, .302, .308, .314, .318, .322, .325, .329, .332, .336, .340, .346, .352, .355, .358, .360, .361, .363, .366, .368, .375, .378, .382, .390],
@@ -769,6 +805,48 @@
 				n:  getV(`transmission_${x}_out_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value
 			});
+
+			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
+			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
+			console.log(torq_s_out, torq_s_inp);
+
+			let g_caps = [torq_g_inp, torq_g_out];
+			let s_caps = [torq_s_inp, torq_s_out];
+
+			let g_idxmin  = g_caps.indexOf(Math.min(...g_caps));
+			let g_capmin  = Math.min(...g_caps);
+			let g_fosmin  = g_capmin/torqout;
+
+			let s_idxmin  = s_caps.indexOf(Math.min(...s_caps));
+			let s_capmin  = Math.min(...s_caps);
+			let s_fosmin  = s_capmin/torqout;
+
+			//setV(`transmission_${x}_torque_cap`, capmin);
+			setV(`transmission_${x}_torque_out`, torqout);
+			setV(`transmission_${x}_g_fos`,      g_fosmin);
+			setV(`transmission_${x}_g_fos_pos`,  g_idxmin ? 'Output':'Input');
+			setV(`transmission_${x}_s_fos`,      s_fosmin);
+			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
+			setV(`transmission_${x}_ratio`,      overall_ratio);
+
+			return [Math.min(g_fosmin), torqout, overall_ratio];
+		} else if (type=='belt') {
+			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
+			let torqout = torque*overall_ratio;
+
+			// TODO: RPM
+			let series   = document.getElementById(`transmission_${x}_series`).value;
+			let pitch    = document.getElementById(`transmission_${x}_pitch`).value;
+			let convPitch = convertFrom(parseFloat(pitch), pitch.replace(/[0-9.]*/, ''));
+			let width    = document.getElementById(`transmission_${x}_width`).value;
+			let length   = document.getElementById(`transmission_${x}_beltteeth`).value*convPitch;
+			let bdata    = BELT_RATINGS[`${series}_${pitch}`];
+
+			let torq_g_inp = BELT_computeBeltTorqueCapacity(
+				bdata, 0, getV(`transmission_${x}_inp_teeth`), width, length)
+				*overall_ratio; // prorate by the gear ratio
+			let torq_g_out = BELT_computeBeltTorqueCapacity(
+				bdata, 0, getV(`transmission_${x}_out_teeth`), width, length);
 
 			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
 			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);

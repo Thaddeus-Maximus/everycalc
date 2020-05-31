@@ -358,11 +358,8 @@
 			return;
 		}
 
-		let factor = bdata['width_multipliers'][width] * interp1D(bdata.lc_lengths, bdata.lc_factors, convertTo(length,'mm'));
-		let torque_cap_1 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_1, teeth_1) * factor;
-		let torque_cap_2 = interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm_2, teeth_2) * factor;
-
-		console.log(bdata, convertTo(length, 'mm'), factor);
+		let torque_cap_1 = BELT_computeBeltTorqueCapacity(bdata, rpm_1, teeth_1, width, length);
+		let torque_cap_2 = BELT_computeBeltTorqueCapacity(bdata, rpm_2, teeth_2, width, length);
 
 		setV('torque_cap_1', torque_cap_1);
 		setV('torque_cap_2', torque_cap_2);
