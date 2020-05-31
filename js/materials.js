@@ -1,5 +1,5 @@
 var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
-	'4140N Steel ': { 
+	'4140N Steel': { 
 		'Ef': 190e9,
 		'E':  190e9,
 		'UTS': 660e6,

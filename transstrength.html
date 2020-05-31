@@ -218,14 +218,14 @@
 					</tr><tr>
 						<td class="collabel">Material</td>
 						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl" onchange="compute();">
-							<option value="7075-T6 Aluminum">7075 (VexPro Aluminum)</option>
-							<option value="6061-T6 Aluminum">6061 (AndyMa Aluminumrk)</option>
-							<option value="4140N Steel">4140N (AM/ Hot-Rolled SteelVP)</option>
+							<option value="7075-T6 Aluminum">7075 Aluminum (VexPro)</option>
+							<option value="6061-T6 Aluminum">6061 Aluminum (AndyMark)</option>
+							<option value="4140N Steel">4140N (AM/VexPro)</option>
 						</select></td>
 						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl" onchange="compute();">
-							<option value="7075-T6 Aluminum">7075 (VexPro Aluminum)</option>
-							<option value="6061-T6 Aluminum">6061 (AndyMa Aluminumrk)</option>
-							<option value="4140N Steel">4140N (AM/ Hot-Rolled SteelVP)</option>
+							<option value="7075-T6 Aluminum">7075 Aluminum (VexPro)</option>
+							<option value="6061-T6 Aluminum">6061 Aluminum (AndyMark)</option>
+							<option value="4140N Steel">4140N (AM/VexPro)</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Width</td>
@@ -238,37 +238,30 @@
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 						<td><select class="dynamic-input" id="transmission_${x}_out_shaft" onchange="refreshShaftSelections(${x}, 'out');" >
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp');" >
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N SteelN">4140 Steel</option>
+							<option value="4140N Steel">4140N Steel</option>
 							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out');" >
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N SteelN">4140 Steel</option>
+							<option value="4140N Steel">4140N Steel</option>
 							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
 						<td><input class="dynamic-input" id="transmission_${x}_inp_diameter" data-unit="dimension" /></td>
 						<td><input class="dynamic-input" id="transmission_${x}_out_diameter" data-unit="dimension" /></td>
-						<td class="unit" data-unit="dimension">
-					</tr><tr>
-						<td class="rowlabel">Key Width</td>
-						<td><input class="dynamic-input" id="transmission_${x}_inp_keywidth" data-unit="dimension" /></td>
-						<td><input class="dynamic-input" id="transmission_${x}_out_keywidth" data-unit="dimension" /></td>
 						<td class="unit" data-unit="dimension">
 					</tr>
 				</table>
@@ -403,37 +396,30 @@
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 						<td><select class="dynamic-input" id="transmission_${x}_out_shaft" onchange="refreshShaftSelections(${x}, 'out');" >
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp');" >
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140 Steel</option>
+							<option value="4140N Steel">4140N Steel</option>
 							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out');" >
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140 Steel</option>
+							<option value="4140N Steel">4140N Steel</option>
 							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
 						<td><input class="dynamic-input" id="transmission_${x}_inp_diameter" data-unit="dimension" /></td>
 						<td><input class="dynamic-input" id="transmission_${x}_out_diameter" data-unit="dimension" /></td>
-						<td class="unit" data-unit="dimension">
-					</tr><tr>
-						<td class="rowlabel">Key Width</td>
-						<td><input class="dynamic-input" id="transmission_${x}_inp_keywidth" data-unit="dimension" /></td>
-						<td><input class="dynamic-input" id="transmission_${x}_out_keywidth" data-unit="dimension" /></td>
 						<td class="unit" data-unit="dimension">
 					</tr>
 				</table>
@@ -494,23 +480,21 @@
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 						<td><select class="dynamic-input" id="transmission_${x}_out_shaft" onchange="refreshShaftSelections(${x}, 'out');" >
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
 							<option value="hex" >Hex</option>
-							<option value="key" >Keyed</option>
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp');" >
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
 							<option value="4140N Steel">4140N Steel</option>
 							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out');" >
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 							<option value="7075-T6 Aluminum">7075 Aluminum</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum</option>
 							<option value="4140N Steel">4140N Steel</option>
@@ -520,11 +504,6 @@
 						<td class="rowlabel">Diameter</td>
 						<td><input class="dynamic-input" id="transmission_${x}_inp_diameter" data-unit="dimension" /></td>
 						<td><input class="dynamic-input" id="transmission_${x}_out_diameter" data-unit="dimension" /></td>
-						<td class="unit" data-unit="dimension">
-					</tr><tr>
-						<td class="rowlabel">Key Width</td>
-						<td><input class="dynamic-input" id="transmission_${x}_inp_keywidth" data-unit="dimension" /></td>
-						<td><input class="dynamic-input" id="transmission_${x}_out_keywidth" data-unit="dimension" /></td>
 						<td class="unit" data-unit="dimension">
 					</tr>
 				</table>
@@ -630,26 +609,26 @@
 		let shape    = document.getElementById(`transmission_${x}_${side}_shaft`);
 		let material = document.getElementById(`transmission_${x}_${side}_shaft_matl`);
 		let diameter = document.getElementById(`transmission_${x}_${side}_diameter`);
-		let keywidth = document.getElementById(`transmission_${x}_${side}_keywidth`);
+		//let keywidth = document.getElementById(`transmission_${x}_${side}_keywidth`);
 		switch(shape.value) {
 			case "thex":
 				material.disabled = false;
-				material.value    = "7075-T6";
+				material.value    = "7075-T6 Aluminum";
 			case "hex":
 				material.disabled = false;
-				keywidth.disabled = true;  keywidth.value="";
+				//keywidth.disabled = true;  keywidth.value="";
 				diameter.disabled = false;
 				break;
 			case "ignore":
 				material.disabled = true;
-				keywidth.disabled = true;  keywidth.value="";
+				//keywidth.disabled = true;  keywidth.value="";
 				diameter.disabled = true;  diameter.value="";
 				break;
-			case "key":
+			/*case "key":
 				material.disabled = false;
 				keywidth.disabled = false;
 				diameter.disabled = false;
-				break;
+				break;*/
 		}
 		setError(1);
 	}
@@ -658,6 +637,12 @@
 		teeth: [10,11,12,13,14,15,16,17,18,19,20,22,24,26,28,30,32,34,36,38,40,45,50,55,60,65,70,75,80,90,100,150,200,300,+Infinity],
 		14.5: [.176, .192, .210, .223, .236, .245, .255, .264, .270, .277, .283, .292, .302, .308, .314, .318, .322, .325, .329, .332, .336, .340, .346, .352, .355, .358, .360, .361, .363, .366, .368, .375, .378, .382, .390],
 		20:   [.201, .226, .245, .264, .276, .289, .295, .302, .308, .314, .320, .330, .337, .344, .352, .358, .364, .370, .377, .383, .389, .399, .308, .415, .421, .425, .429, .433, .436, .442, .446, .458, .463, .471, .484]
+	}
+
+	let CHAIN_STRENGTHS = {
+		35: 190,
+		25: 85,
+		40: 350
 	}
 
 	function computeGearStrength(P) {
@@ -674,11 +659,34 @@
 		return P.sy*P.n/(P.dp*P.dp)/2*P.w*lfac;
 	}
 
-	// TODO
-	function computeShaftStrength(P) {
-		// P is an object with keys:
-		// sy (yield strength, tensile)
-		// not sure... uh... ok later
+	function computeShaftStrength(prefix) {
+		// pass the prefix for your stuff, e.g. "transmission_${x}_inp"
+		let type = document.getElementById(prefix+"_shaft").value;
+		let matl = MATERIAL_DATA[document.getElementById(prefix+"_shaft_matl").value];
+		let diameter = getV(prefix+"_diameter");
+		document.getElementById(prefix+"_diameter").classList.remove('error');
+		let S = 0;
+		console.log(type, matl, diameter);
+		// matl.Sy = torq*radius/J = torq/S => torq = matl.Sy*S
+		switch(type) {
+			case 'ignore':
+				return +Infinity;
+			case 'hex':
+				S = 0.208*Math.pow(diameter, 3);
+				return S*matl.Sy;
+			case 'thex':
+				if (Math.abs(diameter - convertFrom(0.5, 'in')) < 1e-5) {
+					// 1/2 thunderhex has a 5.1mm hole
+					S = (.12*Math.pow(diameter, 4) - .098*Math.pow(5.1e-3, 4))/(1.154*diameter/2);
+				} else if (Math.abs(diameter - convertFrom(0.375, 'in')) < 1e-5) {
+					// 3/8 thunderhex has a 4.2mm hole
+					S = (.12*Math.pow(diameter, 4) - .098*Math.pow(4.2e-3, 4))/(1.154*diameter/2);
+				} else {
+					document.getElementById(prefix+"_diameter").classList.add('error');
+					return 0;
+				}
+				return S*matl.Sy;
+		}
 	}
 
 	function computeTransmission(x, torque) {
@@ -741,6 +749,7 @@
 			return [fosmin, torqout, overall_ratio];
 		} else if (type=='spur') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
+			let torqout = torque*overall_ratio;
 
 			let torq_g_inp = computeGearStrength({
 				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
@@ -761,17 +770,27 @@
 				pa: document.getElementById(`transmission_${x}_pa`).value
 			});
 
+			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
+			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
+			console.log(torq_s_out, torq_s_inp);
+
 			let g_caps = [torq_g_inp, torq_g_out];
-			let torqout = torque*overall_ratio;
+			let s_caps = [torq_s_inp, torq_s_out];
 
 			let g_idxmin  = g_caps.indexOf(Math.min(...g_caps));
 			let g_capmin  = Math.min(...g_caps);
 			let g_fosmin  = g_capmin/torqout;
 
+			let s_idxmin  = s_caps.indexOf(Math.min(...s_caps));
+			let s_capmin  = Math.min(...s_caps);
+			let s_fosmin  = s_capmin/torqout;
+
 			//setV(`transmission_${x}_torque_cap`, capmin);
 			setV(`transmission_${x}_torque_out`, torqout);
 			setV(`transmission_${x}_g_fos`,      g_fosmin);
 			setV(`transmission_${x}_g_fos_pos`,  g_idxmin ? 'Output':'Input');
+			setV(`transmission_${x}_s_fos`,      s_fosmin);
+			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
 			return [Math.min(g_fosmin), torqout, overall_ratio];
