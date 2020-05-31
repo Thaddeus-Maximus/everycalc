@@ -398,6 +398,15 @@
 			document.getElementById(`load_${i}_2`).readOnly = false;
 			document.getElementById(`load_${i}_2`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
 			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
+
+
+			document.getElementById(`load_${i}_3_row`).style.display = '';
+			document.getElementById(`load_${i}_3_label`).innerHTML = type == 'slope' ? 'M=' : 'F=';
+			document.getElementById(`load_${i}_3`).readOnly = true;
+			document.getElementById(`load_${i}_3`).dataset.unit = type == 'slope' ? 'torque' : 'force';
+			document.getElementById(`load_${i}_3_unit`).dataset.unit = type == 'slope' ? 'torque' : 'force';
+			for (j=4;j<=4;j++)
+				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		}
 		UNIT_change(); // draw the units
 	}
@@ -642,6 +651,8 @@
 		fixed   = {}; // if the node id is in the list, it's pinned
 		displs  = {};
 		slopes  = {};
+		displs_a = {};
+		slopes_a = {};
 
 		loads = document.getElementById('loads');
 		for(i=2; i<loads.children.length-1+2; i++) {
@@ -660,8 +671,10 @@
 				moments[i] = getV(`load_${x}_2`);
 			} else if (type == 'displacement') {
 				displs[i] = getV(`load_${x}_2`);
+				displs_a[i] = x;
 			} else if (type == 'slope') {
 				slopes[i] = getV(`load_${x}_2`);
+				slopes_a[i] = x;
 			}
 		}
 
@@ -695,11 +708,15 @@
 				}
 				if (oldnode in displs) {
 					displs[newnode] = displs[oldnode];
+					displs_a[newnode] = displs_a[oldnode];
 					delete displs[oldnode];
+					delete displs_a[oldnode];
 				}
 				if (oldnode in slopes) {
 					slopes[newnode] = slopes[oldnode];
+					slopes_a[newnode] = slopes_a[oldnode];
 					delete slopes[oldnode];
+					delete slopes_a[oldnode];
 				}
 			}
 		}
@@ -715,6 +732,15 @@
 			noden = order.indexOf(parseInt(fix));
 			setV(`load_${fixed[fix]}_2`, rxns[noden*2]);
 			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
+		}
+		for (dis in displs_a) {
+			noden = order.indexOf(parseInt(dis));
+			console.log(noden, dis);
+			setV(`load_${displs_a[dis]}_3`, rxns[noden*2]);
+		}
+		for (slo in slopes_a) {
+			noden = order.indexOf(parseInt(slo));
+			setV(`load_${slopes_a[slo]}_3`, rxns[noden*2+1]);
 		}
 
 		// draw the plot
@@ -852,7 +878,7 @@
 				y1 = y0 - 25*sgn;
 				y2 = y0 - 45*sgn;
 				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
+				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
@@ -861,10 +887,34 @@
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','circle');
 				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
+				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
 				shape.setAttribute('cx', cp);
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
+				shape.setAttribute('cp', position);
+				beam_items.append(shape);
+			} else if (type == 'slope') {
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
+				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+				x1 = cp + 14*sgn;
+				y1 = y0 - 14;
+				x2 = cp - 14*sgn;
+				y2 = y0 + 14;
+				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
+				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
+				shape.classList.add('beam-prescribed');
+				shape.setAttribute('cp', position);
+				beam_items.append(shape);
+			} else if (type == 'displacement') {
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
+				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+				x1 = cp;
+				y1 = y0 - 14;
+				x2 = cp;
+				y2 = y0 + 14;
+				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
+				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
+				shape.classList.add('beam-prescribed');
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			}
@@ -1023,6 +1073,10 @@
 
 	.beam-shape {
 		stroke: none;
+	}
+
+	.beam-prescribed {
+		stroke-width: 3;
 	}
 
 	.beam-arrow {
