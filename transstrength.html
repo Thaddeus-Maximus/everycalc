@@ -728,7 +728,7 @@
 		}
 	}
 
-	function computeTransmission(x, torque) {
+	function computeTransmission(x, torque, n_inputs) {
 		let container = document.getElementById(`transmission_${x}_detail`);
 		let type      = document.getElementById(`transmission_${x}_type`).value;
 		if(type=='vp'){
@@ -798,7 +798,7 @@
 				w:  getV(`transmission_${x}_inp_teeth_width`),
 				n:  getV(`transmission_${x}_inp_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value
-			})*overall_ratio; // prorate by the gear ratio
+			})*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = computeGearStrength({
 				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
 					convertFrom(getV(`transmission_${x}_module`), 'in') :
@@ -807,9 +807,9 @@
 				w:  getV(`transmission_${x}_out_teeth_width`),
 				n:  getV(`transmission_${x}_out_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value
-			});
+			})*n_inputs;
 
-			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
+			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio*n_inputs;
 			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
 
 			let g_caps = [torq_g_inp, torq_g_out];
@@ -846,11 +846,11 @@
 
 			let torq_g_inp = BELT_computeBeltTorqueCapacity(
 				bdata, 0, getV(`transmission_${x}_inp_teeth`), width, length)
-				*overall_ratio; // prorate by the gear ratio
+				*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = BELT_computeBeltTorqueCapacity(
 				bdata, 0, getV(`transmission_${x}_out_teeth`), width, length);
 
-			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
+			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio*n_inputs;
 			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
 
 			let g_caps = [torq_g_inp, torq_g_out];
@@ -882,10 +882,10 @@
 			let chnstrength = CHAIN_STRENGTHS[series];
 			let pitch = convertFrom(parseInt(series.substring(0,1))/8, 'in');
 
-			let torq_g_inp = chnstrength*pitch*getV(`transmission_${x}_inp_teeth`)/Math.PI*overall_ratio; // prorate by the gear ratio
+			let torq_g_inp = chnstrength*pitch*getV(`transmission_${x}_inp_teeth`)/Math.PI*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = chnstrength*pitch*getV(`transmission_${x}_out_teeth`)/Math.PI;
 
-			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio;
+			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio*n_inputs;
 			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
 
 			let g_caps = [torq_g_inp, torq_g_out];
@@ -915,19 +915,21 @@
 		let computed_basic = false;
 		try{
 			let container = document.getElementById('transmission_stages');
-			let torque    = getV('motor_stall_torque')*getV('motor_count');
+			let n_inputs  = getV('motor_count');
+			let torque    = getV('motor_stall_torque')*n_inputs;
 			let fos       = +Infinity;
 			let fos_pos   = NaN;
 			let overall_ratio = 1;
 			setV('input_torque', torque);
 			for(stage of container.children) {
-				let res = computeTransmission(stage.dataset.stage_id, torque);
+				let res = computeTransmission(stage.dataset.stage_id, torque, n_inputs);
 				overall_ratio *= res[2];
 				torque = res[1];
 				if (res[0] < fos) {
 					fos_pos = stage.dataset.stage_id;
 					fos     = res[0];
 				}
+				n_inputs = 1; // after first round, set the number of inputs to 1
 			}
 			
 			setV('overall_fos', fos);
