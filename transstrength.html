@@ -184,10 +184,10 @@
 				let pulled = container.removeChild(container.childNodes[i]);
 				if (direction > 0) {
 					container.insertBefore(pulled, container.childNodes[i+1]);
-					document.getElementById(`transmission_${x}_movedown`).focus();
+					//document.getElementById(`transmission_${x}_movedown`).focus();
 				} else {
 					container.insertBefore(pulled, container.childNodes[i-1]);
-					document.getElementById(`transmission_${x}_moveup`).focus();
+					//document.getElementById(`transmission_${x}_moveup`).focus();
 				}
 				break;
 			}
