@@ -73,14 +73,17 @@ function getV(id, default_value, pct_err_en) {
 
 function setV(id, value, places) {
 	let unit = document.getElementById(id).dataset.unit;
-	if (typeof places === 'undefined')
-		places = (typeof UNIT_PLACES ==='undefined') ? 3:UNIT_PLACES;
 	if (typeof value === 'string') {
 		document.getElementById(id).value = value;
 	} else {
 		if (typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
+		if (typeof places === 'undefined')
+			// log10|value| is roughly the order of magnitude the number is.
+			// Invert it to get the number of places to it
+			// Add a couple extra places for significance
+			places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
 		document.getElementById(id).value = value.toFixed(places);
 	}
 }

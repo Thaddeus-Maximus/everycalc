@@ -503,6 +503,16 @@
 		return msg;
 	}
 
+	function ensureMatrix(M) { // bandaid; makes sure that input M is a matrix, not a scalar
+		if (M._data) return M;
+		else return math.matrix([[M]]);
+	}
+
+	function stripMatrix(M) { // bandaid; makes input matrix M into a scalar if the matrix is 1x1
+		if (M._size == undefined || M._size[0] != 1 || M._size[1] != 1) return M;
+		else return M._data[0][0];
+	}
+
 	function computeFE(E, I, order, poses, forces, moments, pinned, fixed, displs, slopes) {
 		numel = order.length-1;
 
@@ -557,10 +567,10 @@
 
 		Qu = math.multiply(math.inv(K1), math.subtract(Fu, math.multiply(K2, Qk)));
 		Fk = math.add(math.multiply(K3, Qu), math.multiply(K4, Qk));
-		F.subset(math.index(idx_part_k,0), Fk);
-		F.subset(math.index(idx_part_u,0), Fu);
-		Q.subset(math.index(idx_part_k,0), Qk);
-		Q.subset(math.index(idx_part_u,0), Qu);
+		F.subset(math.index(idx_part_k,0), stripMatrix(Fk));
+		F.subset(math.index(idx_part_u,0), stripMatrix(Fu));
+		Q.subset(math.index(idx_part_k,0), stripMatrix(Qk));
+		Q.subset(math.index(idx_part_u,0), stripMatrix(Qu));
 		Qflat = math.flatten(Q)._data;
 		Fflat = math.flatten(F)._data;
 
@@ -774,11 +784,11 @@
 			},
 			queries: {
 				//INDEX: { places: 0 },
-				x: { places: 4 },
-				t: { places: 4 },
-				q: { places: 4 },
-				m: { places: 4 },
-				s: { places: 4 }
+				x: {},
+				t: {},
+				q: {},
+				m: {},
+				s: {}
 			}
 		},
 		channels,
@@ -787,6 +797,7 @@
 		drawBeam();
 
 		}catch(err){
+			console.log(err);
 			setError(2, err);
 			return;
 		}
