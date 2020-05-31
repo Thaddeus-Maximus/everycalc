@@ -155,6 +155,9 @@ var UNIT_CONVERSIONS = {
 	"thou": 0.0254e-3,
 	"ft": 0.3048,
 
+	"1/in": 1/0.0254,
+	"1/mm": 1e+3,
+
 	"ft-lbf": 1.356,
 	"in-lbf": 0.113,
 	"ozf-in": 0.007062,

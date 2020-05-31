@@ -1,14 +1,32 @@
 var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
-	'Aluminum': { // 6061
-		'Ef': 69e9,
-		'E':  69e9,
-		'density': 2.7e3
-	},
-	'Steel': { // 4140
+	'4140N Steel ': { 
 		'Ef': 190e9,
 		'E':  190e9,
+		'UTS': 660e6,
+		'Sy':  590e6,
 		'density': 7.8e3
 	}, 
+	'1018 Hot-Rolled Steel': {
+		'Ef': 190e9,
+		'E':  190e9,
+		'UTS': 430e6,
+		'Sy':  240e6,
+		'density': 7.8e3
+	},
+	'7075-T6 Aluminum': {
+		'Ef': 70e9,
+		'E':  70e9,
+		'UTS': 560e6,
+		'Sy': 480e6,
+		'density': 3.0e3
+	},
+	'6061-T6 Aluminum': {
+		'Ef': 69e9,
+		'E':  69e9,
+		'UTS': 310e6,
+		'Sy': 270e6,
+		'density': 2.7e3
+	},
 	'Titanium': {
 		'Ef': 110e9,
 		'E':  110e9,
