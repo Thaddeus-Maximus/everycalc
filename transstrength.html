@@ -182,8 +182,6 @@
 			if (container.childNodes[i].dataset.stage_id == x) {
 				// found the correct child, now do the swapping...
 				let pulled = container.removeChild(container.childNodes[i]);
-				console.log(i, pulled);
-				console.log(container.childNodes.length);
 				if (direction > 0) {
 					container.insertBefore(pulled, container.childNodes[i+1]);
 					document.getElementById(`transmission_${x}_movedown`).focus();
@@ -219,12 +217,12 @@
 						<td><input class="dynamic-input" id="transmission_${x}_out_teeth" value=50 /></td>
 					</tr><tr>
 						<td class="collabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl">
+						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl" onchange="compute();">
 							<option value="7075-T6 Aluminum">7075 (VexPro Aluminum)</option>
 							<option value="6061-T6 Aluminum">6061 (AndyMa Aluminumrk)</option>
 							<option value="4140N Steel">4140N (AM/ Hot-Rolled SteelVP)</option>
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl">
+						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl" onchange="compute();">
 							<option value="7075-T6 Aluminum">7075 (VexPro Aluminum)</option>
 							<option value="6061-T6 Aluminum">6061 (AndyMa Aluminumrk)</option>
 							<option value="4140N Steel">4140N (AM/ Hot-Rolled SteelVP)</option>
@@ -629,7 +627,6 @@
 	}
 
 	function refreshShaftSelections(x, side){
-		console.log('refreshing');
 		let shape    = document.getElementById(`transmission_${x}_${side}_shaft`);
 		let material = document.getElementById(`transmission_${x}_${side}_shaft_matl`);
 		let diameter = document.getElementById(`transmission_${x}_${side}_diameter`);
@@ -674,8 +671,7 @@
 		// r = n/dp/2
 		// torq = sy*n/dp/2/dp*w*LEWIS_FACTOR(dp,pa)
 		let lfac = interp1D(LEWIS_FACTORS.teeth, LEWIS_FACTORS[P.pa], P.n);
-		console.log(lfac);
-		return P.sy*P.n/P.dp/P.dp/2*P.w*lfac;
+		return P.sy*P.n/(P.dp*P.dp)/2*P.w*lfac;
 	}
 
 	// TODO
@@ -733,7 +729,6 @@
 		} else if (type=='57sport') {
 			let series = document.getElementById(`transmission_${x}_series`).value;
 			let overall_ratio = document.getElementById(`transmission_${x}_ratio`).value;
-			console.log(STRENGTH_MAP_57SPORT, STRENGTH_MAP_57SPORT[series], STRENGTH_MAP_57SPORT[series][overall_ratio]);
 			let capmin = STRENGTH_MAP_57SPORT[series][overall_ratio];
 			let torqout = torque*overall_ratio;
 			let fosmin  = capmin/torqout;
@@ -749,8 +744,8 @@
 
 			let torq_g_inp = computeGearStrength({
 				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
-					convertFrom(getV(`transmission_${x}_inp_teeth`), '1/in') :
-					convertFrom(1/getV(`transmission_${x}_inp_teeth`), '1/mm') , // invert module to get it into dp
+					convertFrom(getV(`transmission_${x}_module`), '1/in') :
+					convertFrom(1/getV(`transmission_${x}_module`), '1/mm') , // invert module to get it into dp
 				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_inp_teeth_matl`).value].Sy,
 				w:  getV(`transmission_${x}_inp_teeth_width`),
 				n:  getV(`transmission_${x}_inp_teeth`),
@@ -758,8 +753,8 @@
 			})*overall_ratio; // prorate by the gear ratio
 			let torq_g_out = computeGearStrength({
 				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
-					convertFrom(getV(`transmission_${x}_out_teeth`), 'in') :
-					convertFrom(1/getV(`transmission_${x}_out_teeth`), 'mm') , // invert module to get it into dp
+					convertFrom(getV(`transmission_${x}_module`), 'in') :
+					convertFrom(1/getV(`transmission_${x}_module`), 'mm') , // invert module to get it into dp
 				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_out_teeth_matl`).value].Sy,
 				w:  getV(`transmission_${x}_out_teeth_width`),
 				n:  getV(`transmission_${x}_out_teeth`),
@@ -787,7 +782,7 @@
 		let computed_basic = false;
 		try{
 			let container = document.getElementById('transmission_stages');
-			let torque    = getV('motor_stall_torque');
+			let torque    = getV('motor_stall_torque')*getV('motor_count');
 			let fos       = +Infinity;
 			let fos_pos   = NaN;
 			let overall_ratio = 1;
