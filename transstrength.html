@@ -32,7 +32,8 @@
 		"theta": ["rev", "rev"],
 		"alpha": ["RPM/s", "RPM/s"],
 		"angle": ["deg", "deg"],
-		"pct":   ["%", "%"]
+		"pct":   ["%", "%"],
+		"dimension": ["mm", "in"]
 	};
 	/*WALK_STEPS = [{
 			poi: 'user_input_motor',
@@ -133,11 +134,11 @@
 		container.dataset.current_stage_id ++;
 		transmission.innerHTML = `
 		<span>
-			[${x}]<select class="dynamic-input" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
-				<option value="spur" >Spur</option>
+			[${x}]<select class="dynamic-input doublewide" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
+				<option value="spur" selected >Spur</option>
 				<option value="belt" >Belt</option>
 				<option value="chain" >Chain</option>
-				<option value="vp"  selected='selected' >VersaPlanetary</option>
+				<option value="vp">VersaPlanetary</option>
 			</select>
 		</span><span style="float:right;">
 			<button onclick="moveTransmissionStage(${x},-1); compute();" title="Move Up" id="transmission_${x}_moveup">^</button>
@@ -201,37 +202,119 @@
 		switch(type) {
 			case 'spur':
 				container.innerHTML =`
-				<table>
+				<table style="float: left;">
 					<tr>
-						<td class="rowlabel">IN</td>
+						<td class="collabel"></td>
+						<td class="collabel">Input</td>
+						<td class="collabel">Output</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td class="rowlabel">Teeth</td>
+						<td><input class="dynamic-input" id="transmission_${x}_out_teeth" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_inp_teeth" /></td>
 					</tr><tr>
-						<td class="rowlabel">OUT</td>
+						<td class="collabel">Material</td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl">
+							<option value="Aluminum 7075-T6">7075 Aluminum (VexPro)</option>
+							<option value="Aluminum 6061-T6">6061 Aluminum (AndyMark)</option>
+							<option value="Steel 4140">4140 Steel (AM/VP)</option>
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl">
+							<option value="Aluminum 7075-T6">7075 Aluminum (VexPro)</option>
+							<option value="Aluminum 6061-T6">6061 Aluminum (AndyMark)</option>
+							<option value="Steel 4140">4140 Steel (AM/VP)</option>
+						</select></td>
+					</tr><tr>
+						<td class="rowlabel">Width</td>
+						<td><input class="dynamic-input" id="transmission_${x}_inp_teeth_width" data-unit="dimension" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_out_teeth_width" data-unit="dimension" /></td>
+						<td class="unit" data-unit="dimension">
+					</tr><tr>
+						<td class="rowlabel">Shaft</td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft" onchange="refreshSpurSelections(${x}, 'inp');" >
+							<option value="ignore">Ignore</option>
+							<option value="thex">ThunderHex</option>
+							<option value="hex" >Hex</option>
+							<option value="key" >Keyed</option>
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft" onchange="refreshSpurSelections(${x}, 'out');" >
+							<option value="ignore">Ignore</option>
+							<option value="thex">ThunderHex</option>
+							<option value="hex" >Hex</option>
+							<option value="key" >Keyed</option>
+						</select></td>
+					</tr><tr>
+						<td class="rowlabel">Material</td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshSpurSelections(${x}, 'inp');" >
+							<option value="Aluminum 7075-T6">7075 Aluminum</option>
+							<option value="Aluminum 6061-T6">6061 Aluminum</option>
+							<option value="Steel 4140">4140 Steel</option>
+							<option value="Steel 1018">1018 Steel</option>
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshSpurSelections(${x}, 'out');" >
+							<option value="Aluminum 7075-T6">7075 Aluminum</option>
+							<option value="Aluminum 6061-T6">6061 Aluminum</option>
+							<option value="Steel 4140">4140 Steel</option>
+							<option value="Steel 1018">1018 Steel</option>
+						</select></td>
+					</tr><tr>
+						<td class="rowlabel">Diameter</td>
+						<td><input class="dynamic-input" id="transmission_${x}_inp_diameter" data-unit="dimension" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_out_diameter" data-unit="dimension" /></td>
+						<td class="unit" data-unit="dimension">
+					</tr><tr>
+						<td class="rowlabel">Key Width</td>
+						<td><input class="dynamic-input" id="transmission_${x}_inp_keywidth" data-unit="dimension" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_out_keywidth" data-unit="dimension" /></td>
+						<td class="unit" data-unit="dimension">
+					</tr>
+				</table>
+
+				<table style="float:right">
+					<tr>
+						<td class="rowlabel" readonly>Ratio </td>
+						<td><input class="dynamic-input" id="transmission_${x}_ratio" readonly /></td>
+						<td></td>
+					</tr><tr>
+						<td class="rowlabel">Output/Capacity</td>
+						<td><input class="dynamic-input" id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
+						<td>/</td>
+						<td><input class="dynamic-input" id="transmission_${x}_torque_cap" data-unit="torque" readonly /></td>
+						<td class="unit" data-unit="torque" ></td>
+					</tr><tr>
+						<td class="rowlabel">Factor of Safety </td>
+						<td><input class="dynamic-input" id="transmission_${x}_fos" readonly /></td>
+						<td>@</td>
+						<td><input class="dynamic-input" id="transmission_${x}_fos_pos" readonly /></td>
 					</tr>
 				</table>
 				`;
+				refreshSpurSelections(x, "inp");
+				refreshSpurSelections(x, "out");
 				break;
 			case 'vp':
 				container.innerHTML =`
 				<table style="float: left">
 					<tr>
 						<td class="rowlabel">Stage 1 </td>
-						<td><input id="transmission_${x}_stage_1" value=7 /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_stage_1" value=7 /></td>
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Stage 2 </td>
-						<td><input id="transmission_${x}_stage_2" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_stage_2" /></td>
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Stage 3 </td>
-						<td><input id="transmission_${x}_stage_3" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_stage_3" /></td>
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Stage 4 </td>
-						<td><input id="transmission_${x}_stage_4" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_stage_4" /></td>
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Output Shaft: </td>
-						<td colspan=2><select id="transmission_${x}_shaft" >
+						<td colspan=2><select class="dynamic-input" id="transmission_${x}_shaft" >
 							<option value="hex_500">1/2" Hex</option>
 							<option value="hex_375">3/8" Hex</option>
 							<option value="rnd_500">1/2" Keyed</option>
@@ -243,25 +326,53 @@
 				<table style="float:right">
 					<tr>
 						<td class="rowlabel" readonly>Ratio </td>
-						<td><input id="transmission_${x}_ratio" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_ratio" readonly /></td>
 						<td></td>
 					</tr><tr>
 						<td class="rowlabel">Output/Capacity</td>
-						<td><input id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
 						<td>/</td>
-						<td><input id="transmission_${x}_torque_cap" data-unit="torque" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_torque_cap" data-unit="torque" readonly /></td>
 						<td class="unit" data-unit="torque" ></td>
 					</tr><tr>
 						<td class="rowlabel">Factor of Safety </td>
-						<td><input id="transmission_${x}_fos" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_fos" readonly /></td>
 						<td>@</td>
-						<td><input id="transmission_${x}_fos_pos" readonly /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_fos_pos" readonly /></td>
 					</tr>
 				</table>
 				`;
 				break;
 		}
 		UNIT_change();
+	}
+
+	function refreshSpurSelections(x, side){
+		console.log('refreshing');
+		let shape    = document.getElementById(`transmission_${x}_${side}_shaft`);
+		let material = document.getElementById(`transmission_${x}_${side}_shaft_matl`);
+		let diameter = document.getElementById(`transmission_${x}_${side}_diameter`);
+		let keywidth = document.getElementById(`transmission_${x}_${side}_keywidth`);
+		switch(shape.value) {
+			case "thex":
+				material.disabled = false;
+				material.value    = "Aluminum 7075-T6";
+			case "hex":
+				material.disabled = false;
+				keywidth.disabled = true;  keywidth.value="";
+				diameter.disabled = false;
+				break;
+			case "ignore":
+				material.disabled = true;
+				keywidth.disabled = true;  keywidth.value="";
+				diameter.disabled = true;  diameter.value="";
+				break;
+			case "key":
+				material.disabled = false;
+				keywidth.disabled = false;
+				diameter.disabled = false;
+				break;
+		}
 	}
 
 	function computeTransmission(x, torque) {
