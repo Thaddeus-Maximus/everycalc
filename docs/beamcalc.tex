@@ -390,17 +390,53 @@
 		\end{Bmatrix}
 	\end{align}
 
-	At this point, the matrix equation could be solved to achieve the nodal displacement vector. Afterwards, the resulting displacement matrix could be used with the unconstrained stiffness matrix to determine the loads at the constraints. This tells us everything we could want to know about what is happening at the nodes, but what about inbetween them?
+	At this point, the matrix equation could be solved to achieve the nodal displacement vector. Afterwards, the resulting displacement matrix could be used with the unconstrained stiffness matrix to determine the loads at the constraints.
+
+	\section{Prescribing Displacements}
+
+	But, what if instead, we wanted to prescribe a displacement rather than a force? This throws a wrench in this whole process... or at least would mean we'd have to go back to the drawing board, and try \textit{matrix partitioning}. Let's consider a different setup, of the form
+
+	\begin{align}
+		\begin{Bmatrix}
+			\{F_u\} \\
+			\{F_p\} 
+		\end{Bmatrix} = \begin{bmatrix}
+			[K_{u,u}] & [K_{u,p}] \\
+			[K_{p,u}] & [K_{p,p}] 
+ 		\end{bmatrix} \begin{Bmatrix}
+			\{q_{u}\} \\
+			\{q_{p}\} 
+		\end{Bmatrix},
+	\end{align}
+
+	where $\{F_u\}$ and $\{F_p\}$ are the portions of the load vector corresponding to the unprescribed and prescribed-displacement portions, respectively. The same holds for $\{q_u\}$ and $\{q_p\}$. There's no \textit{true} sub-vectoring going on here, the brackets are just to denote that these are bits of matrices inside the larger matrices, not just scalar values.
+
+	We can expand out first row of the matrix equation to find that 
+
+	\begin{align}
+		\{F_u\} = [K_{u,u}] \{q_{u}\} + [K_{u,p}] \{q_{p}\}
+	\end{align}
+
+	Solving this yields
+
+	\begin{align}
+		[K_{u,u}] \{q_{u}\} = \{F_u\} - [K_{u,p}] \{q_{p}\}
+	\end{align}
+
+	which is of the form $[M] \{x\} = \{b\}$ (since $\{q_{p}\}$ is the prescribed displacements), so can be solved.
+
+	After finding the non-prescribed displacements, the second row of the matrix equation can be expanded to
+	\begin{align}
+		\{F_p\} = [K_{p,u}] \{q_{u}\} + [K_{p,p}] \{q_{p}\}
+	\end{align}
+
+	which can be used to compute the forces required to produce the prescribed displacements.
+
+	We would then simply need to re-build the force and displacement vectors, and then we can proceed to post-processing.
 
 	\section{Post Processing and Shape Functions}
 
-	One simple output from the FE model would be the reaction loads. These would be the struck-out entries of the load vector $\{F\}$. The entire load vector could be found by simply computing 
-
-	\begin{align}
-		\{F\} = [K]\{q\} .
-	\end{align}
-
-	Getting deflection at particular points (not nodes) will be more involved and require the use of \textit{shape functions}. In the derivation of the beam stiffness matrix, particular \textit{shape functions} were used (the Hermite shape functions). These are nondimensional equations that represent the contribution of one \textit{nodal} degree of freedom to the displacement \textit{field} in an element. By combining these displacement fields, we can determine the total displacement field.
+	Usually, a displacement \textit{field} is desired rather than merely the nodal values. Getting deflection at arbitrary points requires the use of \textit{shape functions}. In the derivation of the beam stiffness matrix (which this paper does not cover), particular \textit{shape functions} were used: the Hermite shape functions. These are nondimensional equations that represent the contribution of one \textit{nodal} degree of freedom to the displacement \textit{field} in an element. By combining these displacement fields, we can determine the total displacement field.
 
 	\begin{figure}[H]
 		\includegraphics[width=0.7\textwidth]{hermite.png}
