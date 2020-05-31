@@ -299,6 +299,8 @@
 					<option value="fix">Fixed</option>
 					<option value="force">Force </option>
 					<option value="moment">Moment</option>
+					<option value="displacement">Displacement</option>
+					<option value="slope">Slope</option>
 				</select></td>
 			</tr>
 			<tr id="load_${x}_1_row">
@@ -383,6 +385,27 @@
 			document.getElementById(`load_${i}_2`).dataset.unit 	  = type == 'force' ? 'force' : 'torque';
 			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'force' ? 'force' : 'torque';
 			for (j=3;j<=4;j++)
+				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
+		} else if (type == 'displacement' || type == 'slope') {
+			document.getElementById(`load_${i}_1_row`).style.display = '';
+			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
+			document.getElementById(`load_${i}_1`).readOnly = false;
+			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
+			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
+
+			document.getElementById(`load_${i}_2_row`).style.display = '';
+			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'slope' ? 'slope=' : 'y=';
+			document.getElementById(`load_${i}_2`).readOnly = false;
+			document.getElementById(`load_${i}_2`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
+			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
+
+
+			document.getElementById(`load_${i}_3_row`).style.display = '';
+			document.getElementById(`load_${i}_3_label`).innerHTML = type == 'slope' ? 'M=' : 'F=';
+			document.getElementById(`load_${i}_3`).readOnly = true;
+			document.getElementById(`load_${i}_3`).dataset.unit = type == 'slope' ? 'torque' : 'force';
+			document.getElementById(`load_${i}_3_unit`).dataset.unit = type == 'slope' ? 'torque' : 'force';
+			for (j=4;j<=4;j++)
 				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
 		}
 		UNIT_change(); // draw the units
@@ -469,13 +492,25 @@
 		return math.multiply(m, EI/L/L/L);
 	}
 
-	function computeFE(E, I, order, poses, forces, moments, pinned, fixed) {
+	function ppmatrix(M) {
+		msg = "";
+		for (row of M._data) {
+			for (cell of row) {
+				msg += cell.toFixed(0) + ',';
+			}
+			msg += '\n';
+		}
+		return msg;
+	}
+
+	function computeFE(E, I, order, poses, forces, moments, pinned, fixed, displs, slopes) {
 		numel = order.length-1;
 
 		numnode = (numel+1)*2;
 
 		var K = math.matrix(math.zeros([numnode,numnode]));
 		F = math.matrix(math.zeros([numnode,1]));
+		Q = math.matrix(math.zeros([numnode,1]));
 		dofs_to_remove = [];
 		for (i in forces){
 			F.subset(math.index(order.indexOf(parseInt(i))*2,0), forces[i]);
@@ -490,6 +525,14 @@
 			dofs_to_remove.push(order.indexOf(parseInt(i))*2);
 			dofs_to_remove.push(order.indexOf(parseInt(i))*2+1);
 		}
+		for (i in displs){
+			dofs_to_remove.push(order.indexOf(parseInt(i))*2);
+			Q.subset(math.index(order.indexOf(parseInt(i))*2,0), displs[i]);
+		}
+		for (i in slopes){
+			dofs_to_remove.push(order.indexOf(parseInt(i))*2+1);
+			Q.subset(math.index(order.indexOf(parseInt(i))*2+1,0), slopes[i]);
+		}
 
 		for (i=0;i<numel;i++) {
 			idx = math.index(math.range(i*2, i*2+4), math.range(i*2, i*2+4));
@@ -499,20 +542,30 @@
 				math.add(ss, Ks));
 		}
 
-		idx_rmv_l = [];
+		idx_part_k = [];
+		idx_part_u = [];
 		for (i=0;i<numnode;i++) {
-			if (! dofs_to_remove.includes(i)) idx_rmv_l.push(i);
+			if (! dofs_to_remove.includes(i)) idx_part_u.push(i);
+			else                              idx_part_k.push(i);
 		}
-		idx_rmv = math.index(idx_rmv_l, idx_rmv_l);
-		Kp = K.subset(idx_rmv);
-		F = F.subset(math.index(idx_rmv_l, 0));
-		q = math.multiply(math.inv(Kp), F);
-		fq = [];
-		offs = 0;
-		for (i=0;i<numnode;i++) {
-			if (dofs_to_remove.includes(i)){fq.push(0); offs++}
-			else fq.push(q._data[i-offs][0]);
-		}
+		console.log(idx_part_k, idx_part_u);
+		K1 = K.subset(math.index(idx_part_u, idx_part_u));
+		K2 = K.subset(math.index(idx_part_u, idx_part_k));
+		K3 = K.subset(math.index(idx_part_k, idx_part_u));
+		K4 = K.subset(math.index(idx_part_k, idx_part_k));
+		Fu = F.subset(math.index(idx_part_u, 0));
+		Qk = Q.subset(math.index(idx_part_k, 0));
+
+		Qu = math.multiply(math.inv(K1), math.subtract(Fu, math.multiply(K2, Qk)));
+		Fk = math.add(math.multiply(K3, Qu), math.multiply(K4, Qk));
+		F.subset(math.index(idx_part_k,0), Fk);
+		F.subset(math.index(idx_part_u,0), Fu);
+		Q.subset(math.index(idx_part_k,0), Qk);
+		Q.subset(math.index(idx_part_u,0), Qu);
+		//console.log(F, Q, Qu, Fk); return;
+		Qflat = math.flatten(Q)._data;
+		Fflat = math.flatten(F)._data;
+		console.log(Qflat);
 
 		channels = {
 			x : [], // x, position
@@ -522,7 +575,7 @@
 			s : []  // s, shear force
 		}
 		for (i=0;i<numel;i++) {
-			q_seg = fq.slice(i*2, i*2+4);
+			q_seg = Qflat.slice(i*2, i*2+4);
 			dl = poses[order[i+1]] - poses[order[i]];
 			for (zeta=-1; zeta<1; zeta+=0.05) {
 				channels.x.push(poses[order[i]] + (zeta+1)/2*dl);
@@ -539,9 +592,9 @@
 			channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 		}
 
-		rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
+		//rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
 
-		return [channels, rxns];
+		return [channels, Fflat];
 	}
 
 	function beamShapeFunction(arr, zeta, dl) {
@@ -596,6 +649,10 @@
 		moments = {}; // maps node ids to values
 		pinned  = {}; // if the node id is in the list, it's pinned
 		fixed   = {}; // if the node id is in the list, it's pinned
+		displs  = {};
+		slopes  = {};
+		displs_a = {};
+		slopes_a = {};
 
 		loads = document.getElementById('loads');
 		for(i=2; i<loads.children.length-1+2; i++) {
@@ -612,6 +669,12 @@
 				forces[i] = getV(`load_${x}_2`);
 			} else if (type == 'moment') {
 				moments[i] = getV(`load_${x}_2`);
+			} else if (type == 'displacement') {
+				displs[i] = getV(`load_${x}_2`);
+				displs_a[i] = x;
+			} else if (type == 'slope') {
+				slopes[i] = getV(`load_${x}_2`);
+				slopes_a[i] = x;
 			}
 		}
 
@@ -643,11 +706,23 @@
 					fixed[newnode] = fixed[oldnode];
 					delete fixed[oldnode];
 				}
+				if (oldnode in displs) {
+					displs[newnode] = displs[oldnode];
+					displs_a[newnode] = displs_a[oldnode];
+					delete displs[oldnode];
+					delete displs_a[oldnode];
+				}
+				if (oldnode in slopes) {
+					slopes[newnode] = slopes[oldnode];
+					slopes_a[newnode] = slopes_a[oldnode];
+					delete slopes[oldnode];
+					delete slopes_a[oldnode];
+				}
 			}
 		}
 
 		[channels, rxns] = computeFE(getV('moi'), getV('elastic_modulus'),
-			order, poses, forces, moments, pinned, fixed);
+			order, poses, forces, moments, pinned, fixed, displs, slopes);
 
 		for (pin in pinned) {
 			noden = order.indexOf(parseInt(pin));
@@ -657,6 +732,15 @@
 			noden = order.indexOf(parseInt(fix));
 			setV(`load_${fixed[fix]}_2`, rxns[noden*2]);
 			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
+		}
+		for (dis in displs_a) {
+			noden = order.indexOf(parseInt(dis));
+			console.log(noden, dis);
+			setV(`load_${displs_a[dis]}_3`, rxns[noden*2]);
+		}
+		for (slo in slopes_a) {
+			noden = order.indexOf(parseInt(slo));
+			setV(`load_${slopes_a[slo]}_3`, rxns[noden*2+1]);
 		}
 
 		// draw the plot
@@ -793,7 +877,7 @@
 				y1 = y0 - 25*sgn;
 				y2 = y0 - 45*sgn;
 				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
+				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
 				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
@@ -802,10 +886,34 @@
 
 				shape = document.createElementNS('http://www.w3.org/2000/svg','circle');
 				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#3c3' : '#d22');
+				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
 				shape.setAttribute('cx', cp);
 				shape.setAttribute('cy', y0);
 				shape.setAttribute('r', 12);
+				shape.setAttribute('cp', position);
+				beam_items.append(shape);
+			} else if (type == 'slope') {
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
+				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+				x1 = cp + 14*sgn;
+				y1 = y0 - 14;
+				x2 = cp - 14*sgn;
+				y2 = y0 + 14;
+				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
+				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
+				shape.classList.add('beam-prescribed');
+				shape.setAttribute('cp', position);
+				beam_items.append(shape);
+			} else if (type == 'displacement') {
+				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
+				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+				x1 = cp;
+				y1 = y0 - 14;
+				x2 = cp;
+				y2 = y0 + 14;
+				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
+				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
+				shape.classList.add('beam-prescribed');
 				shape.setAttribute('cp', position);
 				beam_items.append(shape);
 			}
@@ -964,6 +1072,10 @@
 
 	.beam-shape {
 		stroke: none;
+	}
+
+	.beam-prescribed {
+		stroke-width: 3;
 	}
 
 	.beam-arrow {
