@@ -84,7 +84,7 @@
 		G /= getV("G3A",1);
 
 		setV("G_pre", G, 4);
-		setV("G_comb", G*getV("G_pod"), 4);
+		setV("G_comb", G*getV("G_pod"));
 	}
 	function computePodRatio() {
 		var G = 1;
@@ -96,7 +96,7 @@
 		G /= getV("G3AP",1);
 
 		setV("G_pod", G, 4);
-		setV("G_comb", G*getV("G_pre"), 4);
+		setV("G_comb", G*getV("G_pre"));
 	}
 
 	function compute() {

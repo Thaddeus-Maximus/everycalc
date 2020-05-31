@@ -167,22 +167,22 @@
 			let Mres = convertFrom(parseMath(load_expr, variables), UNIT_MAP.force[UNIT_sys])*r;
 			let run_state = MOTOR_computeState(motor, 'torque', 0);
 			setV("theor_run_spd",     run_state.speed*r/G);
-			setV("theor_run_current", run_state.current, 2);
+			setV("theor_run_current", run_state.current);
 			
 
 			let free_state = MOTOR_computeState(motor, 'torque', 0);
 			setV("theor_free_spd",     free_state.speed*r/G);
-			setV("theor_free_current", free_state.current, 2);
+			setV("theor_free_current", free_state.current);
 			setV("theor_adj_spd",      free_state.speed*r/G*getV("gearbox_speedloss", NaN));
 
 			let stall_state = MOTOR_computeState(motor, 'speed', 0);
 			setV("theor_stall_force",    stall_state.torque*G/r);
-			setV("theor_stall_current",  stall_state.current, 2);
+			setV("theor_stall_current",  stall_state.current);
 
 			if (isFinite(mu*N*r/G)) {
 				let traction_state = MOTOR_computeState(motor, 'torque', mu*N*r/G);
 				setV("theor_traction_force",    traction_state.torque*G/r);
-				setV("theor_traction_current",  traction_state.current, 2);
+				setV("theor_traction_current",  traction_state.current);
 			} else {
 				setV("theor_traction_force",    '-');
 				setV("theor_traction_current",  '-');
@@ -310,20 +310,20 @@
 					f: {axis: 'z'}
 				},
 				queries: {
-					INDEX: { places: 0 },
-					cur: { places: 4 },
-					t: { places: 4 },
+					INDEX: {},
+					cur: {},
+					t: {},
 
-					d: { places: 4 },
-					v: { places: 4 },
-					a: { places: 4 },
-					f: { places: 4 },
+					d: {},
+					v: {},
+					a: {},
+					f: {},
 
-					omega: { places: 4 },
-					theta: { places: 4 },
-					T: { places: 4 },
-					alpha: { places: 4 },
-					voltage: { places: 3 }
+					omega: {},
+					theta: {},
+					T: {},
+					alpha: {},
+					voltage: {}
 				}
 			}, channels);
 
