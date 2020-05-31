@@ -116,8 +116,9 @@
 	    		computeMOI();
 	    	}
 	    	if(input.id.startsWith('transmission_')) {
-	    		let str = input.id.split('_');
-	    		computeTransmission(str[1]);
+	    		//let str = input.id.split('_');
+	    		//computeTransmission(str[1]);
+	    		//compute();
 	    	}
 			if(key!=13) setError(1);
 	    });
@@ -132,16 +133,16 @@
 		container.dataset.current_stage_id ++;
 		transmission.innerHTML = `
 		<span>
-			<select class="dynamic-input" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
+			[${x}]<select class="dynamic-input" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
 				<option value="spur" >Spur</option>
 				<option value="belt" >Belt</option>
 				<option value="chain" >Chain</option>
 				<option value="vp"  selected='selected' >VersaPlanetary</option>
 			</select>
 		</span><span style="float:right;">
-			<button onclick="moveLoad(${x},+1); compute();" title="Move Up">^</button>
-			<button onclick="moveLoad(${x},-1); compute();" title="Move Down">v</button>
-			<button onclick="removeLoad(${x}); compute();" title="Remove">X</button>
+			<button onclick="moveTransmissionStage(${x},-1); compute();" title="Move Up" id="transmission_${x}_moveup">^</button>
+			<button onclick="moveTransmissionStage(${x},+1); compute();" title="Move Down" id="transmission_${x}_moveup">v</button>
+			<button onclick="removeTransmissionStage(${x}); compute();" title="Remove">X</button>
 		</span>
 		<div id="transmission_${x}_detail" style="width:100%; overflow:hidden;"></div>
 		`;
@@ -153,6 +154,45 @@
 		}
 		selectTransmissionType(x);
 		registerCallbacks();
+	}
+
+	function removeTransmissionStage(x) {
+		let container = document.getElementById('transmission_stages');
+		for(i=0; i<container.children.length; i++) {
+			if (container.children[i].dataset.stage_id == x) {
+				container.removeChild(container.children[i]);
+				i--;
+			}
+			else { // make them even and odd
+				container.children[i].classList.remove(i%2 ? 'odd' : 'even');
+				container.children[i].classList.add(i%2 ? 'even' : 'odd');
+			}
+		}
+	}
+
+	function moveTransmissionStage(x, direction) {
+		let container = document.getElementById('transmission_stages');
+		let searching = true;
+		for(let i=(direction < 0 ? 1:0); i<container.childNodes.length-(direction > 0 ? 1:0); i++) {
+			if (container.childNodes[i].dataset.stage_id == x) {
+				// found the correct child, now do the swapping...
+				let pulled = container.removeChild(container.childNodes[i]);
+				console.log(i, pulled);
+				console.log(container.childNodes.length);
+				if (direction > 0) {
+					container.insertBefore(pulled, container.childNodes[i+1]);
+					document.getElementById(`transmission_${x}_movedown`).focus();
+				} else {
+					container.insertBefore(pulled, container.childNodes[i-1]);
+					document.getElementById(`transmission_${x}_moveup`).focus();
+				}
+				break;
+			}
+		}
+		for(i=0; i<container.children.length; i++) {
+			container.children[i].classList.remove(i%2 ? 'odd' : 'even');
+			container.children[i].classList.add(i%2 ? 'even' : 'odd');
+		}
 	}
 
 	function selectTransmissionType(x) {
@@ -175,7 +215,7 @@
 				<table style="float: left">
 					<tr>
 						<td class="rowlabel">Stage 1 </td>
-						<td><input id="transmission_${x}_stage_1" /></td>
+						<td><input id="transmission_${x}_stage_1" value=7 /></td>
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Stage 2 </td>
@@ -224,8 +264,7 @@
 		UNIT_change();
 	}
 
-	function computeTransmission(x) {
-		console.log('computing', x);
+	function computeTransmission(x, torque) {
 		let container = document.getElementById(`transmission_${x}_detail`);
 		let type      = document.getElementById(`transmission_${x}_type`).value;
 		switch(type) {
@@ -262,21 +301,44 @@
 				};
 				caps[0] = shaftmap[document.getElementById(`transmission_${x}_shaft`).value];
 
-				let idxmin = caps.indexOf(Math.min(...caps));
-				let capmin = Math.min(...caps);
+				let idxmin  = caps.indexOf(Math.min(...caps));
+				let capmin  = Math.min(...caps);
+				let torqout = torque*overall_ratio;
+				let fosmin  = capmin/torqout;
 
 				setV(`transmission_${x}_torque_cap`, capmin);
-				setV(`transmission_${x}_fos_pos`, idxmin ? `Stage ${idxmin}` : 'Shaft');
-				setV(`transmission_${x}_ratio`, overall_ratio, 0);
+				setV(`transmission_${x}_torque_out`, torqout);
+				setV(`transmission_${x}_fos`,        fosmin);
+				setV(`transmission_${x}_fos_pos`,    idxmin ? `Stage ${idxmin}` : 'Shaft');
+				setV(`transmission_${x}_ratio`,      overall_ratio, 0);
 
-				break;
+				return [fosmin, torqout, overall_ratio];
 		}
 	}
 
 	function compute() {
 		let computed_basic = false;
 		try{
+			let container = document.getElementById('transmission_stages');
+			let torque    = getV('motor_stall_torque');
+			let fos       = +Infinity;
+			let fos_pos   = NaN;
+			let overall_ratio = 1;
+			setV('input_torque', torque);
+			for(stage of container.children) {
+				let res = computeTransmission(stage.dataset.stage_id, torque);
+				overall_ratio *= res[2];
+				torque = res[1];
+				if (res[0] < fos) {
+					fos_pos = stage.dataset.stage_id;
+					fos     = res[0];
+				}
+			}
 			
+			setV('overall_fos', fos);
+			setV('output_torque', torque);
+			setV('overall_ratio', overall_ratio);
+
 		}catch(err){
 			console.log(err);
 			setError(2, err);
@@ -369,8 +431,8 @@
 			</div>
 		</div>
 		<div style="">
-			<div id="transmission_stages" data-current_stage_id=0 ><!-- transmission stages will go inside of here --></div>
-			<button id="add_transmission_stage" onclick="addTransmissionStage()" style="width: 100%">Add Stage</button>
+			<div id="transmission_stages" data-current_stage_id=0 ></div>
+			<button id="add_transmission_stage" onclick="addTransmissionStage(); compute();" style="width: 100%">Add Stage</button>
 		</div>
 	</div>
 </div>
