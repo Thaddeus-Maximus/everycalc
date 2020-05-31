@@ -19,7 +19,7 @@
 
 	EXP_FN_BASE = 'simplemech'; // filename base for export utility
 	UNIT_MAP = { // map of units
-		"torque": ["N-m", "N-m"],
+		"torque": ["N-m", "in-lbf"],
 		"encoder_cpx": ["c/m", "c/ft"],
 		"radius": ["mm","in"],
 		"force": ["N", "lbf"],
@@ -94,12 +94,6 @@
 			let key = e.keyCode ? e.keyCode : e.which;
 			let input = e.target;
 
-			if(input.id == 'toggle-gratio'){
-				collapseGearRatio();
-				calcRatio();
-				compute();
-			}
-		  	
 		  	if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
 
 	    	// if a key is pressed, invalidate current results
@@ -109,10 +103,174 @@
 			}
 		});
 		EC_setOnKeyUp(); // default handler is OK
-
-		calcRatio();
 		compute();
 		//WALK_onload();
+	}
+
+	function registerCallbacks() {
+		EC_setOnInput(function(e) {
+	    	let key = e.keyCode ? e.keyCode : e.which;
+	    	let input = e.target;
+	    	if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
+	    	if(input.id.startsWith('section_')) {
+	    		computeMOI();
+	    	}
+	    	if(input.id.startsWith('transmission_')) {
+	    		let str = input.id.split('_');
+	    		computeTransmission(str[1]);
+	    	}
+			if(key!=13) setError(1);
+	    });
+		EC_setOnKeyUp(); // default handler OK
+	}
+
+	function addTransmissionStage(params) {
+		setError(1);
+		let container = document.getElementById('transmission_stages');
+		let transmission = document.createElement('div');
+		x = container.dataset.current_stage_id;
+		container.dataset.current_stage_id ++;
+		transmission.innerHTML = `
+		<span>
+			<select class="dynamic-input" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
+				<option value="spur" >Spur</option>
+				<option value="belt" >Belt</option>
+				<option value="chain" >Chain</option>
+				<option value="vp"  selected='selected' >VersaPlanetary</option>
+			</select>
+		</span><span style="float:right;">
+			<button onclick="moveLoad(${x},+1); compute();" title="Move Up">^</button>
+			<button onclick="moveLoad(${x},-1); compute();" title="Move Down">v</button>
+			<button onclick="removeLoad(${x}); compute();" title="Remove">X</button>
+		</span>
+		<div id="transmission_${x}_detail" style="width:100%; overflow:hidden;"></div>
+		`;
+		transmission.dataset.stage_id = x;
+		transmission.classList.add(x%2 ? 'even' : 'odd');
+		container.appendChild(transmission);
+		if (typeof params != 'undefined') {
+			// process args
+		}
+		selectTransmissionType(x);
+		registerCallbacks();
+	}
+
+	function selectTransmissionType(x) {
+		let container = document.getElementById(`transmission_${x}_detail`);
+		let type      = document.getElementById(`transmission_${x}_type`).value;
+		switch(type) {
+			case 'spur':
+				container.innerHTML =`
+				<table>
+					<tr>
+						<td class="rowlabel">IN</td>
+					</tr><tr>
+						<td class="rowlabel">OUT</td>
+					</tr>
+				</table>
+				`;
+				break;
+			case 'vp':
+				container.innerHTML =`
+				<table style="float: left">
+					<tr>
+						<td class="rowlabel">Stage 1 </td>
+						<td><input id="transmission_${x}_stage_1" /></td>
+						<td>:1</td>
+					</tr><tr>
+						<td class="rowlabel">Stage 2 </td>
+						<td><input id="transmission_${x}_stage_2" /></td>
+						<td>:1</td>
+					</tr><tr>
+						<td class="rowlabel">Stage 3 </td>
+						<td><input id="transmission_${x}_stage_3" /></td>
+						<td>:1</td>
+					</tr><tr>
+						<td class="rowlabel">Stage 4 </td>
+						<td><input id="transmission_${x}_stage_4" /></td>
+						<td>:1</td>
+					</tr><tr>
+						<td class="rowlabel">Output Shaft: </td>
+						<td colspan=2><select id="transmission_${x}_shaft" >
+							<option value="hex_500">1/2" Hex</option>
+							<option value="hex_375">3/8" Hex</option>
+							<option value="rnd_500">1/2" Keyed</option>
+							<option value="cim">CIM Shaft</option>
+						</select></td>
+					</tr>
+				</table>
+
+				<table style="float:right">
+					<tr>
+						<td class="rowlabel" readonly>Ratio </td>
+						<td><input id="transmission_${x}_ratio" readonly /></td>
+						<td></td>
+					</tr><tr>
+						<td class="rowlabel">Output/Capacity</td>
+						<td><input id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
+						<td>/</td>
+						<td><input id="transmission_${x}_torque_cap" data-unit="torque" readonly /></td>
+						<td class="unit" data-unit="torque" ></td>
+					</tr><tr>
+						<td class="rowlabel">Factor of Safety </td>
+						<td><input id="transmission_${x}_fos" readonly /></td>
+						<td>@</td>
+						<td><input id="transmission_${x}_fos_pos" readonly /></td>
+					</tr>
+				</table>
+				`;
+				break;
+		}
+		UNIT_change();
+	}
+
+	function computeTransmission(x) {
+		console.log('computing', x);
+		let container = document.getElementById(`transmission_${x}_detail`);
+		let type      = document.getElementById(`transmission_${x}_type`).value;
+		switch(type) {
+			case 'spur':
+				
+				break;
+			case 'vp':
+				let caps = [0,0,0,0,0]; // in this array shaft is first, connected to fourth, then third, then second, then first stage (motor connected to first stage)
+				let overall_ratio = 1;
+				for (let i=4; i>=1; i--) {
+					let id = `transmission_${x}_stage_${i}`;
+					let ratio = document.getElementById(id).value;
+					let stagecap = +Infinity;
+					document.getElementById(id).classList.remove('error');
+					if ([3,4,5].includes(parseInt(ratio))) {
+						stagecap = +Infinity*overall_ratio;
+						overall_ratio *= parseInt(ratio);
+					} else if ([7,9,10].includes(parseInt(ratio))) {
+						stagecap = 100*overall_ratio;
+						overall_ratio *= parseInt(ratio);
+					} else if (typeof ratio=='string' && ratio.toLowerCase().startsWith('r')) {
+						stagecap = 160*overall_ratio;
+					} else if (ratio!=='') {
+						stagecap = 0;
+						document.getElementById(id).classList.add('error');
+					}
+					caps[i] = stagecap;
+				}
+				let shaftmap = {
+					hex_500: 157,
+					hex_375: 57,
+					rnd_500: 130,
+					cim:     29
+				};
+				caps[0] = shaftmap[document.getElementById(`transmission_${x}_shaft`).value];
+
+				let idxmin = caps.indexOf(Math.min(...caps));
+				let capmin = Math.min(...caps);
+
+				setV(`transmission_${x}_torque_cap`, capmin);
+				setV(`transmission_${x}_fos_pos`, idxmin ? `Stage ${idxmin}` : 'Shaft');
+				setV(`transmission_${x}_ratio`, overall_ratio, 0);
+
+				break;
+		}
 	}
 
 	function compute() {
@@ -160,58 +318,60 @@
 	</svg>
 
 	<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="float: left; display:table-row;" class="container">
-		<div class="even" id="user_input_motor" style="display:table-cell;">
-			<span># Motors
-			<input class='narrow' id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></span><br/>
-			<span class="rowlabel">Motor</span>
-			<select class="doublewide" id="motor_select" onchange="MOTOR_selectMotor('motor'); compute();">
-			</select>
-			<input class="dropdown" type="checkbox" id="toggle-motor">
-			<label class="dropdown" for="toggle-motor">V</label>
-			<table id='detail_motor' class="dropdown">
-				<tr>
-					<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
-					<td><input data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
-					<td class="unit" data-unit="omega" >[RPM]</td>
-				</tr><tr>
-					<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-					<td><input data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
-					<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
-				</tr><tr>
-					<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
-					<td><input id="motor_free_current" readonly value=1.3 /></td>
-					<td class="unit">[A]</td>
-				</tr><tr>
-					<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
-					<td><input id="motor_stall_current" readonly value=166 /></td>
-					<td class="unit">[A]</td>
-				</tr>
-			</table>
+	<div style="" class="container">
+		<div style="display:table-row">
+			<div class="even" id="user_input_motor" style="display:table-cell;">
+				<span># Motors
+				<input class='narrow' id="motor_count" oninput="MOTOR_selectMotor('motor'); compute();" value=1 /></span><br/>
+				<span class="rowlabel">Motor</span>
+				<select class="doublewide" id="motor_select" onchange="MOTOR_selectMotor('motor'); compute();">
+				</select>
+				<input class="dropdown" type="checkbox" id="toggle-motor">
+				<label class="dropdown" for="toggle-motor">V</label>
+				<table id='detail_motor' class="dropdown">
+					<tr>
+						<th class="rowlabel">Free Speed<span class="ttt">The maximum RPM of the motor</span></th>
+						<td><input data-unit="omega" id="motor_max_speed" readonly value=5880 /></td>
+						<td class="unit" data-unit="omega" >[RPM]</td>
+					</tr><tr>
+						<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
+						<td><input data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
+						<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
+					</tr><tr>
+						<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
+						<td><input id="motor_free_current" readonly value=1.3 /></td>
+						<td class="unit">[A]</td>
+					</tr><tr>
+						<th class="rowlabel">Stall Current<span class="ttt">The current drawn at 0 RPM / Max Torque</span></th>
+						<td><input id="motor_stall_current" readonly value=166 /></td>
+						<td class="unit">[A]</td>
+					</tr>
+				</table>
+			</div>
+			<div class="output" id="computed_outputs" style="display:table-cell;">
+				<table>
+					<tr>
+						<th class="rowlabel">Input Torque</th>
+						<td><input data-unit="torque" id="input_torque" readonly /></td>
+						<td class="unit" data-unit="torque"></td>
+					</tr><tr>
+						<th class="rowlabel">Output Torque</th>
+						<td><input data-unit="torque" id="output_torque" readonly /></td>
+						<td class="unit" data-unit="torque"></td>
+					</tr><tr>
+						<th class="rowlabel">Overall Gear Ratio</th>
+						<td><input id="overall_ratio" readonly /></td>
+					</tr><tr>
+						<th class="rowlabel">Overall FOS</th>
+						<td><input id="overall_fos" readonly /></td>
+					</tr>
+				</table>
+			</div>
 		</div>
-		<div class="output" id="computed_outputs" style="display:table-cell;">
-			<table>
-				<tr>
-					<th class="rowlabel">Input Torque</th>
-					<td><input data-unit="torque" id="input_torque" readonly /></td>
-					<td class="unit" data-unit="torque"></td>
-				</tr><tr>
-					<th class="rowlabel">Output Torque</th>
-					<td><input data-unit="torque" id="output_torque" readonly /></td>
-					<td class="unit" data-unit="torque"></td>
-				</tr><tr>
-					<th class="rowlabel">Overall Gear Ratio</th>
-					<td><input id="overall_ratio" readonly /></td>
-				</tr><tr>
-					<th class="rowlabel">Overall FOS</th>
-					<td><input id="overall_fos" readonly /></td>
-				</tr>
-			</table>
+		<div style="">
+			<div id="transmission_stages" data-current_stage_id=0 ><!-- transmission stages will go inside of here --></div>
+			<button id="add_transmission_stage" onclick="addTransmissionStage()" style="width: 100%">Add Stage</button>
 		</div>
-	</div>
-	<div style="float: left; display:table-row;" class="container">
-		
-		<div id="transmission_stages" style="display:table-row"><!-- transmission stages will go inside of here --></div>
 	</div>
 </div>
 </body>
