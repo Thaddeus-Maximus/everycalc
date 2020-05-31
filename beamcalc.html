@@ -548,7 +548,6 @@
 			if (! dofs_to_remove.includes(i)) idx_part_u.push(i);
 			else                              idx_part_k.push(i);
 		}
-		console.log(idx_part_k, idx_part_u);
 		K1 = K.subset(math.index(idx_part_u, idx_part_u));
 		K2 = K.subset(math.index(idx_part_u, idx_part_k));
 		K3 = K.subset(math.index(idx_part_k, idx_part_u));
@@ -562,10 +561,8 @@
 		F.subset(math.index(idx_part_u,0), Fu);
 		Q.subset(math.index(idx_part_k,0), Qk);
 		Q.subset(math.index(idx_part_u,0), Qu);
-		//console.log(F, Q, Qu, Fk); return;
 		Qflat = math.flatten(Q)._data;
 		Fflat = math.flatten(F)._data;
-		console.log(Qflat);
 
 		channels = {
 			x : [], // x, position
@@ -735,7 +732,6 @@
 		}
 		for (dis in displs_a) {
 			noden = order.indexOf(parseInt(dis));
-			console.log(noden, dis);
 			setV(`load_${displs_a[dis]}_3`, rxns[noden*2]);
 		}
 		for (slo in slopes_a) {
