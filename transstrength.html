@@ -19,7 +19,7 @@
 
 <script type="text/javascript" id="main">
 
-	EXP_FN_BASE = 'simplemech'; // filename base for export utility
+	EXP_FN_BASE = 'transmission'; // filename base for export utility
 	UNIT_MAP = { // map of units
 		"torque": ["N-m", "in-lbf"],
 		"encoder_cpx": ["c/m", "c/ft"],
@@ -36,7 +36,8 @@
 		"angle": ["deg", "deg"],
 		"pct":   ["%", "%"],
 		"dimension": ["mm", "in"],
-		"pa": ["deg","deg"]
+		"pa": ["deg","deg"],
+		"motor-torque": ["N-m", "N-m"]
 	};
 	/*WALK_STEPS = [{
 			poi: 'user_input_motor',
@@ -84,6 +85,23 @@
 		}];*/
 </script>
 <script type="text/javascript">
+
+	/* TODO LAND
+	 * - Persistence / spawnable boxes
+	 * - Constrain spur gear sets so that they meet a given center distance
+	 * - Dropdown list of common COTS gearboxes
+	 * -- AM Toughbox Series, AM Sonic Shifter, All the WCP Boxes, 
+	 * - More accurate chain model?
+	 * - Full options for materials
+	 *  - Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
+	 * - Options for multi-motor propogation? For instance, you _could_ feed two versaplanetaries into a toughbox.
+	 * - VersaDM Gearbox for VersaPlanetary
+	 * - Optionless reduction
+	 * - REV UltraPlanetary (only 3,4,5:1 ratios, final stage always fails at 40:1)
+	 * - Rack and Pinion output
+	 * - Better error handling, more robust input validation? There seems to be some gaps
+	 * - Revamp UI? Some things feel a little out of place
+	 */
 
 	/* Initialization routine run on page load */
 	function init() {
@@ -137,7 +155,7 @@
 		container.dataset.current_stage_id ++;
 		transmission.innerHTML = `
 		<span>
-			[${x}]<select class="dynamic-input doublewide" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
+			<select class="dynamic-input doublewide" id="transmission_${x}_type" onchange="selectTransmissionType(${x}); compute();">
 				<option value="spur" selected >Spur</option>
 				<option value="belt" >Belt</option>
 				<option value="chain" >Chain</option>
@@ -325,7 +343,7 @@
 						<td>:1</td>
 					</tr><tr>
 						<td class="rowlabel">Output Shaft: </td>
-						<td colspan=2><select class="dynamic-input" id="transmission_${x}_shaft" >
+						<td colspan=2><select class="dynamic-input" id="transmission_${x}_shaft" onchange="compute();" >
 							<option value="hex_500">1/2" Hex</option>
 							<option value="hex_375">3/8" Hex</option>
 							<option value="rnd_500">1/2" Keyed</option>
@@ -522,7 +540,7 @@
 						<td><input class="dynamic-input" id="transmission_${x}_torque_out" data-unit="torque" readonly /></td>
 						<td></td><td class="unit" data-unit="torque" ></td>
 					</tr><tr>
-						<td class="rowlabel">Belt FOS</td>
+						<td class="rowlabel">Chain FOS</td>
 						<td><input class="dynamic-input" id="transmission_${x}_g_fos" readonly /></td>
 						<td>@</td>
 						<td><input class="dynamic-input" id="transmission_${x}_g_fos_pos" readonly /></td>
@@ -728,7 +746,7 @@
 		}
 	}
 
-	function computeTransmission(x, torque, n_inputs) {
+	function computeTransmission(x, torque, speed, n_inputs) {
 		let container = document.getElementById(`transmission_${x}_detail`);
 		let type      = document.getElementById(`transmission_${x}_type`).value;
 		if(type=='vp'){
@@ -765,6 +783,7 @@
 			let capmin  = Math.min(...caps);
 			let torqout = torque*overall_ratio;
 			let fosmin  = capmin/torqout;
+			let spdout  = speed/overall_ratio;
 
 			setV(`transmission_${x}_torque_cap`, capmin);
 			setV(`transmission_${x}_torque_out`, torqout);
@@ -772,23 +791,25 @@
 			setV(`transmission_${x}_fos_pos`,    idxmin ? `Stage ${idxmin}` : 'Shaft');
 			setV(`transmission_${x}_ratio`,      overall_ratio, 0);
 
-			return [fosmin, torqout, overall_ratio];
+			return [fosmin, torqout, overall_ratio, spdout];
 		} else if (type=='57sport') {
 			let series = document.getElementById(`transmission_${x}_series`).value;
 			let overall_ratio = document.getElementById(`transmission_${x}_ratio`).value;
 			let capmin = STRENGTH_MAP_57SPORT[series][overall_ratio];
 			let torqout = torque*overall_ratio;
 			let fosmin  = capmin/torqout;
+			let spdout  = speed/overall_ratio;
 
 			setV(`transmission_${x}_torque_cap`, capmin);
 			setV(`transmission_${x}_torque_out`, torqout);
 			setV(`transmission_${x}_fos`,        fosmin);
 			setV(`transmission_${x}_ratio`,      overall_ratio, 0);
 
-			return [fosmin, torqout, overall_ratio];
+			return [fosmin, torqout, overall_ratio, spdout];
 		} else if (type=='spur') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
 			let torqout = torque*overall_ratio;
+			let spdout  = speed/overall_ratio;
 
 			let torq_g_inp = computeGearStrength({
 				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
@@ -831,10 +852,11 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio];
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
 		} else if (type=='belt') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
-			let torqout = torque*overall_ratio;
+			let torqout = torque*overall_ratio;			
+			let spdout  = speed/overall_ratio;
 
 			// TODO: RPM
 			let series   = document.getElementById(`transmission_${x}_series`).value;
@@ -845,10 +867,10 @@
 			let bdata    = BELT_RATINGS[`${series}_${pitch}`];
 
 			let torq_g_inp = BELT_computeBeltTorqueCapacity(
-				bdata, 0, getV(`transmission_${x}_inp_teeth`), width, length)
+				bdata, convertTo(speed, 'RPM'),  getV(`transmission_${x}_inp_teeth`), width, length)
 				*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = BELT_computeBeltTorqueCapacity(
-				bdata, 0, getV(`transmission_${x}_out_teeth`), width, length);
+				bdata, convertTo(spdout, 'RPM'), getV(`transmission_${x}_out_teeth`), width, length);
 
 			let torq_s_inp = computeShaftStrength(`transmission_${x}_inp`)*overall_ratio*n_inputs;
 			let torq_s_out = computeShaftStrength(`transmission_${x}_out`);
@@ -872,10 +894,11 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio];
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
 		} else if (type=='chain') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
 			let torqout = torque*overall_ratio;
+			let spdout  = speed/overall_ratio;
 
 			// TODO: RPM
 			let series = document.getElementById(`transmission_${x}_series`).value;
@@ -907,7 +930,7 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio];
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
 		}
 	}
 
@@ -920,11 +943,13 @@
 			let fos       = +Infinity;
 			let fos_pos   = NaN;
 			let overall_ratio = 1;
+			let speed     = getV('motor_max_speed');
 			setV('input_torque', torque);
 			for(stage of container.children) {
-				let res = computeTransmission(stage.dataset.stage_id, torque, n_inputs);
+				let res = computeTransmission(stage.dataset.stage_id, torque, speed, n_inputs);
 				overall_ratio *= res[2];
 				torque = res[1];
+				speed  = res[3];
 				if (res[0] < fos) {
 					fos_pos = stage.dataset.stage_id;
 					fos     = res[0];
@@ -932,8 +957,9 @@
 				n_inputs = 1; // after first round, set the number of inputs to 1
 			}
 			
-			setV('overall_fos', fos);
+			setV('overall_fos',   fos);
 			setV('output_torque', torque);
+			setV('output_speed',  speed);
 			setV('overall_ratio', overall_ratio);
 
 		}catch(err){
@@ -994,8 +1020,8 @@
 						<td class="unit" data-unit="omega" >[RPM]</td>
 					</tr><tr>
 						<th class="rowlabel">Stall Torque<span class="ttt">The maximum torque of the motor, occurring at 0 RPM</span></th>
-						<td><input data-unit="torque" id="motor_stall_torque" readonly value=3.36 /></td>
-						<td class="unit" data-unit="torque" id="unit_motor_stall_torque"></td>
+						<td><input data-unit="motor-torque" id="motor_stall_torque" readonly value=3.36 /></td>
+						<td class="unit" data-unit="motor-torque" id="unit_motor_stall_torque"></td>
 					</tr><tr>
 						<th class="rowlabel">Free Current<span class="ttt">The current drawn when the motor is unloaded</span></th>
 						<td><input id="motor_free_current" readonly value=1.3 /></td>
@@ -1017,6 +1043,10 @@
 						<th class="rowlabel">Output Torque</th>
 						<td><input data-unit="torque" id="output_torque" readonly /></td>
 						<td class="unit" data-unit="torque"></td>
+					</tr><tr>
+						<th class="rowlabel">Output Speed</th>
+						<td><input data-unit="omega" id="output_speed" readonly /></td>
+						<td class="unit" data-unit="omega"></td>
 					</tr><tr>
 						<th class="rowlabel">Overall Gear Ratio</th>
 						<td><input id="overall_ratio" readonly /></td>
