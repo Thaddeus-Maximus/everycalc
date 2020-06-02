@@ -92,7 +92,7 @@
 	 * - Dropdown list of common COTS gearboxes
 	 * -- AM Toughbox Series, AM Sonic Shifter, All the WCP Boxes, 
 	 * - More accurate chain model?
-	 * - Full options for materials
+	 * - Full options for materials, move that logic to materials.js
 	 *  - Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
 	 * - Options for multi-motor propogation? For instance, you _could_ feed two versaplanetaries into a toughbox.
 	 * - VersaDM Gearbox for VersaPlanetary
@@ -101,6 +101,8 @@
 	 * - Rack and Pinion output
 	 * - Better error handling, more robust input validation? There seems to be some gaps
 	 * - Revamp UI? Some things feel a little out of place
+	 * - Highlight low FOSes
+	 * - Build walkthrough
 	 */
 
 	/* Initialization routine run on page load */
@@ -112,19 +114,7 @@
 		UNIT_change();
 
 		// on keyup for all variables
-		EC_setOnInput(function(e) {
-			let key = e.keyCode ? e.keyCode : e.which;
-			let input = e.target;
-
-		  	if(input.id.startsWith('toggle')) return; // ignore these, just css stuff
-
-	    	// if a key is pressed, invalidate current results
-	    	setError(1);
-			if (input.type == 'checkbox') {
-				compute();
-			}
-		});
-		EC_setOnKeyUp(); // default handler is OK
+		registerCallbacks();
 		compute();
 		//WALK_onload();
 	}
@@ -142,6 +132,8 @@
 	    		//computeTransmission(str[1]);
 	    		//compute();
 	    	}
+		  	if(input.id.endsWith('_spacing_drives') || input.id.endsWith('_teeth') || input.id.endsWith('_spacing'))
+			  	computeTeeth(input);
 			if(key!=13) setError(1);
 	    });
 		EC_setOnKeyUp(); // default handler OK
@@ -213,6 +205,36 @@
 		for(i=0; i<container.children.length; i++) {
 			container.children[i].classList.remove(i%2 ? 'odd' : 'even');
 			container.children[i].classList.add(i%2 ? 'even' : 'odd');
+		}
+	}
+
+	function getDP(x) { // return diametral pitch in 1/m
+		return document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
+					convertFrom(getV(`transmission_${x}_module`), '1/in') :
+					convertFrom(1/getV(`transmission_${x}_module`), '1/mm')
+	}
+
+	function computeTeeth(input) {
+		x = parseInt(input.id.split('_')[1]); // get that sick ID
+		if (document.getElementById(`transmission_${x}_type`).value != 'spur') return; // you shouldn't be here, go away
+		if (document.getElementById(`transmission_${x}_spacing_drives`).checked) {
+			document.getElementById(`transmission_${x}_spacing`).readOnly = false;
+			if (input.id.endsWith('_inp_teeth') || input.id.endsWith('_spacing_drives') || input.id.endsWith('_spacing')) {
+				let spacing  = getV(`transmission_${x}_spacing`);
+				let teeth    = getV(`transmission_${x}_inp_teeth`);
+				let dp       = getDP(x);
+				let newTeeth = (2*spacing - teeth/dp)*dp;
+				setV(`transmission_${x}_out_teeth`, newTeeth);
+			} else if (input.id.endsWith('_out_teeth')) {
+				let spacing = getV(`transmission_${x}_spacing`);
+				let teeth = getV(`transmission_${x}_out_teeth`);
+				let dp       = getDP(x);
+				let newTeeth = (2*spacing - teeth/dp)*dp;
+				setV(`transmission_${x}_inp_teeth`, newTeeth);
+			}
+		} else {
+			document.getElementById(`transmission_${x}_spacing`).readOnly = true;
+			setV(`transmission_${x}_spacing`, (getV(`transmission_${x}_out_teeth`)+getV(`transmission_${x}_inp_teeth`))/getDP(x)/2 );
 		}
 	}
 
@@ -299,6 +321,11 @@
 						</td>
 						<td class="unit" data-unit="pa"></td>
 					</tr><tr>
+						<td class="rowlabel">Spacing</td>
+						<td><input id="transmission_${x}_spacing" value='' data-unit="dimension"/></td>
+						<td class="unit" data-unit="dimension"></td>
+						<td><input type="checkbox" id="transmission_${x}_spacing_drives" />Drive Teeth?</td>
+					</tr><tr>
 						<td class="rowlabel">Ratio </td>
 						<td><input class="dynamic-input" id="transmission_${x}_ratio" readonly /></td>
 						<td></td>
@@ -321,6 +348,7 @@
 				`;
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
+				computeTeeth(document.getElementById(`transmission_${x}_spacing_drives`));
 				break;
 			case 'vp':
 				container.innerHTML =`
@@ -723,7 +751,6 @@
 		let diameter = getV(prefix+"_diameter");
 		document.getElementById(prefix+"_diameter").classList.remove('error');
 		let S = 0;
-		console.log(type, matl, diameter);
 		// matl.Sy = torq*radius/J = torq/S => torq = matl.Sy*S
 		switch(type) {
 			case 'ignore':
@@ -812,18 +839,14 @@
 			let spdout  = speed/overall_ratio;
 
 			let torq_g_inp = computeGearStrength({
-				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
-					convertFrom(getV(`transmission_${x}_module`), '1/in') :
-					convertFrom(1/getV(`transmission_${x}_module`), '1/mm') , // invert module to get it into dp
+				dp: getDP(x), // invert module to get it into dp
 				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_inp_teeth_matl`).value].Sy,
 				w:  getV(`transmission_${x}_inp_teeth_width`),
 				n:  getV(`transmission_${x}_inp_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value
 			})*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = computeGearStrength({
-				dp: document.getElementById(`transmission_${x}_moduleselect`).value=='dp' ?
-					convertFrom(getV(`transmission_${x}_module`), 'in') :
-					convertFrom(1/getV(`transmission_${x}_module`), 'mm') , // invert module to get it into dp
+				dp: getDP(x), // invert module to get it into dp
 				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_out_teeth_matl`).value].Sy,
 				w:  getV(`transmission_${x}_out_teeth_width`),
 				n:  getV(`transmission_${x}_out_teeth`),
