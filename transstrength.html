@@ -176,8 +176,8 @@
 		transmission.classList.add(x%2 ? 'even' : 'odd');
 		container.appendChild(transmission);
 		if (typeof params != 'undefined') {
-			document.getElementById(`transmission_${x}_type`).value = params[`transmission_${x}_type`];
-			delete params[`transmission_${x}_type`]; // get rid of it so that it doesn't cause issues later?
+			document.getElementById(`transmission_${x}_type`).value = params.type
+			delete params.type; // get rid of it so that it doesn't cause issues later?
 		} else {
 			params = {};
 		}
@@ -218,7 +218,7 @@
 		}
 		for(i=0; i<container.children.length; i++) {
 			container.children[i].classList.remove(i%2 ? 'odd' : 'even');
-			container.children[i].classList.add(i%2 ? 'even' : 'odd');
+			container.children[i].classList.add   (i%2 ? 'even' : 'odd');
 		}
 	}
 
@@ -240,8 +240,8 @@
 				let newTeeth = (2*spacing - teeth/dp)*dp;
 				setV(`transmission_${x}_out_teeth`, newTeeth);
 			} else if (input.id.endsWith('_out_teeth')) {
-				let spacing = getV(`transmission_${x}_spacing`);
-				let teeth = getV(`transmission_${x}_out_teeth`);
+				let spacing  = getV(`transmission_${x}_spacing`);
+				let teeth    = getV(`transmission_${x}_out_teeth`);
 				let dp       = getDP(x);
 				let newTeeth = (2*spacing - teeth/dp)*dp;
 				setV(`transmission_${x}_inp_teeth`, newTeeth);
@@ -253,17 +253,19 @@
 	}
 
 	function unpackTransmissionParams(x, params) {
+		let strstrt = (`transmission_${x}_`).length;
 		for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
-			console.log(input);
-			if (! params[input.id])
+			let id = input.id.slice(strstrt);
+			if (! params[id])
 				continue;
 			else if (input.type == 'checkbox' || input.type == 'radio')
-				input.checked = params[input.id] == "true" ? true:false;
+				input.checked = params[id] == "true" ? true:false;
 			else
-				input.value = params[input.id];
+				input.value = params[id];
 		}
 		for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('select')) {
-			if(params[input.id]) input.value = params[input.id];
+			let id = input.id.slice(strstrt);
+			if(params[id]) input.value = params[id];
 		}
 	}
 
@@ -280,16 +282,19 @@
 
 		for(i=0; i<container.children.length; i++) {
 			let x = container.children[i].dataset.stage_id;
+			let strstrt = (`transmission_${x}_`).length;
 			trans_obj_i = {};
-			trans_obj_i[`transmission_${x}_type`] = document.getElementById(`transmission_${x}_type`).value;
+			trans_obj_i[`type`] = document.getElementById(`transmission_${x}_type`).value;
 			for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
+				let id = input.id.slice(strstrt);
 				if (input.type == 'checkbox' || input.type == 'radio')
-					trans_obj_i[input.id] = input.checked ? "true":"false";
+					trans_obj_i[id] = input.checked ? "true":"false";
 				else
-					trans_obj_i[input.id] = input.value;
+					trans_obj_i[id] = input.value;
 			}
 			for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('select')) {
-				trans_obj_i[input.id] = input.value;
+				let id = input.id.slice(strstrt);
+				trans_obj_i[id] = input.value;
 			}
 			trans_obj.push(trans_obj_i);
 		}
@@ -1084,6 +1089,7 @@
 
 			return [fosmin, torqout, overall_ratio, spdout];
 		} else if (type=='spur') {
+			computeTeeth(document.getElementById(`transmission_${x}_spacing_drives`));
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
 			let torqout = torque*overall_ratio;
 			let spdout  = speed/overall_ratio;
