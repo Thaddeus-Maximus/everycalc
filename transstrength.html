@@ -109,7 +109,17 @@
 	function init() {
 		EC_onload();
 		MOTOR_setupMotorSelect("motor");
-		EXP_onload();
+		
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
+		}
+
 		MOTOR_selectMotor("motor");
 		UNIT_change();
 
@@ -166,9 +176,12 @@
 		transmission.classList.add(x%2 ? 'even' : 'odd');
 		container.appendChild(transmission);
 		if (typeof params != 'undefined') {
-			// process args
+			document.getElementById(`transmission_${x}_type`).value = params[`transmission_${x}_type`];
+			delete params[`transmission_${x}_type`]; // get rid of it so that it doesn't cause issues later?
+		} else {
+			params = {};
 		}
-		selectTransmissionType(x);
+		selectTransmissionType(x, params);
 		registerCallbacks();
 	}
 
@@ -239,7 +252,51 @@
 		}
 	}
 
-	function selectTransmissionType(x) {
+	function unpackTransmissionParams(x, params) {
+		for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
+			console.log(input);
+			if (! params[input.id])
+				continue;
+			else if (input.type == 'checkbox' || input.type == 'radio')
+				input.checked = params[input.id] == "true" ? true:false;
+			else
+				input.value = params[input.id];
+		}
+		for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('select')) {
+			if(params[input.id]) input.value = params[input.id];
+		}
+	}
+
+	function loadDynamicPersistence() {
+		let trans_obj = JSON.parse(getLocalStorage('transmission_stages'));
+		for (let tran of trans_obj) {
+			addTransmissionStage(tran);
+		}
+	}
+
+	function dumpDynamicPersistence() {
+		let container = document.getElementById('transmission_stages');
+		let trans_obj = [];
+
+		for(i=0; i<container.children.length; i++) {
+			let x = container.children[i].dataset.stage_id;
+			trans_obj_i = {};
+			trans_obj_i[`transmission_${x}_type`] = document.getElementById(`transmission_${x}_type`).value;
+			for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
+				if (input.type == 'checkbox' || input.type == 'radio')
+					trans_obj_i[input.id] = input.checked ? "true":"false";
+				else
+					trans_obj_i[input.id] = input.value;
+			}
+			for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('select')) {
+				trans_obj_i[input.id] = input.value;
+			}
+			trans_obj.push(trans_obj_i);
+		}
+		setLocalStorage('transmission_stages', JSON.stringify(trans_obj));
+	}
+
+	function selectTransmissionType(x, params) {
 		let container = document.getElementById(`transmission_${x}_detail`);
 		let type      = document.getElementById(`transmission_${x}_type`).value;
 		switch(type) {
@@ -347,6 +404,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
 				computeTeeth(document.getElementById(`transmission_${x}_spacing_drives`));
@@ -392,6 +450,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				break;
 			case 'belt':
 				container.innerHTML =`
@@ -485,6 +544,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
 				selectBeltSeries(x);
@@ -546,6 +606,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				break;
 			case 'belt':
 				container.innerHTML =`
@@ -639,6 +700,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
 				selectBeltSeries(x);
@@ -727,6 +789,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
 				break;
@@ -764,6 +827,7 @@
 					</tr>
 				</table>
 				`;
+				unpackTransmissionParams(x, params);
 				select57Series(x);
 				break;
 		}
@@ -1177,7 +1241,8 @@
 			return;
 		}
 		setError(0);
-		EXP_dumpPersistence();
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
 	}
 </script>
 
