@@ -353,7 +353,15 @@
 			case 'vp':
 				container.innerHTML =`
 				<table style="float: left">
-					<tr>
+					<tr></tr>
+						<td class="rowlabel">VersaDM</td>
+						<td><select id="transmission_${x}_versadm" onchange="compute();">
+							<option value="" >None</option>
+							<option value="1" >1:1</option>
+							<option value="3.75" >3.75:1</option>
+							<option value="5.33" >5.33:1</option>
+						</select></td>
+					<tr><tr>
 						<td class="rowlabel">Stage 1 </td>
 						<td><input class="dynamic-input" id="transmission_${x}_stage_1" value=7 /></td>
 						<td>:1</td>
@@ -779,6 +787,7 @@
 		if(type=='vp'){
 			let caps = [0,0,0,0,0]; // in this array shaft is first, connected to fourth, then third, then second, then first stage (motor connected to first stage)
 			let overall_ratio = 1;
+
 			for (let i=4; i>=1; i--) {
 				let id = `transmission_${x}_stage_${i}`;
 				let ratio = document.getElementById(id).value;
@@ -804,6 +813,12 @@
 				rnd_500: 130,
 				cim:     29
 			};
+
+			let versadm = document.getElementById(`transmission_${x}_versadm`).value;
+			if (versadm != '') {
+				overall_ratio *= parseFloat(versadm);
+			}
+			
 			caps[0] = shaftmap[document.getElementById(`transmission_${x}_shaft`).value];
 
 			let idxmin  = caps.indexOf(Math.min(...caps));
@@ -816,7 +831,7 @@
 			setV(`transmission_${x}_torque_out`, torqout);
 			setV(`transmission_${x}_fos`,        fosmin);
 			setV(`transmission_${x}_fos_pos`,    idxmin ? `Stage ${idxmin}` : 'Shaft');
-			setV(`transmission_${x}_ratio`,      overall_ratio, 0);
+			setV(`transmission_${x}_ratio`,      overall_ratio);
 
 			return [fosmin, torqout, overall_ratio, spdout];
 		} else if (type=='57sport') {
