@@ -22,18 +22,12 @@
 	EXP_FN_BASE = 'transmission'; // filename base for export utility
 	UNIT_MAP = { // map of units
 		"torque": ["N-m", "in-lbf"],
-		"encoder_cpx": ["c/m", "c/ft"],
-		"radius": ["mm","in"],
 		"force": ["N", "lbf"],
 		"mass": ["kg", "lbm"],
 		"speed": ["m/s", "ft/s"],
 		"distance": ["m", "ft"],
-		"acceleration": ["m/s^2", "ft/s^2"],
 		'moi': ['kg mm^2', 'lbm in^2'],
 		"omega": ["RPM", "RPM"],
-		"theta": ["rev", "rev"],
-		"alpha": ["RPM/s", "RPM/s"],
-		"angle": ["deg", "deg"],
 		"pct":   ["%", "%"],
 		"dimension": ["mm", "in"],
 		"pa": ["deg","deg"],
@@ -112,6 +106,11 @@
 		
 		switch(EXP_onload()) {
 			case 0: // run when nothing loads
+				addTransmissionStage({
+					type:   '57sport',
+					series: 'hd',
+					ratio:  48
+				});
 				break;
 			case 1: // run when export loads
 				break;
@@ -253,10 +252,11 @@
 	}
 
 	function unpackTransmissionParams(x, params) {
+		if (params == undefined) params = {};
 		let strstrt = (`transmission_${x}_`).length;
 		for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
 			let id = input.id.slice(strstrt);
-			if (! params[id])
+			if (params[id] == undefined)
 				continue;
 			else if (input.type == 'checkbox' || input.type == 'radio')
 				input.checked = params[id] == "true" ? true:false;
@@ -471,15 +471,15 @@
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Pitch</td>
-						<td><select class="dynamic-input" id="transmission_${x}_pitch" onchange="selectBeltPitch(${x}); compute();">
+						<td><select class="dynamic-input" id="transmission_${x}_pitch" onchange="selectBeltPitch(${x}); compute();" value="5mm" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Width</td>
-						<td><select class="dynamic-input" id="transmission_${x}_width" onchange="compute();">
+						<td><select class="dynamic-input" id="transmission_${x}_width" onchange="compute();" value="9mm" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Teeth</td>
-						<td><input class="dynamic-input" id="transmission_${x}_beltteeth" /></td>
+						<td><input class="dynamic-input" id="transmission_${x}_beltteeth" value=400 /></td>
 					</tr>
 				</table>
 
@@ -620,8 +620,8 @@
 						<td colspan=2 class="collabel">Belt</td>
 					</tr><tr>
 						<td class="rowlabel">Series</td>
-						<td><select class="dynamic-input" id="transmission_${x}_series" onchange="selectBeltSeries(${x}); compute();" >
-							<option value="htd" selected>HTD</option>
+						<td><select class="dynamic-input" id="transmission_${x}_series" onchange="selectBeltSeries(${x}); compute();" value='undefined' >
+							<option value="htd">HTD</option>
 							<option value="gt2">GT2</option>
 							<option value="gt3">GT3</option>
 						</select></td>
@@ -834,6 +834,7 @@
 				`;
 				unpackTransmissionParams(x, params);
 				select57Series(x);
+				unpackTransmissionParams(x, params);
 				break;
 		}
 		registerCallbacks();
