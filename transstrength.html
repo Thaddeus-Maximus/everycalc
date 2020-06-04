@@ -81,18 +81,13 @@
 <script type="text/javascript">
 
 	/* TODO LAND
-	 * - Persistence / spawnable boxes
-	 * - Constrain spur gear sets so that they meet a given center distance
 	 * - Dropdown list of common COTS gearboxes
 	 * -- AM Toughbox Series, AM Sonic Shifter, All the WCP Boxes, 
 	 * - More accurate chain model?
 	 * - Full options for materials, move that logic to materials.js
-	 *  - Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
+	 * -- Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
 	 * - Options for multi-motor propogation? For instance, you _could_ feed two versaplanetaries into a toughbox.
-	 * - VersaDM Gearbox for VersaPlanetary
 	 * - Optionless reduction
-	 * - REV UltraPlanetary (only 3,4,5:1 ratios, final stage always fails at 40:1)
-	 * - Rack and Pinion output
 	 * - Better error handling, more robust input validation? There seems to be some gaps
 	 * - Revamp UI? Some things feel a little out of place
 	 * - Highlight low FOSes
@@ -148,6 +143,8 @@
 		EC_setOnKeyUp(); // default handler OK
 	}
 
+	let none_spawned = true;
+
 	function addTransmissionStage(params) {
 		setError(1);
 		let container = document.getElementById('transmission_stages');
@@ -164,6 +161,8 @@
 				<option value="up">UltraPlanetary</option>
 				<option value="57sport">57 Sport</option>
 			</select>
+			<input type="radio" id="transmission_${x}_resolves_multimotor" name="rmm" value="${x}" onchange="compute();" />
+			<label for="transmission_${x}_resolves_multimotor">Combines Multiple Motors</label>
 		</span><span style="float:right;">
 			<button onclick="moveTransmissionStage(${x},-1); compute();" title="Move Up" id="transmission_${x}_moveup">^</button>
 			<button onclick="moveTransmissionStage(${x},+1); compute();" title="Move Down" id="transmission_${x}_moveup">v</button>
@@ -175,9 +174,13 @@
 		transmission.classList.add(x%2 ? 'even' : 'odd');
 		container.appendChild(transmission);
 		if (typeof params != 'undefined') {
-			document.getElementById(`transmission_${x}_type`).value = params.type
+			document.getElementById(`transmission_${x}_type`).value = params.type;
+			document.getElementById(`transmission_${x}_resolves_multimotor`).checked = params.resolves_multimotor == 'true' ? true:false;
 			delete params.type; // get rid of it so that it doesn't cause issues later?
+			delete params.resolves_multimotor; // get rid of it so that it doesn't cause issues later?
 		} else {
+			document.getElementById(`transmission_${x}_resolves_multimotor`).checked = none_spawned;
+			none_spawned = false;
 			params = {};
 		}
 		selectTransmissionType(x, params);
@@ -284,7 +287,8 @@
 			let x = container.children[i].dataset.stage_id;
 			let strstrt = (`transmission_${x}_`).length;
 			trans_obj_i = {};
-			trans_obj_i[`type`] = document.getElementById(`transmission_${x}_type`).value;
+			trans_obj_i.type = document.getElementById(`transmission_${x}_type`).value;
+			trans_obj_i.resolves_multimotor = document.getElementById(`transmission_${x}_resolves_multimotor`).checked ? 'true':'false';
 			for (input of document.getElementById(`transmission_${x}_detail`).getElementsByTagName('input')) {
 				let id = input.id.slice(strstrt);
 				if (input.type == 'checkbox' || input.type == 'radio')
@@ -1042,7 +1046,9 @@
 			setV(`transmission_${x}_fos_pos`,    idxmin ? `Stage ${idxmin}` : 'Shaft');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [fosmin, torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [fosmin, torqout, overall_ratio, spdout, n_inputs];
 		} else if (type=='up'){
 			let caps = [+Infinity,0,0,0,0]; // in this array shaft is first, connected to fourth, then third, then second, then first stage (motor connected to first stage)
 			let overall_ratio = 1;
@@ -1074,7 +1080,9 @@
 			setV(`transmission_${x}_fos_pos`,    idxmin ? `Stage ${idxmin}` : 'Shaft');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [fosmin, torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [fosmin, torqout, overall_ratio, spdout, n_inputs];
 		} else if (type=='57sport') {
 			let series = document.getElementById(`transmission_${x}_series`).value;
 			let overall_ratio = document.getElementById(`transmission_${x}_ratio`).value;
@@ -1088,7 +1096,9 @@
 			setV(`transmission_${x}_fos`,        fosmin);
 			setV(`transmission_${x}_ratio`,      overall_ratio, 0);
 
-			return [fosmin, torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [fosmin, torqout, overall_ratio, spdout, n_inputs];
 		} else if (type=='spur') {
 			computeTeeth(document.getElementById(`transmission_${x}_spacing_drives`));
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
@@ -1132,7 +1142,9 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout, n_inputs];
 		} else if (type=='belt') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
 			let torqout = torque*overall_ratio;			
@@ -1174,7 +1186,9 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout, n_inputs];
 		} else if (type=='chain') {
 			let overall_ratio = getV(`transmission_${x}_out_teeth`)/getV(`transmission_${x}_inp_teeth`);
 			let torqout = torque*overall_ratio;
@@ -1210,7 +1224,9 @@
 			setV(`transmission_${x}_s_fos_pos`,  s_idxmin ? 'Output':'Input');
 			setV(`transmission_${x}_ratio`,      overall_ratio);
 
-			return [Math.min(g_fosmin), torqout, overall_ratio, spdout];
+			if(document.getElementById(`transmission_${x}_resolves_multimotor`).checked) n_inputs = 1;
+
+			return [Math.min(g_fosmin), torqout, overall_ratio, spdout, n_inputs];
 		}
 	}
 
@@ -1234,7 +1250,7 @@
 					fos_pos = stage.dataset.stage_id;
 					fos     = res[0];
 				}
-				n_inputs = 1; // after first round, set the number of inputs to 1
+				n_inputs = res[4];
 			}
 			
 			setV('overall_fos',   fos);
