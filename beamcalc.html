@@ -75,7 +75,7 @@
 	function init() {
 		// basic loading, create options dynamically
 		EC_onload();
-		populateMaterials();
+		MATERIAL_populateSelect('material');
 
 		// load persistence or exported values
 		switch(EXP_onload()) {
@@ -95,8 +95,8 @@
 		}
 
 		UNIT_change();
-		populateMaterials();
-		document.getElementById('material').value = 'Aluminum';
+		MATERIAL_populateSelect('material');
+		selectMaterialBase();
 		selectMaterial();
 		selectShape();
 		computeMOI();
@@ -449,7 +449,7 @@
 		}
 	}
 
-	function populateMaterials() {
+	/*function populateMaterials() {
 		select = document.getElementById('material');
 
 		i=0;
@@ -460,14 +460,11 @@
 			opt.value = matl;
 			select.appendChild(opt);
 		}
-	}
+	}*/
 
 	function selectMaterial() {
-		matl = document.getElementById('material').value;
-
-		document.getElementById('elastic_modulus').readOnly = matl != 'custom';
-		document.getElementById('Sf').readOnly 				= matl != 'custom';
-		document.getElementById('density').readOnly 		= matl != 'custom';
+		matl = document.getElementById('material_detail').value;
+		if (!matl) return;
 
 		if (matl != 'custom') {
 			setV('elastic_modulus', MATERIAL_DATA[matl]['Ef']);
@@ -475,7 +472,14 @@
 			setV('mass', MATERIAL_DATA[matl]['density']*getV('area')*getV('length'));
 			setV('Sf', MATERIAL_DATA[matl]['Sf'] ? MATERIAL_DATA[matl]['Sf'] : '-');
 		}
+	}
 
+	function selectMaterialBase() {
+		let custom = MATERIAL_selectBase('material');
+
+		document.getElementById('elastic_modulus').readOnly = !custom;
+		document.getElementById('Sf').readOnly 				= !custom;
+		document.getElementById('density').readOnly 		= !custom;
 	}
 
 	//la = linearAlgebra();
@@ -967,8 +971,9 @@
 			
 		<div class="odd" id="user_input_material">
 			<label class="bold rowlabel">Material</label>
-			<select id="material" onchange="selectMaterial(); compute();">
-				<option value="custom">Custom</option>
+			<select id="material_base" onchange="selectMaterialBase(); compute();">
+			</select>
+			<select id="material_detail" onchange="selectMaterial(); compute();">
 			</select>
 			<input class="dropdown" type="checkbox" id="toggle-material">
 			<label class="dropdown" for="toggle-material">V</label>

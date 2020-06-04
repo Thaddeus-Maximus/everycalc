@@ -1,4 +1,4 @@
-var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
+let MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 	'4140N Steel': { 
 		'Ef': 190e9,
 		'E':  190e9,
@@ -27,7 +27,7 @@ var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 		'Sy': 270e6,
 		'density': 2.7e3
 	},
-	'Titanium': {
+	'Titanium Ti6Al4V': {
 		'Ef': 110e9,
 		'E':  110e9,
 		'density': 4.4e3
@@ -44,7 +44,7 @@ var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 		'Ef': 2.9e9, 
 		'density': 1.18e3
 	},
-	'Nylon 6/6 (AKA 101)': {
+	'Nylon 6/6': {
 		'density': 1.1e3,
 		'E':  3.3e9,
 		'Ef': 2.8e9,
@@ -58,7 +58,7 @@ var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 		'Sf': 41e6,
 		'density': 0.91e3
 	},
-	'Polycarbonate': {
+	'PC': {
 		'E':  2.3e9,
 		'Ef': 2.3e9,
 		'St': 66e6,
@@ -86,4 +86,60 @@ var MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 		'Sf': 77e6,
 		'St': 53e6
 	}
+}
+
+let MATERIAL_TYPES = {
+	'Steel': ['4140N Steel', '1018 Hot-Rolled Steel'],
+	'Aluminum': ['7075-T6 Aluminum', '6061-T6 Aluminum'],
+	'Titanium': ['Titanium Ti6Al4V'],
+	'Magnesium': ['Magnesium AM100A-F'],
+	'Nylon': ["MF Onyx", "Nylon 6/6"],
+	'Polypropylene': ["PP Homopolymer"],
+	'Polycarbonate': ["PC"],
+	'Printable': ["PLA", "ABS", "PET-G", "MF Onyx", "Nylon 6/6"]
+}
+
+function MATERIAL_populateSelect(id_base, no_custom) {
+	let select    = document.getElementById(`${id_base}_base`);
+	//let subselect = document.getElementById(`${id_base}_detail`);
+	let old_val = select.value;
+	select.innerHTML = '';
+	for (base in MATERIAL_TYPES) {
+		console.log(base, select.children);
+		let opt = document.createElement('option');
+		opt.innerHTML = base;
+		opt.value = base;
+		if (old_val == base) opt.selected = true;
+		select.appendChild(opt);
+	}
+	if(!no_custom) {
+		let opt = document.createElement('option');
+		opt.innerHTML = 'Custom';
+		opt.value = 'custom';
+		if (old_val == base) opt.selected = true;
+		select.appendChild(opt);
+	}
+
+	MATERIAL_selectBase(id_base);
+}
+
+function MATERIAL_selectBase(id_base) {
+	let select    = document.getElementById(`${id_base}_base`);
+	let subselect = document.getElementById(`${id_base}_detail`);
+	let old_val = select.value;
+	subselect.innerHTML = '';
+	if (select.value == 'custom') {
+		subselect.disabled = true;
+		return true;
+	}
+	subselect.disabled = false;
+	for (matl of MATERIAL_TYPES[select.value]) {
+		console.log(matl);
+		let opt = document.createElement('option');
+		opt.innerHTML = matl;
+		opt.value = matl;
+		if (old_val == matl) opt.selected = true;
+		subselect.appendChild(opt);
+	}
+	return false;
 }
