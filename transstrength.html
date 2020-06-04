@@ -77,18 +77,61 @@
 			poi: 'toggle_varref_label',
 			desc: 'Variables that can be used in the load and end condition expressions are here.'
 		}];*/
+
+	PREDEFINED_GEARBOXES = {
+			"": [],
+			"AndyMark Toughbox": [{
+				"type":"spur",
+				"resolves_multimotor":"true",
+				"inp_teeth":"14",
+				"out_teeth":"50.00",
+				"inp_teeth_width":"0.575",
+				"out_teeth_width":"0.375",
+				"inp_diameter":"",
+				"out_diameter":"0.375",
+				"module":"20",
+				"spacing":"1.600",
+				"spacing_drives":"true",
+				"inp_teeth_matl":"4140N Steel",
+				"out_teeth_matl":"4140N Steel",
+				"inp_shaft":"ignore",
+				"out_shaft":"hex",
+				"inp_shaft_matl":"4140N Steel",
+				"out_shaft_matl":"4140N Steel",
+				"moduleselect":"dp",
+				"pa":"14.5"
+			},{
+				"type":"spur",
+				"resolves_multimotor":"false",
+				"inp_teeth":"19",
+				"out_teeth":"45.00",
+				"inp_teeth_width":"0.575",
+				"out_teeth_width":"0.375",
+				"inp_diameter":"0.375",
+				"out_diameter":"0.5",
+				"module":"20",
+				"spacing":"1.600",
+				"spacing_drives":"true",
+				"inp_teeth_matl":"4140N Steel",
+				"out_teeth_matl":"4140N Steel",
+				"inp_shaft":"hex",
+				"out_shaft":"hex",
+				"inp_shaft_matl":"4140N Steel",
+				"out_shaft_matl":"4140N Steel",
+				"moduleselect":"dp",
+				"pa":"14.5"
+			}],
+			"AndyMark Sonic Shifter": []
+	}
 </script>
 <script type="text/javascript">
 
 	/* TODO LAND
 	 * - Dropdown list of common COTS gearboxes
-	 * -- AM Toughbox Series, AM Sonic Shifter, All the WCP Boxes, 
-	 * - More accurate chain model?
+	 * -- AM Toughbox Series, AM Sonic Shifter, All the WCP Boxes
 	 * - Full options for materials, move that logic to materials.js
 	 * -- Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
-	 * - Options for multi-motor propogation? For instance, you _could_ feed two versaplanetaries into a toughbox.
 	 * - Optionless reduction
-	 * - Better error handling, more robust input validation? There seems to be some gaps
 	 * - Revamp UI? Some things feel a little out of place
 	 * - Highlight low FOSes
 	 * - Build walkthrough
@@ -120,6 +163,7 @@
 		// on keyup for all variables
 		registerCallbacks();
 		compute();
+		populatePredefinedGearbox();
 		//WALK_onload();
 	}
 
@@ -141,6 +185,27 @@
 			if(key!=13) setError(1);
 	    });
 		EC_setOnKeyUp(); // default handler OK
+	}
+
+	function populatePredefinedGearbox() {
+		let select = document.getElementById('predefined_select');
+		for (gearbox in PREDEFINED_GEARBOXES) {
+			let opt = document.createElement('option');
+			opt.innerHTML = gearbox;
+			opt.value = gearbox;
+			select.appendChild(opt);
+		}
+	}
+
+	function selectPredefinedGearbox() { 
+		setError(1);
+		let select    = document.getElementById('predefined_select');
+		let container = document.getElementById('transmission_stages');
+		container.innerHTML = '';
+		let trans_obj = PREDEFINED_GEARBOXES[select.value];
+		for (let tran of trans_obj) {
+			addTransmissionStage(tran);
+		}
 	}
 
 	let none_spawned = true;
@@ -176,8 +241,8 @@
 		if (typeof params != 'undefined') {
 			document.getElementById(`transmission_${x}_type`).value = params.type;
 			document.getElementById(`transmission_${x}_resolves_multimotor`).checked = params.resolves_multimotor == 'true' ? true:false;
-			delete params.type; // get rid of it so that it doesn't cause issues later?
-			delete params.resolves_multimotor; // get rid of it so that it doesn't cause issues later?
+			//delete params.type; // get rid of it so that it doesn't cause issues later?
+			//delete params.resolves_multimotor; // get rid of it so that it doesn't cause issues later?
 		} else {
 			document.getElementById(`transmission_${x}_resolves_multimotor`).checked = none_spawned;
 			none_spawned = false;
@@ -1329,6 +1394,8 @@
 						<td class="unit">[A]</td>
 					</tr>
 				</table>
+				<select class="doublewide" id="predefined_select" onchange="selectPredefinedGearbox(); compute();">
+				</select>
 			</div>
 			<div class="output" id="computed_outputs" style="display:table-cell;">
 				<table>
