@@ -33,53 +33,35 @@
 		"pa": ["deg","deg"],
 		"motor-torque": ["N-m", "N-m"]
 	};
-	/*WALK_STEPS = [{
+	WALK_STEPS = [{
 			poi: 'user_input_motor',
 			desc: 'Input details about the motors powering your mechanism...',
 			valign: 'bottom'
 		},{
-			poi: 'user_input_gratio',
-			desc: 'Input the gear ratio (you can use the dropdown to compute it)...'
+			poi: 'predefined_select',
+			desc: 'Optionally choose from predefined COTS gearboxes...'
 		},{
-			poi: 'user_input_encoder',
-			desc: 'The encoder box can be used to help figure out encoder resolution...'
+			poi: 'transmission_stages',
+			desc: 'These are the stages in this transmission.'
 		},{
-			poi: 'user_input_traction',
-			desc: 'Traction limiting should be used for drivetrains...'
+			poi: 'add_transmission_stage',
+			desc: 'Additional transmission stages can be added.'
 		},{
-			poi: 'user_input_electrical',
-			desc: 'Simultion of voltage drop and current limiting can be done...'
+			poi: 'transmission_0_topcluster',
+			desc: 'Stages can be moved up, down, or removed.'
 		},{
-			poi: 'user_input_radius',
-			desc: "Plug in the effective radius of your mechanism (arm length, wheel radius, or spool radius)..."
+			poi: 'transmission_0_type',
+			desc: 'Different transmission types can be chose from.'
 		},{
-			poi: 'user_input_mass',
-			desc: 'Plug in the mass of the system being accelerated...'
-		},{
-			poi: 'user_input_load',
-			desc: 'Plug in the load perpindicular to the radius...'
-		},{
-			poi: 'user_input_endcond',
-			desc: 'Plug in an end condition for simulation...'
+			poi: 'transmission_0_resolves_multimotor',
+			desc: 'If multiple motors feed in and come out in one output, tick this radiobutton.'
 		},{
 			poi: 'computed_outputs',
-			desc: 'Computed/simulated values will appear here.'
-		},{
-			poi: 'chart',
-			desc: 'Simulation results are plotted here.'
-		},{
-			poi: 'chart',
-			desc: 'Click on the plot to probe points for values.'
-		},{
-			poi: 'toggle_tips_label',
-			desc: 'More tips and notes are in here.'
-		},{
-			poi: 'toggle_varref_label',
-			desc: 'Variables that can be used in the load and end condition expressions are here.'
-		}];*/
+			desc: 'Computed values will appear here.',
+			valign: 'bottom'
+		}];
 
 	PREDEFINED_GEARBOXES = {
-			"": [],
 			"AndyMark Toughbox": [{
 				"type":"spur",
 				"resolves_multimotor":"true",
@@ -92,12 +74,16 @@
 				"module":"20",
 				"spacing":"1.600",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"4140N Steel",
-				"out_teeth_matl":"4140N Steel",
+				"inp_teeth_matl_detail":"4140N Steel",
+				"out_teeth_matl_detail":"4140N Steel",
+				"inp_teeth_matl_base":"Steel",
+				"out_teeth_matl_base":"Steel",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"4140N Steel",
+				"inp_shaft_matl_detail":"4140N Steel",
+				"out_shaft_matl_detail":"4140N Steel",
+				"inp_shaft_matl_base":"Steel",
+				"out_shaft_matl_base":"Steel",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			},{
@@ -112,12 +98,16 @@
 				"module":"20",
 				"spacing":"1.600",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"4140N Steel",
-				"out_teeth_matl":"4140N Steel",
+				"inp_teeth_matl_detail":"4140N Steel",
+				"out_teeth_matl_detail":"4140N Steel",
+				"inp_teeth_matl_base":"Steel",
+				"out_teeth_matl_base":"Steel",
 				"inp_shaft":"hex",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"4140N Steel",
+				"inp_shaft_matl_detail":"4140N Steel",
+				"out_shaft_matl_detail":"4140N Steel",
+				"inp_shaft_matl_base":"Steel",
+				"out_shaft_matl_base":"Steel",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}],
@@ -132,12 +122,16 @@
 				"out_diameter":"0.5",
 				"module":"20",
 				"spacing_drives":"false",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}],
@@ -151,12 +145,16 @@
 				"out_diameter":".375",
 				"module":"20",
 				"spacing_drives":"false",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			},{
@@ -171,12 +169,16 @@
 				"module":"20",
 				"spacing":"1.350",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"hex",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"7075-T6 Aluminum",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}],
@@ -192,12 +194,16 @@
 				"module":"20",
 				"spacing":"2.100",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}],
@@ -212,12 +218,16 @@
 				"out_diameter":".375",
 				"module":"20",
 				"spacing_drives":"false",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			},{
@@ -232,12 +242,16 @@
 				"module":"20",
 				"spacing":"1.850",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"hex",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"7075-T6 Aluminum",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}],
@@ -252,12 +266,16 @@
 				"module":"20",
 				"spacing":"1.800",
 				"spacing_drives":"false",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"ignore",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"4140N Steel",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			},{
@@ -272,12 +290,16 @@
 				"module":"20",
 				"spacing":"1.200",
 				"spacing_drives":"true",
-				"inp_teeth_matl":"7075-T6 Aluminum",
-				"out_teeth_matl":"7075-T6 Aluminum",
+				"inp_teeth_matl_detail":"7075-T6 Aluminum",
+				"out_teeth_matl_detail":"7075-T6 Aluminum",
+				"inp_teeth_matl_base":"Aluminum",
+				"out_teeth_matl_base":"Aluminum",
 				"inp_shaft":"hex",
 				"out_shaft":"hex",
-				"inp_shaft_matl":"7075-T6 Aluminum",
-				"out_shaft_matl":"7075-T6 Aluminum",
+				"inp_shaft_matl_detail":"7075-T6 Aluminum",
+				"out_shaft_matl_detail":"7075-T6 Aluminum",
+				"inp_shaft_matl_base":"Aluminum",
+				"out_shaft_matl_base":"Aluminum",
 				"moduleselect":"dp",
 				"pa":"14.5"
 			}]
@@ -286,8 +308,6 @@
 <script type="text/javascript">
 
 	/* TODO LAND
-	 * - Full options for materials, move that logic to materials.js
-	 * -- Sub-options for materials? https://www.w3schools.com/TAGs/tryit.asp?filename=tryhtml_optgroup
 	 * - Optionless reduction?
 	 * - Revamp UI? Some things feel a little out of place
 	 * - Highlight low FOSes?
@@ -321,7 +341,7 @@
 		registerCallbacks();
 		compute();
 		populatePredefinedGearbox();
-		//WALK_onload();
+		WALK_onload();
 	}
 
 	function registerCallbacks() {
@@ -346,6 +366,12 @@
 
 	function populatePredefinedGearbox() {
 		let select = document.getElementById('predefined_select');
+		if (true) {
+			let opt = document.createElement('option');
+			opt.innerHTML = '<select COTS gearbox>';
+			opt.value = '';
+			select.appendChild(opt);
+		}
 		for (gearbox in PREDEFINED_GEARBOXES) {
 			let opt = document.createElement('option');
 			opt.innerHTML = gearbox;
@@ -358,6 +384,7 @@
 		setError(1);
 		let select    = document.getElementById('predefined_select');
 		let container = document.getElementById('transmission_stages');
+		if (! select.value) return;
 		container.innerHTML = '';
 		let trans_obj = PREDEFINED_GEARBOXES[select.value];
 		for (let tran of trans_obj) {
@@ -385,7 +412,7 @@
 			</select>
 			<input type="radio" id="transmission_${x}_resolves_multimotor" name="rmm" value="${x}" onchange="compute();" />
 			<label for="transmission_${x}_resolves_multimotor">Combines Multiple Motors</label>
-		</span><span style="float:right;">
+		</span><span style="float:right;" id="transmission_${x}_topcluster" >
 			<button onclick="moveTransmissionStage(${x},-1); compute();" title="Move Up" id="transmission_${x}_moveup">^</button>
 			<button onclick="moveTransmissionStage(${x},+1); compute();" title="Move Down" id="transmission_${x}_moveup">v</button>
 			<button onclick="removeTransmissionStage(${x}); compute();" title="Remove">X</button>
@@ -535,7 +562,7 @@
 				container.innerHTML =`
 				<table style="float: left;">
 					<tr>
-						<td class="collabel"></td>
+						<td class="collabel bold">Gears</td>
 						<td class="collabel">Input</td>
 						<td class="collabel">Output</td>
 						<td></td>
@@ -545,24 +572,39 @@
 						<td><input class="dynamic-input" id="transmission_${x}_inp_teeth" value=14 /></td>
 						<td><input class="dynamic-input" id="transmission_${x}_out_teeth" value=50 /></td>
 					</tr><tr>
-						<td class="collabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl" onchange="compute();">
+						<td class="rowlabel">Material</td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl_base" onchange="MATERIAL_selectBase('transmission_${x}_inp_teeth_matl'); compute();">
 							<option value="7075-T6 Aluminum">7075 Aluminum (VexPro)</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum (AndyMark)</option>
 							<option value="4140N Steel">4140N (AM/VexPro)</option>
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl" onchange="compute();">
+						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl_base" onchange="MATERIAL_selectBase('transmission_${x}_out_teeth_matl'); compute();">
 							<option value="7075-T6 Aluminum">7075 Aluminum (VexPro)</option>
 							<option value="6061-T6 Aluminum">6061 Aluminum (AndyMark)</option>
 							<option value="4140N Steel">4140N (AM/VexPro)</option>
+						</select></td>
+					</tr><tr>
+						<td></td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_teeth_matl_detail" onchange="compute();">
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_teeth_matl_detail" onchange="compute();">
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Width</td>
 						<td><input class="dynamic-input" id="transmission_${x}_inp_teeth_width" data-unit="dimension" value=0.5 /></td>
 						<td><input class="dynamic-input" id="transmission_${x}_out_teeth_width" data-unit="dimension" value=0.5 /></td>
 						<td class="unit" data-unit="dimension">
+					</tr>
+				</table>
+				
+				<table style="float: left;">
+					<tr>
+						<td class="collabel bold">Shaft</td>
+						<td class="collabel">Input</td>
+						<td class="collabel">Output</td>
+						<td></td>
 					</tr><tr>
-						<td class="rowlabel">Shaft</td>
+						<td class="rowlabel">Shape</td>
 						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft" onchange="refreshShaftSelections(${x}, 'inp');" >
 							<option value="ignore">Ignore</option>
 							<option value="thex">ThunderHex</option>
@@ -575,17 +617,15 @@
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'inp'); MATERIAL_selectBase('transmission_${x}_inp_shaft_matl'); compute();" >
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'out'); MATERIAL_selectBase('transmission_${x}_out_shaft_matl'); compute();" >
+						</select></td>
+					</tr><tr>
+						<td></td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
@@ -635,6 +675,15 @@
 					</tr>
 				</table>
 				`;
+				MATERIAL_populateSelect(`transmission_${x}_inp_teeth_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_teeth_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
+				unpackTransmissionParams(x, params);
+				MATERIAL_populateSelect(`transmission_${x}_inp_teeth_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_teeth_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
 				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
@@ -733,17 +782,15 @@
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'inp'); MATERIAL_selectBase('transmission_${x}_inp_shaft_matl'); compute();" >
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'out'); MATERIAL_selectBase('transmission_${x}_out_shaft_matl'); compute();" >
+						</select></td>
+					</tr><tr>
+						<td></td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
@@ -775,6 +822,11 @@
 					</tr>
 				</table>
 				`;
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
+				unpackTransmissionParams(x, params);
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
 				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
@@ -889,17 +941,15 @@
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'inp'); MATERIAL_selectBase('transmission_${x}_inp_shaft_matl'); compute();" >
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'out'); MATERIAL_selectBase('transmission_${x}_out_shaft_matl'); compute();" >
+						</select></td>
+					</tr><tr>
+						<td></td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
@@ -931,6 +981,11 @@
 					</tr>
 				</table>
 				`;
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
+				unpackTransmissionParams(x, params);
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
 				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
@@ -978,17 +1033,15 @@
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Material</td>
-						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'inp'); MATERIAL_selectBase('transmission_${x}_inp_shaft_matl'); compute();" >
 						</select></td>
-						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
-							<option value="7075-T6 Aluminum">7075 Aluminum</option>
-							<option value="6061-T6 Aluminum">6061 Aluminum</option>
-							<option value="4140N Steel">4140N Steel</option>
-							<option value="1018 Hot-Rolled Steel">1018 Hot-Rolled Steel</option>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_base" onchange="refreshShaftSelections(${x}, 'out'); MATERIAL_selectBase('transmission_${x}_out_shaft_matl'); compute();" >
+						</select></td>
+					</tr><tr>
+						<td></td>
+						<td><select class="dynamic-input" id="transmission_${x}_inp_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'inp'); compute();" >
+						</select></td>
+						<td><select class="dynamic-input" id="transmission_${x}_out_shaft_matl_detail" onchange="refreshShaftSelections(${x}, 'out'); compute();" >
 						</select></td>
 					</tr><tr>
 						<td class="rowlabel">Diameter</td>
@@ -1020,6 +1073,11 @@
 					</tr>
 				</table>
 				`;
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
+				unpackTransmissionParams(x, params);
+				MATERIAL_populateSelect(`transmission_${x}_inp_shaft_matl`, true);
+				MATERIAL_populateSelect(`transmission_${x}_out_shaft_matl`, true);
 				unpackTransmissionParams(x, params);
 				refreshShaftSelections(x, "inp");
 				refreshShaftSelections(x, "out");
@@ -1103,28 +1161,27 @@
 
 	function refreshShaftSelections(x, side){
 		let shape    = document.getElementById(`transmission_${x}_${side}_shaft`);
-		let material = document.getElementById(`transmission_${x}_${side}_shaft_matl`);
+		let materialb = document.getElementById(`transmission_${x}_${side}_shaft_matl_base`);
+		let materiald = document.getElementById(`transmission_${x}_${side}_shaft_matl_detail`);
 		let diameter = document.getElementById(`transmission_${x}_${side}_diameter`);
 		//let keywidth = document.getElementById(`transmission_${x}_${side}_keywidth`);
 		switch(shape.value) {
 			case "thex":
-				material.disabled = false;
-				material.value    = "7075-T6 Aluminum";
+				materialb.disabled = false;
+				materiald.disabled = false;
+				materialb.value    = "Aluminum";
+				MATERIAL_selectBase(`transmission_${x}_${side}_shaft_matl`);
+				materiald.value    = "7075-T6 Aluminum";
 			case "hex":
-				material.disabled = false;
-				//keywidth.disabled = true;  keywidth.value="";
+				materialb.disabled = false;
+				materiald.disabled = false;
 				diameter.disabled = false;
 				break;
 			case "ignore":
-				material.disabled = true;
-				//keywidth.disabled = true;  keywidth.value="";
+				materialb.disabled = true;
+				materiald.disabled = true;
 				diameter.disabled = true;  diameter.value="";
 				break;
-			/*case "key":
-				material.disabled = false;
-				keywidth.disabled = false;
-				diameter.disabled = false;
-				break;*/
 		}
 		setError(1);
 	}
@@ -1190,7 +1247,7 @@
 	function computeShaftStrength(prefix) {
 		// pass the prefix for your stuff, e.g. "transmission_${x}_inp"
 		let type = document.getElementById(prefix+"_shaft").value;
-		let matl = MATERIAL_DATA[document.getElementById(prefix+"_shaft_matl").value];
+		let matl = MATERIAL_DATA[document.getElementById(prefix+"_shaft_matl_detail").value];
 		let diameter = getV(prefix+"_diameter");
 		document.getElementById(prefix+"_diameter").classList.remove('error');
 		let S = 0;
@@ -1329,14 +1386,14 @@
 
 			let torq_g_inp = computeGearStrength({
 				dp: getDP(x), // invert module to get it into dp
-				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_inp_teeth_matl`).value].Sy,
+				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_inp_teeth_matl_detail`).value].Sy,
 				w:  getV(`transmission_${x}_inp_teeth_width`),
 				n:  getV(`transmission_${x}_inp_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value
 			})*overall_ratio*n_inputs; // prorate by the gear ratio
 			let torq_g_out = computeGearStrength({
 				dp: getDP(x), // invert module to get it into dp
-				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_out_teeth_matl`).value].Sy,
+				sy: MATERIAL_DATA[document.getElementById(`transmission_${x}_out_teeth_matl_detail`).value].Sy,
 				w:  getV(`transmission_${x}_out_teeth_width`),
 				n:  getV(`transmission_${x}_out_teeth`),
 				pa: document.getElementById(`transmission_${x}_pa`).value

@@ -32,7 +32,7 @@ let MATERIAL_DATA = { // 1 g/cm^3 = 1000 kg/m^3
 		'E':  110e9,
 		'density': 4.4e3
 	},
-	'Magnesium': { // AM100A-F
+	'Magnesium AM100A-F': { // AM100A-F
 		'Ef': 46e9,
 		'E':  46e9,
 		'density': 1.7e3
@@ -105,7 +105,6 @@ function MATERIAL_populateSelect(id_base, no_custom) {
 	let old_val = select.value;
 	select.innerHTML = '';
 	for (base in MATERIAL_TYPES) {
-		console.log(base, select.children);
 		let opt = document.createElement('option');
 		opt.innerHTML = base;
 		opt.value = base;
@@ -134,7 +133,6 @@ function MATERIAL_selectBase(id_base) {
 	}
 	subselect.disabled = false;
 	for (matl of MATERIAL_TYPES[select.value]) {
-		console.log(matl);
 		let opt = document.createElement('option');
 		opt.innerHTML = matl;
 		opt.value = matl;
