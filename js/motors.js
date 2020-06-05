@@ -263,6 +263,16 @@ var MOTOR_specs = {
 		"voltage": 12
 	},
 
+	"rs550": {
+		"plain_name": "BaneBots RS550",
+		"max_speed": 19000,
+		"free_current": 0.4,
+		"max_power": 190,
+		"stall_torque": 0.38,
+		"stall_current": 84,
+		"voltage": 12
+	},
+
 	"neverest": {
 		"plain_name": "AndyMark NeveRest",
 		"max_speed": 5480,
@@ -273,13 +283,31 @@ var MOTOR_specs = {
 		"voltage": 12
 	},
 
-	"rs550": {
-		"plain_name": "BaneBots RS550",
-		"max_speed": 19000,
+	"rev-41-1301": {
+		"plain_name": "REV HD Hex Motor",
+		"max_speed": 6000,
+		"stall_torque": .105,
+		"stall_current": 8.5,
+		"max_power": 15,
+		"free_current": 400e-3,
+		"voltage": 12
+	},
+
+	"rev-41-1300": {
+		"plain_name": "REV Core Hex Motor",
+		"max_speed": 125,
+		"stall_torque": 3.2,
+		"stall_current": 4.4,
+		"free_current": 0.2,
+		"voltage": 12
+	},
+
+	"rs555": {
+		"plain_name": "BaneBots RS555",
+		"max_speed": 7750,
 		"free_current": 0.4,
-		"max_power": 190,
-		"stall_torque": 0.38,
-		"stall_current": 84,
+		"stall_torque": 0.205,
+		"stall_current": 15,
 		"voltage": 12
 	},
 
