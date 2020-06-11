@@ -1,0 +1,189 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css"> 
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<script type="text/javascript">
+	EXP_FN_BASE = 'fit_tol';
+	UNIT_MAP = {
+		'dimension': ['mm', 'in'] // ezpz
+	};
+	WALK_STEPS = [{
+			poi: 'type',
+			desc: 'Select the gland type...',
+			valign: 'bottom'
+		},{
+			poi: 'user_inputs',
+			desc: 'Plug in gland dimensions...',
+			valign: 'bottom'
+		},{
+			poi: 'dashsize',
+			desc: 'Standard o-ring sizes can be input here.'
+		},{
+			poi: 'computed_outputs',
+			desc: 'Min and max values are calculated here.',
+			valign: 'bottom',
+			halign: 'right'
+		}];
+
+	FIT_INTENTS = {
+		'Loose Running': {
+			hole:  ['H11', 'c11'],
+			shaft: ['C11', 'h11']
+		},
+		'Free Running': {
+			hole:  ['H9', 'd9'],
+			shaft: ['D9', 'h9']
+		},
+		'Close Running': {
+			hole:  ['H8', 'f7'],
+			shaft: ['F8', 'h7']
+		},
+		'Sliding': {
+			hole:  ['H7', 'g6'],
+			shaft: ['G7', 'h6']
+		},
+		'Locational Clearance': {
+			hole:  ['H7', 'h6'],
+			shaft: ['H7', 'h6']
+		},
+		'Light Transition': {
+			hole:  ['H7', 'k6'],
+			shaft: ['K7', 'h6']
+		},
+		'Tight Transition': {
+			hole:  ['H7', 'n6'],
+			shaft: ['N7', 'h6']
+		},
+		'Locational Interference': {
+			hole:  ['H7', 'p6'],
+			shaft: ['P7', 'h6']
+		},
+		'Medium Drive Fit': {
+			hole:  ['H7', 's6'],
+			shaft: ['S7', 'h6']
+		},
+		'Force Fit': {
+			hole:  ['H7', 'u6'],
+			shaft: ['U7', 'h6']
+		}
+	}
+</script>
+<script type="text/javascript">
+
+	function init() {
+		EC_onload();
+		EXP_onload();
+		UNIT_change();
+
+		// not an expensive calculator, just fire on all changes
+		EC_setOnInput(
+			function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	if(key!=13) setError(1);
+		    	if (e.target.id == 'dashsize'){
+		    		selectDashSize();
+		    		setError(1);
+		    	}
+		    	if (e.target.id == 'rw' || e.target.id == 'rid'){
+		    		clearDashSize();
+		    		setError(1);
+		    	}
+
+		    	if (e.target.id.startsWith('d')) {
+		    		illustrationHighlight(e.target.id.substring(1,2));
+		    	}
+
+		    	compute();
+		    });
+		EC_setOnKeyUp(); // default handler ok
+
+		//WALK_onload();
+	}
+
+	function compute() {
+		try{
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;
+		}
+		setError(0);
+		EXP_dumpPersistence();
+	}
+</script>
+
+<html>
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="float: left;" class="container">
+
+<div style='display:table-row'>
+	<div class="odd" style='display:table-cell'>
+		<table id="user_inputs">
+			<tr>
+				<td class="collabel">
+					Nominal
+				</td><td class="collabel">
+					Intent/Basis
+				</td><td class="collabel">
+					Hole/Shaft Class
+				</td><td class="collabel">
+					Hole
+				</td><td class="collabel">
+					Shaft
+				</td><td class="collabel">
+					Interference
+				</td>
+			</tr><tr>
+				<td><input id="nominal_0" /></td>
+				<td>
+					<select id="intent_0" >
+						<option value=""
+					</select>
+				</td>
+			</tr>
+		</table>
+	</div>
+</div>
+</div>
+</body>
+</html>
