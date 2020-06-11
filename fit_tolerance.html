@@ -8,6 +8,7 @@
 <script type="text/javascript" src="js/eclib.js"></script>
 <script type="text/javascript" src="js/units.js"></script>
 <script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/isofits.js"></script>
 <script type="text/javascript" src="js/walkthrough.js"></script>
 
 <!-- Export library requires this script tag -->
@@ -35,49 +36,6 @@
 			valign: 'bottom',
 			halign: 'right'
 		}];
-
-	FIT_INTENTS = {
-		'Loose Running': {
-			hole:  ['H11', 'c11'],
-			shaft: ['C11', 'h11']
-		},
-		'Free Running': {
-			hole:  ['H9', 'd9'],
-			shaft: ['D9', 'h9']
-		},
-		'Close Running': {
-			hole:  ['H8', 'f7'],
-			shaft: ['F8', 'h7']
-		},
-		'Sliding': {
-			hole:  ['H7', 'g6'],
-			shaft: ['G7', 'h6']
-		},
-		'Locational Clearance': {
-			hole:  ['H7', 'h6'],
-			shaft: ['H7', 'h6']
-		},
-		'Light Transition': {
-			hole:  ['H7', 'k6'],
-			shaft: ['K7', 'h6']
-		},
-		'Tight Transition': {
-			hole:  ['H7', 'n6'],
-			shaft: ['N7', 'h6']
-		},
-		'Locational Interference': {
-			hole:  ['H7', 'p6'],
-			shaft: ['P7', 'h6']
-		},
-		'Medium Drive Fit': {
-			hole:  ['H7', 's6'],
-			shaft: ['S7', 'h6']
-		},
-		'Force Fit': {
-			hole:  ['H7', 'u6'],
-			shaft: ['U7', 'h6']
-		}
-	}
 </script>
 <script type="text/javascript">
 
@@ -86,23 +44,15 @@
 		EXP_onload();
 		UNIT_change();
 
+		populateIntents();
+		populateClasses('class_hole_0');
+		populateClasses('class_shaft_0');
+
 		// not an expensive calculator, just fire on all changes
 		EC_setOnInput(
 			function(e) {
 		    	var key = e.keyCode ? e.keyCode : e.which;
 		    	if(key!=13) setError(1);
-		    	if (e.target.id == 'dashsize'){
-		    		selectDashSize();
-		    		setError(1);
-		    	}
-		    	if (e.target.id == 'rw' || e.target.id == 'rid'){
-		    		clearDashSize();
-		    		setError(1);
-		    	}
-
-		    	if (e.target.id.startsWith('d')) {
-		    		illustrationHighlight(e.target.id.substring(1,2));
-		    	}
 
 		    	compute();
 		    });
@@ -120,6 +70,65 @@
 		}
 		setError(0);
 		EXP_dumpPersistence();
+	}
+
+	function populateIntents() {
+		let select = document.getElementById('intent_0');
+		let opt = document.createElement('option');
+			opt.innerHTML = '';
+			opt.value = '';
+			select.appendChild(opt);
+
+		for (intent in ISOFIT_INTENTS) {
+			opt = document.createElement('option');
+			opt.innerHTML = intent;
+			opt.value = intent;
+			select.appendChild(opt);
+		}
+	}
+
+	function populateClasses(x) {
+		let select = document.getElementById(x);
+		for (intent of ISOFIT_CLASSES) {
+			opt = document.createElement('option');
+			opt.innerHTML = intent;
+			opt.value = intent;
+			select.appendChild(opt);
+		}
+	}
+
+	function selectIntent() {
+		let intentSelect = document.getElementById('intent_0');
+		let basisSelect = document.getElementById('basis_0');
+		console.log(intentSelect.value, basisSelect.value);
+
+		if (intentSelect.value != '' && basisSelect.value != '') {
+			let holeSelect  = document.getElementById('class_hole_0');
+			let shaftSelect = document.getElementById('class_shaft_0');
+
+			selectItemByValue(holeSelect,  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0]);
+			selectItemByValue(shaftSelect, ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1]);
+			console.log('selected', ISOFIT_INTENTS[intentSelect.value]);
+		} else {
+			basisSelect.value = '';
+		}
+	}
+
+	function selectBasis() {
+		let intentSelect = document.getElementById('intent_0');
+		let basisSelect = document.getElementById('basis_0');
+		console.log(intentSelect.value, basisSelect.value);
+
+		if (intentSelect.value != '' && basisSelec.value != '') {
+			let holeSelect  = document.getElementById('class_hole_0');
+			let shaftSelect = document.getElementById('class_shaft_0');
+
+			selectItemByValue(holeSelect,  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0]);
+			selectItemByValue(shaftSelect, ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1]);
+			console.log('selected', ISOFIT_INTENTS[intentSelect.value]);
+		} else {
+			basisSelect.value = '';
+		}
 	}
 </script>
 
@@ -163,7 +172,9 @@
 				<td class="collabel">
 					Nominal
 				</td><td class="collabel">
-					Intent/Basis
+					Intent
+				</td><td>
+					Basis
 				</td><td class="collabel">
 					Hole/Shaft Class
 				</td><td class="collabel">
@@ -176,8 +187,19 @@
 			</tr><tr>
 				<td><input id="nominal_0" /></td>
 				<td>
-					<select id="intent_0" >
-						<option value=""
+					<select id="intent_0" class="doublewide" onchange="selectIntent(); compute();" >
+					</select>
+				</td><td>
+					<select id="basis_0" class="" onchange="selectBasis(); compute();">
+						<option value="" selected></option>
+						<option value="hole">Hole</option>
+						<option value="shaft">Shaft</option>
+					</select>
+				</td><td>
+					<select id="class_hole_0" class="" >
+					</select>
+				</td><td>
+					<select id="class_shaft_0" class="" >
 					</select>
 				</td>
 			</tr>
