@@ -54,6 +54,9 @@ th {
 .tiny{
 	width: inherit;
 }
+.halfwide{
+  width: 30px;
+}
 
 .odd {
 	margin: none;

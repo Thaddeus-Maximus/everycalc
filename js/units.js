@@ -68,10 +68,8 @@ function getV(id, default_value, pct_err_en) {
 	return v;
 }
 
-// IDEA: Associate variables not by element id but by associated dimension/unit
-// This would cut down drastically on the unit sprawl phenomenon.... not sure if it makes the DOM bigger... does increase flexibility... some impact to plotting... no efficiency impacts
-
-function setV(id, value, places) {
+// TODO: leading zeroes
+function setV(id, value, places, show_sign, leading_zero) {
 	let unit = document.getElementById(id).dataset.unit;
 	if (typeof value === 'string') {
 		document.getElementById(id).value = value;
@@ -79,12 +77,14 @@ function setV(id, value, places) {
 		if (typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
-		if (typeof places === 'undefined')
+		if (typeof places === 'undefined') {
 			// log10|value| is roughly the order of magnitude the number is.
 			// Invert it to get the number of places to it
 			// Add a couple extra places for significance
 			places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
-		document.getElementById(id).value = value.toFixed(places);
+		}
+		let v = value.toFixed(places);
+		document.getElementById(id).value = (show_sign && value>0 ? "+":"") + v;
 	}
 }
 

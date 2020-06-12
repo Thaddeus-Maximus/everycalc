@@ -51,5 +51,7 @@ function ISOFIT_computeZone(nominal, isoclass) {
 	while (i<ISOFIT_NOMINAL_LIMITS.length && nominal*1000 > ISOFIT_NOMINAL_LIMITS[i]){
 		i++;
 	}
-	return ISOFIT_ZONES[ISOFIT_NOMINAL_LIMITS[i]][isoclass];
+	let mult = (isoclass.toUpperCase()==isoclass ? +1 : -1)/1000;
+	let arr  = ISOFIT_ZONES[ISOFIT_NOMINAL_LIMITS[i]][isoclass.toUpperCase()];
+	return [arr[0]*mult, arr[1]*mult];
 }
