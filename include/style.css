@@ -92,7 +92,7 @@ input {
 input.narrow  {
   width: 40px;
 }
-input[readonly] {
+input[readonly], input[disabled]{
   background-color: #ccd;
 }
 

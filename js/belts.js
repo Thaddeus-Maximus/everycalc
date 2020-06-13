@@ -44,6 +44,12 @@ function BELT_calculateCenterDist(l, d1, d2, crossed) {
 	return c;
 }
 
+function BELT_computeBeltTorqueCapacity(bdata, rpm, teeth, width, length) {
+	// rpm must be in RPM, yes.
+	let factor = bdata.width_multipliers[width] * interp1D(bdata.lc_lengths, bdata.lc_factors, convertTo(length,'mm'));
+	return interp2D(bdata.rpms, bdata.teeth, bdata.torques, rpm, teeth) * factor;
+}
+
 // Belt sizes available at different manufacturers
 var BELT_MFRS = {"vex": "VexPro", "am": "AndyMark"};
 var BELT_SIZES = {
@@ -55,6 +61,12 @@ var BELT_SIZES = {
 		"5mm": [40,45,48,93,55,85,104,107,110,117,120,131,140,151,160,170,180,200]
 	}
 };
+
+var BELT_PITCHES = {
+	htd: ['3mm', '5mm'],
+	gt3: ['2mm', '3mm', '5mm'],
+	gt2: ['3mm', '5mm'],
+}
 
 // Taken from https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf
 var BELT_RATINGS = {
