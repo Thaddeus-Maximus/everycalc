@@ -1,0 +1,449 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css"> 
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/isofits.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<script type="text/javascript">
+	EXP_FN_BASE = 'fit_tol';
+	UNIT_MAP = {
+		'dimension': ['mm', 'in'] // ezpz
+	};
+	WALK_STEPS = [{
+			poi: 'nominal_0',
+			desc: 'Input a nominal diameter...',
+			valign: 'bottom'
+		},{
+			poi: 'intent_0',
+			desc: 'Select the intent of this fit...',
+			valign: 'bottom'
+		},{
+			poi: 'basis_0',
+			desc: 'Select whether the shaft or hole is the basis...',
+			valign: 'bottom'
+		},{
+			poi: 'class_td_0',
+			desc: 'Suggested ISO zones are output here.',
+			valign: 'bottom'
+		},{
+			poi: 'class_td_0',
+			desc: 'The zones can be overridden.',
+			valign: 'bottom'
+		},{
+			poi: 'table_output_0',
+			desc: 'Computed tolerances and interferences are calculated here.',
+			valign: 'bottom'
+		},{
+			poi: 'mode_0',
+			desc: 'The style of output can be selected here.',
+			valign: 'bottom'
+		}];
+</script>
+<script type="text/javascript">
+
+	function init() {
+		EC_onload();
+
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				addFit();
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
+		}
+
+		UNIT_change();
+
+		registerCallbacks();
+
+		WALK_onload();
+
+		compute();
+	}
+
+	function registerCallbacks() {
+		// not an expensive calculator, just fire on all changes
+		EC_setOnInput(
+			function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	setError(1);
+		    	compute();
+		    });
+		EC_setOnKeyUp(
+			function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	setError(1);
+		    	compute();
+		    });
+	}
+
+	function compute() {
+		try{
+			let container = document.getElementById('fits');
+			for (let i=0; i<container.children.length; i++) {
+				x = container.children[i].dataset.fit_id;
+				let modeSelect  = document.getElementById(`mode_${x}`);
+				let nominal     = getV(`nominal_${x}`);
+				let holeSelect  = document.getElementById(`class_hole_${x}`);
+				let shaftSelect = document.getElementById(`class_shaft_${x}`);
+				if(!validateClass(holeSelect) || !validateClass(shaftSelect)) {
+					throw `Invalid Hole or Shaft Zone in Fit ${x}`;
+				}
+				checkStandardClassFit(x);
+				selectMode(x);
+				let holeZone  = ISOFIT_computeZone(nominal, holeSelect.value);
+				let shaftZone = ISOFIT_computeZone(nominal, shaftSelect.value);
+
+				let metric = document.getElementById('unit_select').value == '0';
+				let places = metric ? 3:5;
+
+				switch(modeSelect.value) {
+					case "bilateral":
+						setV(`dim_hole_a_${x}`,  Math.max(...holeZone),  places, true);
+						setV(`dim_hole_b_${x}`,  Math.min(...holeZone),  places, true);
+						setV(`dim_shaft_a_${x}`, Math.max(...shaftZone), places, true);
+						setV(`dim_shaft_b_${x}`, Math.min(...shaftZone), places, true);
+						break;
+					case "symmetric":
+						let holeAvg  = nominal+( holeZone[0]  + holeZone[1]  )/2;
+						let shaftAvg = nominal+( shaftZone[0] + shaftZone[1] )/2;
+						let holeSpn  = Math.abs( holeZone[1]  - holeZone[0]  )/2;
+						let shaftSpn = Math.abs( shaftZone[1] - shaftZone[0] )/2;
+						setV(`dim_hole_a_${x}`,  holeAvg,  places);
+						setV(`dim_hole_b_${x}`,  holeSpn,  places);
+						setV(`dim_shaft_a_${x}`, shaftAvg, places);
+						setV(`dim_shaft_b_${x}`, shaftSpn, places);
+						break;
+					case "minmax":
+						setV(`dim_hole_a_${x}`,  nominal+Math.max(...holeZone),  places);
+						setV(`dim_hole_b_${x}`,  nominal+Math.min(...holeZone),  places);
+						setV(`dim_shaft_a_${x}`, nominal+Math.max(...shaftZone), places);
+						setV(`dim_shaft_b_${x}`, nominal+Math.min(...shaftZone), places);
+						break;
+				}
+
+				perms = [
+					shaftZone[1]-holeZone[0],
+					shaftZone[0]-holeZone[0],
+					shaftZone[1]-holeZone[1],
+					shaftZone[0]-holeZone[1]
+				];
+
+				setV(`dim_interf_a_${x}`, Math.min(...perms), places, true);
+				setV(`dim_interf_b_${x}`, Math.max(...perms), places, true);
+
+				// setV(id, value, plages, show_sign)
+			}
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;
+		}
+		setError(0);
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
+	}
+
+	function populateIntents(x) {
+		let select = document.getElementById(`intent_${x}`);
+		let opt = document.createElement('option');
+			opt.innerHTML = '';
+			opt.value = '';
+			select.appendChild(opt);
+
+		for (intent in ISOFIT_INTENTS) {
+			opt = document.createElement('option');
+			opt.innerHTML = intent;
+			opt.value = intent;
+			select.appendChild(opt);
+		}
+	}
+
+	function validateClass(x) {
+		if ( ISOFIT_CLASSES.includes(x.value.toUpperCase())) {
+			x.classList.remove('error');
+			return true;
+		} else {
+			x.classList.add('error');
+			return false;
+		}
+	}
+
+	function checkStandardClassFit(x) {
+		//document.getElementById('intent_0').selectedIndex = 0;
+		//document.getElementById('basis_0').selectedIndex = 0;
+		let intentSelect = document.getElementById(`intent_${x}`);
+		let basisSelect  = document.getElementById(`basis_${x}`);
+		let holeSelect   = document.getElementById(`class_hole_${x}`);
+		let shaftSelect  = document.getElementById(`class_shaft_${x}`);
+
+		for (intent in ISOFIT_INTENTS) {
+			if (ISOFIT_INTENTS[intent].hole[0] == holeSelect.value && ISOFIT_INTENTS[intent].hole[1] == shaftSelect.value) {
+				selectItemByValue(basisSelect,  'hole');
+				selectItemByValue(intentSelect, intent);
+				return true;
+			}
+			if (ISOFIT_INTENTS[intent].shaft[0] == holeSelect.value && ISOFIT_INTENTS[intent].shaft[1] == shaftSelect.value) {
+				selectItemByValue(basisSelect,  'shaft');
+				selectItemByValue(intentSelect, intent);
+				return true;
+			}
+		}
+		selectItemByValue(basisSelect,  '');
+		selectItemByValue(intentSelect, '');
+
+	}
+
+	function selectIntent(x) {
+		let intentSelect = document.getElementById(`intent_${x}`);
+		let basisSelect  = document.getElementById(`basis_${x}`);
+		let holeSelect   = document.getElementById(`class_hole_${x}`);
+		let shaftSelect  = document.getElementById(`class_shaft_${x}`);
+
+		if (intentSelect.value != '' && basisSelect.value != '') {
+			holeSelect.value =  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0];
+			shaftSelect.value = ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1];
+
+			compute();
+		} else {
+			basisSelect.value = '';
+			holeSelect.value  = '';
+			shaftSelect.value = '';
+		}
+	}
+
+	function selectBasis(x) {
+		let intentSelect = document.getElementById(`intent_${x}`);
+		let basisSelect  = document.getElementById(`basis_${x}`);
+		let holeSelect   = document.getElementById(`class_hole_${x}`);
+		let shaftSelect  = document.getElementById(`class_shaft_${x}`);
+
+		if (intentSelect.value != '' && basisSelect.value != '') {
+			holeSelect.value =  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0];
+			shaftSelect.value = ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1];
+
+			compute();
+		} else {
+			basisSelect.value = '';
+			holeSelect.value  = '';
+			shaftSelect.value = '';
+		}
+	}
+
+	function selectMode(x) {
+		let modeSelect = document.getElementById(`mode_${x}`);
+		let sepHole    = document.getElementById(`sep_hole_${x}`);
+		let sepShaft   = document.getElementById(`sep_shaft_${x}`);
+		if (modeSelect.value == "bilateral") {
+			sepShaft.innerHTML = sepHole.innerHTML = '/';
+		} else if (modeSelect.value == "symmetric") {
+			sepShaft.innerHTML = sepHole.innerHTML = '+/-';
+		} else if (modeSelect.value == "minmax") {
+			sepShaft.innerHTML = sepHole.innerHTML = 'to';
+		} else {
+			sepShaft.innerHTML = sepHole.innerHTML = 'ERROR';
+		}
+	}
+
+	function addFit(params) {
+		setError(1);
+		let container = document.getElementById('fits');
+		let div       = document.createElement('div');
+		let x         = parseInt(container.dataset.current_fit_number);
+		container.dataset.current_fit_number = x+1;
+		div.innerHTML = `
+			<table style='float: left;'>
+				<tr>
+					<td class="rowlabel">
+						Nominal Diam.
+					</td>
+					<td><input class="dynamic-input" id="nominal_${x}" data-unit="dimension" /><span class="unit" data-unit="dimension" >[]</span></td>
+				</tr><tr>
+					<td class="rowlabel">Intent</td>
+					<td>
+						<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x});" >
+						</select><br/>
+					</td>
+				</tr><tr>
+					<td class="rowlabel">Basis</td>
+					<td>
+						<select class="dynamic-input doublewide" id="basis_${x}" onchange="selectBasis(${x});">
+							<option value="" selected></option>
+							<option value="hole">Hole Basis</option>
+							<option value="shaft">Shaft Basis</option>
+						</select>
+					</td>
+				</tr><tr>
+					<td class="rowlabel">
+						Hole/Shaft
+					</td><td id="class_td_${x}">
+						<input class="dynamic-input halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input halfwide" />
+					</td>
+				</tr>
+			</table>
+			<table style='float: right;' id="table_output_${x}">
+				<tr>
+					<td colspan=3  style='text-align: center' >
+						<select class="dynamic-input doublewide" id="mode_${x}" onchange="selectMode(${x}); compute();">
+							<option value="bilateral" selected>Bilateral Deviation</option>
+							<option value="symmetric">Symmetric Tolerance</option>
+							<option value="minmax">Min/Max Limits</option>
+						</select>
+					</td><td style="text-align: right;">
+						<button id="close_${x}" onclick="removeFit(${x}); compute();">X</button>
+					</td>
+				</tr>
+				<tr>
+					<td class="rowlabel">
+						Hole
+					</td>
+					<td><input class="dynamic-input" id="dim_hole_a_${x}" readonly  data-unit="dimension" /></td>
+					<td id="sep_hole_${x}" style='text-align: center' >/</td>
+					<td><input class="dynamic-input" id="dim_hole_b_${x}" readonly  data-unit="dimension" /></td>
+				</tr><tr>
+					<td class="rowlabel">
+						Shaft
+					</td>
+					<td><input class="dynamic-input" id="dim_shaft_a_${x}" readonly  data-unit="dimension" /></td>
+					<td id="sep_shaft_${x}" style='text-align: center' >/</td>
+					<td><input class="dynamic-input" id="dim_shaft_b_${x}" readonly  data-unit="dimension" /></td>
+				</tr><tr>
+					<td class="rowlabel">
+						Interference
+					</td>
+					<td><input class="dynamic-input" id="dim_interf_a_${x}" readonly  data-unit="dimension" /></td>
+					<td id="sep_interf_${x}" style='text-align: center' >to</td>
+					<td><input class="dynamic-input" id="dim_interf_b_${x}" readonly  data-unit="dimension" /></td>
+				</tr>
+			</table>`;
+		div.style = "width:100%; overflow:hidden;";
+		div.dataset.fit_id = x;
+		div.classList.add(x%2 ? 'even':'odd');
+		div.classList.add('fit');
+
+		container.appendChild(div);
+		populateIntents(x);
+		UNIT_change();
+		registerCallbacks();
+
+		if (typeof params == 'undefined') {
+			params = {
+				nominal: 6,
+				class_hole: "H7",
+				class_shaft: "h6",
+				mode: "bilateral"
+			}
+		}
+		document.getElementById(`class_hole_${x}`).value = params.class_hole;
+		document.getElementById(`class_shaft_${x}`).value = params.class_shaft;
+		document.getElementById(`nominal_${x}`).value = params.nominal;
+		selectItemByValue(document.getElementById(`mode_${x}`), params.mode);
+
+		setError(1);
+	}
+
+	function removeFit(x) {
+		let container = document.getElementById('fits');
+		let div       = document.createElement('div');
+		for(let i=0; i<container.children.length; i++) {
+			if (container.children[i].dataset.fit_id == x) {
+				container.removeChild(container.children[i]);
+				i--;
+			}
+			else { // make them even and odd
+				container.children[i].classList.remove(i%2 ? 'odd' : 'even');
+				container.children[i].classList.add(i%2 ? 'even' : 'odd');
+			}
+		}
+		setError(1);
+	}
+
+	function dumpDynamicPersistence() {
+		let container = document.getElementById('fits');
+		let trans_obj = [];
+
+		for(let i=0; i<container.children.length; i++) {
+			let x = container.children[i].dataset.fit_id;
+			/*let x = container.children[i].dataset.stage_id;
+			let strend = (`_${x}`).length;
+			trans_obj_i = {};
+			for (input of container.children[i].getElementsByTagName('input')) {
+				let id = input.id.slice(0, -strend);
+				if (input.type == 'checkbox' || input.type == 'radio')
+					trans_obj_i[id] = input.checked ? "true":"false";
+				else
+					trans_obj_i[id] = input.value;
+			}
+			for (input of container.children[i].getElementsByTagName('select')) {
+				let id = input.id.slice(0, -strend);
+				trans_obj_i[id] = input.value;
+			}*/
+			trans_obj_i = {
+				nominal:     document.getElementById(`nominal_${x}`).value,
+				class_hole:  document.getElementById(`class_hole_${x}`).value,
+				class_shaft: document.getElementById(`class_shaft_${x}`).value,
+				mode:        document.getElementById(`mode_${x}`).value
+			}
+			trans_obj.push(trans_obj_i);
+		}
+		setLocalStorage('fits', JSON.stringify(trans_obj));
+	}
+
+	function loadDynamicPersistence() {
+		let fits_obj = JSON.parse(getLocalStorage('fits'));
+		for (let fit of fits_obj) {
+			addFit(fit);
+		}
+	}
+</script>
+
+<html>
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+	<div style="float: left;" class="container">
+		<div style='display:table-row' id="fits" data-current_fit_number=0 ></div>
+		<div><button id='addFit_btn' onclick='addFit()'>Add Fit</button></div>
+	</div>
+</body>
+</html>

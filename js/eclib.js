@@ -34,6 +34,16 @@ function EC_setOnKeyUp(fn) {
 	}
 }
 
+function selectItemByValue(elmnt, value){
+  for(var i=0; i < elmnt.options.length; i++)
+  {
+    if(elmnt.options[i].value === value) {
+      elmnt.selectedIndex = i;
+      break;
+    }
+  }
+}
+
 function roundToZero(x) {
 	return x < 0 ? Math.ceil(x) : Math.floor(x);
 }
