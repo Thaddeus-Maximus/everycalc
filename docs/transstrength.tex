@@ -95,12 +95,30 @@
 	$S_{shaft}$ will be the maximum shear stress, or the tensile yield stress divided by two.
 
 \section{Strength of Timing Belt Runs}
+	Belt strength is calculated from the tables in the \href{https://www.gates.com/content/dam/gates/home/resources/resource-library/catalogs/light-power-and-precision-manual.pdf}{\underline{Gates Light Power and Precision Manual}}.
 
-\section{Strength of Chain Runs}
+	\begin{figure}[H]
+	\includegraphics[width=\textwidth]{beltrating_a.png}
+	\includegraphics[width=\textwidth]{beltrating_b.png}
+	\caption{Exemplary data from the Gates manual.}
+	\end{figure}
+
+	These tables list allowable pulley torque $T(\omega, N)$ as a function of RPM $\omega$ and pulley teeth $N$. Note that 6 teeth should be in engagement.
+	2-D interpolation is used to determine values on the in-betweens.
+	Tabulated values outside the bounds are extrapolated. Omitted values are presumed to be zero.
+
+	\begin{align}
+		T_{base} &= \text{interp2D}(\{N\}, \{\omega\}, [T], N_{sprocket}, \omega_{sprocket}) \\
+		K_{length} &= \text{interp1D}(\{L\}, \{K_{lengths}\}, \{L_{belt}\}) \\
+		K_{width} &= \text{lookup}(\{w\}, \{K_{widths}\}, \{w_{belt}\}) \\
+		T_{rated,\ sprocket} &= K_{length} \times K_{width} \times T_{base}
+	\end{align}
+
+	It should also be noted that the number of teeth engaged with the pulley is recommended to be no less than 6.
 
 \section{Strength of COTS Planetaries}
 	\subsection{VexPro VersaPlanetary}
-	\href{https://www.vexrobotics.com/versaplanetary.html}{\underline{VexPro's VersaPlanetaries}} come with a \href{https://docs.google.com/gview?url=http://link.vex.com/vexpro/pdf/VersaPlanetary-LoadRatings}{\underline{Load Rating Guide}}
+	\href{https://www.vexrobotics.com/versaplanetary.html}{\underline{VexPro's VersaPlanetaries}} come with a \href{https://docs.google.com/gview?url=http://link.vex.com/vexpro/pdf/VersaPlanetary-LoadRatings}{\underline{Load Rating Guide}}.
 
 	The key failure points identified are:
 	\begin{asparaitem}
@@ -115,8 +133,9 @@
 	These ratings, as this calculator, do not take into consideration bending loads which could further derate the carrying capacity.
 
 	\subsection{AndyMark 57 Sport}
-	\href{https://www.andymark.com/products/57-sport-options}{\underline{AndyMark's 57 Sport Gearboxes}} 
+	\href{https://www.andymark.com/products/57-sport-options}{\underline{AndyMark's 57 Sport Gearboxes}} are rated on a per-gearbox configuration with a maximum torque capacity.
 
-\section{Assembling Components}
-
+	\subsection{REV UltraPlanetary}
+	\href{https://www.revrobotics.com/rev-41-1600/}{\underline{REV's UltraPlanetaries}} have a load rating of 40 N-m at the final cartridge (output).
+	
 \end{document}

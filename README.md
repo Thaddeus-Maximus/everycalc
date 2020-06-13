@@ -38,6 +38,7 @@ Awesome! Let me know, fork this repo, then take a look at the [trajectory source
 - [Belt Calculator](docs/beltcalc.pdf)
 - [Beam Tool](docs/beamcalc.pdf)
 - [Wheel Pitchers](docs/pitchers.pdf)
+- [Transmission Strength](docs/transstrength.pdf)
 
 # Credits
 Using [mathjs](https://mathjs.org/) for beam calculator (as some rudimentary FEA is performed).
