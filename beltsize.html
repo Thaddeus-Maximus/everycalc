@@ -333,6 +333,9 @@
 	}
 
 	function computeStrength() {
+		computeRPM   (document.getElementById('rpm_1'));
+		computeTorque(document.getElementById('torque_1'));
+
 		let teeth_1  = getV('p1_n');
 		let teeth_2  = getV('p2_n');
 		let length   = getV('l_s');

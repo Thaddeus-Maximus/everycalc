@@ -311,11 +311,13 @@
 	 * - Optionless reduction?
 	 * - Revamp UI? Some things feel a little out of place
 	 * - Highlight low FOSes?
+	 * * Exporting produces a dump list rather than correct and prper combo box
 	 */
 
 	/* Initialization routine run on page load */
 	function init() {
 		EC_onload();
+		populatePredefinedGearbox();
 		MOTOR_setupMotorSelect("motor");
 		
 		switch(EXP_onload()) {
@@ -339,7 +341,6 @@
 		// on keyup for all variables
 		registerCallbacks();
 		compute();
-		populatePredefinedGearbox();
 		WALK_onload();
 	}
 
@@ -365,9 +366,10 @@
 
 	function populatePredefinedGearbox() {
 		let select = document.getElementById('predefined_select');
+		select.innerHTML = "";
 		if (true) {
 			let opt = document.createElement('option');
-			opt.innerHTML = '<select COTS gearbox>';
+			opt.innerHTML = '[select COTS gearbox]';
 			opt.value = '';
 			select.appendChild(opt);
 		}
