@@ -1256,7 +1256,7 @@
 				return +Infinity;
 			case 'hex':
 				S = 0.208*Math.pow(diameter, 3);
-				return S*matl.Sy;
+				return S*matl.Sy/2;
 			case 'thex':
 				if (Math.abs(diameter - convertFrom(0.5, 'in')) < 1e-5) {
 					// 1/2 thunderhex has a 5.1mm hole
@@ -1268,7 +1268,7 @@
 					document.getElementById(prefix+"_diameter").classList.add('error');
 					return 0;
 				}
-				return S*matl.Sy;
+				return S*matl.Sy/2;
 		}
 	}
 
