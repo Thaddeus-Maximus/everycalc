@@ -20,21 +20,33 @@
 		'dimension': ['mm', 'in'] // ezpz
 	};
 	WALK_STEPS = [{
-			poi: 'type',
-			desc: 'Select the gland type...',
+			poi: 'nominal_0',
+			desc: 'Input a nominal diameter...',
 			valign: 'bottom'
 		},{
-			poi: 'user_inputs',
-			desc: 'Plug in gland dimensions...',
+			poi: 'intent_0',
+			desc: 'Select the intent of this fit...',
 			valign: 'bottom'
 		},{
-			poi: 'dashsize',
-			desc: 'Standard o-ring sizes can be input here.'
+			poi: 'basis_0',
+			desc: 'Select whether the shaft or hole is the basis...',
+			valign: 'bottom'
 		},{
-			poi: 'computed_outputs',
-			desc: 'Min and max values are calculated here.',
-			valign: 'bottom',
-			halign: 'right'
+			poi: 'class_td_0',
+			desc: 'Suggested ISO zones are output here.',
+			valign: 'bottom'
+		},{
+			poi: 'class_td_0',
+			desc: 'The zones can be overridden.',
+			valign: 'bottom'
+		},{
+			poi: 'table_output_0',
+			desc: 'Computed tolerances and interferences are calculated here.',
+			valign: 'bottom'
+		},{
+			poi: 'mode_0',
+			desc: 'The style of output can be selected here.',
+			valign: 'bottom'
 		}];
 </script>
 <script type="text/javascript">
@@ -61,7 +73,7 @@
 
 		registerCallbacks();
 
-		//WALK_onload();
+		WALK_onload();
 
 		compute();
 	}
@@ -202,30 +214,36 @@
 	function selectIntent(x) {
 		let intentSelect = document.getElementById(`intent_${x}`);
 		let basisSelect  = document.getElementById(`basis_${x}`);
+		let holeSelect   = document.getElementById(`class_hole_${x}`);
+		let shaftSelect  = document.getElementById(`class_shaft_${x}`);
 
 		if (intentSelect.value != '' && basisSelect.value != '') {
-			let holeSelect   = document.getElementById(`class_hole_${x}`);
-			let shaftSelect  = document.getElementById(`class_shaft_${x}`);
-
 			holeSelect.value =  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0];
 			shaftSelect.value = ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1];
+
+			compute();
 		} else {
 			basisSelect.value = '';
+			holeSelect.value  = '';
+			shaftSelect.value = '';
 		}
 	}
 
 	function selectBasis(x) {
 		let intentSelect = document.getElementById(`intent_${x}`);
 		let basisSelect  = document.getElementById(`basis_${x}`);
+		let holeSelect   = document.getElementById(`class_hole_${x}`);
+		let shaftSelect  = document.getElementById(`class_shaft_${x}`);
 
 		if (intentSelect.value != '' && basisSelect.value != '') {
-			let holeSelect   = document.getElementById(`class_hole_${x}`);
-			let shaftSelect  = document.getElementById(`class_shaft_${x}`);
-
 			holeSelect.value =  ISOFIT_INTENTS[intentSelect.value][basisSelect.value][0];
 			shaftSelect.value = ISOFIT_INTENTS[intentSelect.value][basisSelect.value][1];
+
+			compute();
 		} else {
 			basisSelect.value = '';
+			holeSelect.value  = '';
+			shaftSelect.value = '';
 		}
 	}
 
@@ -260,13 +278,13 @@
 				</tr><tr>
 					<td class="rowlabel">Intent</td>
 					<td>
-						<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x}); compute();" >
+						<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x});" >
 						</select><br/>
 					</td>
 				</tr><tr>
 					<td class="rowlabel">Basis</td>
 					<td>
-						<select class="dynamic-input doublewide" id="basis_${x}" onchange="selectBasis(${x}); compute();">
+						<select class="dynamic-input doublewide" id="basis_${x}" onchange="selectBasis(${x});">
 							<option value="" selected></option>
 							<option value="hole">Hole Basis</option>
 							<option value="shaft">Shaft Basis</option>
@@ -275,12 +293,12 @@
 				</tr><tr>
 					<td class="rowlabel">
 						Hole/Shaft
-					</td><td>
+					</td><td id="class_td_${x}">
 						<input class="dynamic-input halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input halfwide" />
 					</td>
 				</tr>
 			</table>
-			<table style='float: right;'>
+			<table style='float: right;' id="table_output_${x}">
 				<tr>
 					<td colspan=3  style='text-align: center' >
 						<select class="dynamic-input doublewide" id="mode_${x}" onchange="selectMode(${x}); compute();">
