@@ -56,11 +56,7 @@
 
 		switch(EXP_onload()) {
 			case 0: // run when nothing loads
-				addFit({
-					nominal: 6,
-					class_hole: "H7",
-					class_shaft: "h6"
-				});
+				addFit();
 				break;
 			case 1: // run when export loads
 				break;
@@ -112,30 +108,30 @@
 				let shaftZone = ISOFIT_computeZone(nominal, shaftSelect.value);
 
 				let metric = document.getElementById('unit_select').value == '0';
-				let places = metric ? 4:5;
+				let places = metric ? 3:5;
 
 				switch(modeSelect.value) {
 					case "bilateral":
-						setV(`dim_hole_a_${x}`,  holeZone[0],  places, true);
-						setV(`dim_hole_b_${x}`,  holeZone[1],  places, true);
-						setV(`dim_shaft_a_${x}`, shaftZone[0], places, true);
-						setV(`dim_shaft_b_${x}`, shaftZone[1], places, true);
+						setV(`dim_hole_a_${x}`,  Math.max(...holeZone),  places, true);
+						setV(`dim_hole_b_${x}`,  Math.min(...holeZone),  places, true);
+						setV(`dim_shaft_a_${x}`, Math.max(...shaftZone), places, true);
+						setV(`dim_shaft_b_${x}`, Math.min(...shaftZone), places, true);
 						break;
 					case "symmetric":
 						let holeAvg  = nominal+( holeZone[0]  + holeZone[1]  )/2;
 						let shaftAvg = nominal+( shaftZone[0] + shaftZone[1] )/2;
-						let holeSpn  = ( holeZone[1]  - holeZone[0]  )/2;
-						let shaftSpn = ( shaftZone[1] - shaftZone[0] )/2;
+						let holeSpn  = Math.abs( holeZone[1]  - holeZone[0]  )/2;
+						let shaftSpn = Math.abs( shaftZone[1] - shaftZone[0] )/2;
 						setV(`dim_hole_a_${x}`,  holeAvg,  places);
 						setV(`dim_hole_b_${x}`,  holeSpn,  places);
 						setV(`dim_shaft_a_${x}`, shaftAvg, places);
 						setV(`dim_shaft_b_${x}`, shaftSpn, places);
 						break;
 					case "minmax":
-						setV(`dim_hole_a_${x}`,  nominal+holeZone[0],  places);
-						setV(`dim_hole_b_${x}`,  nominal+holeZone[1],  places);
-						setV(`dim_shaft_a_${x}`, nominal+shaftZone[0], places);
-						setV(`dim_shaft_b_${x}`, nominal+shaftZone[1], places);
+						setV(`dim_hole_a_${x}`,  nominal+Math.max(...holeZone),  places);
+						setV(`dim_hole_b_${x}`,  nominal+Math.min(...holeZone),  places);
+						setV(`dim_shaft_a_${x}`, nominal+Math.max(...shaftZone), places);
+						setV(`dim_shaft_b_${x}`, nominal+Math.min(...shaftZone), places);
 						break;
 				}
 
@@ -146,8 +142,8 @@
 					shaftZone[0]-holeZone[1]
 				];
 
-				setV(`dim_interf_a_${x}`, Math.min(...perms), places);
-				setV(`dim_interf_b_${x}`, Math.max(...perms), places);
+				setV(`dim_interf_a_${x}`, Math.min(...perms), places, true);
+				setV(`dim_interf_b_${x}`, Math.max(...perms), places, true);
 
 				// setV(id, value, plages, show_sign)
 			}
@@ -343,11 +339,18 @@
 		UNIT_change();
 		registerCallbacks();
 
-		if (typeof params != 'undefined') {
-			for(p in params) {
-				document.getElementById(`${p}_${x}`).value = params[p];
+		if (typeof params == 'undefined') {
+			params = {
+				nominal: 6,
+				class_hole: "H7",
+				class_shaft: "h6",
+				mode: "bilateral"
 			}
 		}
+		document.getElementById(`class_hole_${x}`).value = params.class_hole;
+		document.getElementById(`class_shaft_${x}`).value = params.class_shaft;
+		document.getElementById(`nominal_${x}`).value = params.nominal;
+		selectItemByValue(document.getElementById(`mode_${x}`), params.mode);
 
 		setError(1);
 	}
@@ -391,7 +394,8 @@
 			trans_obj_i = {
 				nominal:     document.getElementById(`nominal_${x}`).value,
 				class_hole:  document.getElementById(`class_hole_${x}`).value,
-				class_shaft: document.getElementById(`class_shaft_${x}`).value
+				class_shaft: document.getElementById(`class_shaft_${x}`).value,
+				mode:        document.getElementById(`mode_${x}`).value
 			}
 			trans_obj.push(trans_obj_i);
 		}
