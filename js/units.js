@@ -38,7 +38,7 @@ function UNIT_change() {
 			let oldstr = label.innerHTML;
 			let start = oldstr.indexOf('[');
 			if (start < 0)
-				label.innerHTML = brktunit;
+				label.innerHTML = UNIT_MAP[varname][UNIT_sys];
 			else
 				label.innerHTML = oldstr.substring(0, start) + brktunit;
 		}

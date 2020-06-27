@@ -2,7 +2,7 @@
 <meta content="utf-8" http-equiv="encoding">
 
 <!DOCTYPE html>
-<link rel="stylesheet" href="include/style.css"> 
+<link rel="stylesheet" href="include/style.css">
 
 <!-- Include relevant libraries -->
 <script type="text/javascript" src="js/eclib.js"></script>
@@ -290,7 +290,13 @@
 					<td class="rowlabel">
 						Hole/Shaft
 					</td><td id="class_td_${x}">
-						<input class="dynamic-input halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input halfwide" />
+						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
+					</td>
+				</tr><tr>
+					<td class="rowlabel bottom-border">
+						Hole/Shaft
+					</td><td id="class_td_${x}" class="bottom-border">
+						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
 					</td>
 				</tr>
 			</table>
@@ -441,7 +447,7 @@
 	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="float: left;" class="container">
+	<div style="float: left;" id="content">
 		<div style='display:table-row' id="fits" data-current_fit_number=0 ></div>
 		<div><button id='addFit_btn' onclick='addFit()'>Add Fit</button></div>
 	</div>
