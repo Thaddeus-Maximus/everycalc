@@ -24,7 +24,8 @@
             Red:               #e74c3c
             Yellow:            #f1c40f
             Orange-Red:        #e67e22
-            Console:           #2c3051;
+            Console Bkgrnd:    #2c3051
+            Console Fogrnd:    #2eec71 / #81F828
 */
 
 /* INPUT STUFF */
@@ -35,43 +36,45 @@
 
 td{
   padding: 0px;
+  padding-left: 0.2em;
+  padding-right: 0.2em;
   margin: 0px;
+}
+
+select, button, input {
+  border: 1px solid #BBAE46;
+  border-radius: .2em;
+  padding: .1em;
+  margin: 1px;
+  color: #2c3031;
+  background-color: #fafce4;
+}
+
+select, button{
+  font-size: 10pt;
+  font-weight: normal;
+  font-family: "Noto Sans", "Segoe UI", monospace;
 }
 input {
   width: 5em;
-  border: none;
-  background-color: #fafce4;
-  color: #2c3031;
-  padding: .1em;
-  margin: 1px;
   text-align: right;
   font-size: 12pt;
   font-weight: normal;
   font-family: "Ubuntu Mono", "Consolas", monospace;
-  border-radius: .2em;
 }
+
 input.input-halfwide {
   width: 2em;
 }
 input[readonly] {
   font-family: "Ubuntu Mono", "Consolas", monospace;
   background-color: #2c3041;
-  color: #81F828;
+  color: #2eec71;
+  border: 1px solid #BBAE46;
 }
 input[disabled] {
   background-color: #fafce4;
   color: #fafce4;
-}
-
-select, button{
-  border: none;
-  padding: .1em;
-  margin: 1px;
-  color: #2c3031;
-  background-color: #fafce4;
-  font-size: 10pt;
-  font-weight: normal;
-  font-family: "Noto Sans", "Segoe UI", monospace;
 }
 table {
   border-collapse: separate;
@@ -82,30 +85,39 @@ table {
   border-bottom: 2px solid #BBAE46;
 }
 
-.even .odd {
-  background-color: #FBEEA6;
+.section:last-child{
+  border-bottom: 2px solid #BBAE46;
+}
+.section-row {
+
+}
+.section-cell {
+  display: inline;
 }
 
 /* NAVBAR STUFF */
 
 #content {
   float: left;
-  margin: 0;
+  margin: 0px;
+  padding: 0px;
   margin-top: 28px;
   background-color: #FBEEA6;
 }
-
+body {
+  background-color: #FBEEA6;
+}
 #topbar {
-  background-color: #ddd;
   display: flex;
   flex-direction: row;
   font-weight: bold;
-  font-size: 10px;
+  font-size: 9pt;
 
   position: fixed;
   width: 100%;
+  left: 0px;
   height: 28px;
-  top: 0;
+  top: 0px;
   z-index: 5;
   border-bottom: 1px solid #333;
 }

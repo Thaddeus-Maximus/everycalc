@@ -265,19 +265,33 @@
 		let x         = parseInt(container.dataset.current_fit_number);
 		container.dataset.current_fit_number = x+1;
 		div.innerHTML = `
-			<table style='float: left;'>
-				<tr>
-					<td class="rowlabel">
-						Nominal Diam.
-					</td>
-					<td><input class="dynamic-input" id="nominal_${x}" data-unit="dimension" /><span class="unit" data-unit="dimension" >[]</span></td>
-				</tr><tr>
-					<td class="rowlabel">Intent</td>
-					<td>
-						<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x});" >
-						</select><br/>
-					</td>
-				</tr><tr>
+			<div class="section">
+				<div class="section-row">
+					Intent
+					<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x});" >
+						</select>
+					<select class="dynamic-input doublewide" id="mode_${x}" onchange="selectMode(${x}); compute();">
+						<option value="bilateral" selected>Bilateral Deviation</option>
+						<option value="symmetric">Symmetric Tolerance</option>
+						<option value="minmax">Min/Max Limits</option>
+					</select>
+					<button id="close_${x}" onclick="removeFit(${x}); compute();">X</button>
+				</div>
+				<div class="section-row">
+					<div class="section-cell">Nominal Diam.</div>
+					<div class="section-cell">
+						<input class="dynamic-input" id="nominal_${x}" data-unit="dimension" /><span class="unit" data-unit="dimension" >[]</span>
+					</div>
+					<div class="section-cell">Hole</div>
+					<div class="section-cell">
+						<input class="dynamic-input" id="dim_hole_a_${x}" readonly  data-unit="dimension" />
+					</div>
+					<div class="section-cell" id="sep_hole_${x}">/</div>
+					<div class="section-cell">
+						<input class="dynamic-input" id="dim_hole_b_${x}" readonly  data-unit="dimension" />
+					</div>
+				</div>
+				<!--</tr><tr>
 					<td class="rowlabel">Basis</td>
 					<td>
 						<select class="dynamic-input doublewide" id="basis_${x}" onchange="selectBasis(${x});">
@@ -286,40 +300,6 @@
 							<option value="shaft">Shaft Basis</option>
 						</select>
 					</td>
-				</tr><tr>
-					<td class="rowlabel">
-						Hole/Shaft
-					</td><td id="class_td_${x}">
-						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
-					</td>
-				</tr><tr>
-					<td class="rowlabel bottom-border">
-						Hole/Shaft
-					</td><td id="class_td_${x}" class="bottom-border">
-						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
-					</td>
-				</tr>
-			</table>
-			<table style='float: right;' id="table_output_${x}">
-				<tr>
-					<td colspan=3  style='text-align: center' >
-						<select class="dynamic-input doublewide" id="mode_${x}" onchange="selectMode(${x}); compute();">
-							<option value="bilateral" selected>Bilateral Deviation</option>
-							<option value="symmetric">Symmetric Tolerance</option>
-							<option value="minmax">Min/Max Limits</option>
-						</select>
-					</td><td style="text-align: right;">
-						<button id="close_${x}" onclick="removeFit(${x}); compute();">X</button>
-					</td>
-				</tr>
-				<tr>
-					<td class="rowlabel">
-						Hole
-					</td>
-					<td><input class="dynamic-input" id="dim_hole_a_${x}" readonly  data-unit="dimension" /></td>
-					<td id="sep_hole_${x}" style='text-align: center' >/</td>
-					<td><input class="dynamic-input" id="dim_hole_b_${x}" readonly  data-unit="dimension" /></td>
-				</tr><tr>
 					<td class="rowlabel">
 						Shaft
 					</td>
@@ -327,14 +307,19 @@
 					<td id="sep_shaft_${x}" style='text-align: center' >/</td>
 					<td><input class="dynamic-input" id="dim_shaft_b_${x}" readonly  data-unit="dimension" /></td>
 				</tr><tr>
-					<td class="rowlabel">
+					<td class="rowlabel bottom-border">
+						Hole/Shaft
+					</td><td id="class_td_${x}" class="bottom-border">
+						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
+					</td>
+					<td class="rowlabel bottom-border">
 						Interference
 					</td>
-					<td><input class="dynamic-input" id="dim_interf_a_${x}" readonly  data-unit="dimension" /></td>
-					<td id="sep_interf_${x}" style='text-align: center' >to</td>
-					<td><input class="dynamic-input" id="dim_interf_b_${x}" readonly  data-unit="dimension" /></td>
-				</tr>
-			</table>`;
+					<td class="bottom-border"><input class="dynamic-input" id="dim_interf_a_${x}" readonly  data-unit="dimension" /></td>
+					<td class="bottom-border" id="sep_interf_${x}" style='text-align: center' >to</td>
+					<td class="bottom-border"><input class="dynamic-input" id="dim_interf_b_${x}" readonly  data-unit="dimension" /></td>
+				</tr>-->
+			</div>`;
 		div.style = "width:100%; overflow:hidden;";
 		div.dataset.fit_id = x;
 		div.classList.add(x%2 ? 'even':'odd');
