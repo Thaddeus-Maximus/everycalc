@@ -89,10 +89,13 @@ table {
   border-bottom: 2px solid #BBAE46;
 }
 .section-row {
-
+  display: table-row;
+}
+.section-urow {
+  display: inline;
 }
 .section-cell {
-  display: inline;
+  display: table-cell;
 }
 
 /* NAVBAR STUFF */

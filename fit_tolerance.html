@@ -266,8 +266,7 @@
 		container.dataset.current_fit_number = x+1;
 		div.innerHTML = `
 			<div class="section">
-				<div class="section-row">
-					Intent
+				<div class="section-urow">
 					<select class="dynamic-input doublewide" id="intent_${x}" onchange="selectIntent(${x});" >
 						</select>
 					<select class="dynamic-input doublewide" id="mode_${x}" onchange="selectMode(${x}); compute();">
@@ -275,7 +274,7 @@
 						<option value="symmetric">Symmetric Tolerance</option>
 						<option value="minmax">Min/Max Limits</option>
 					</select>
-					<button id="close_${x}" onclick="removeFit(${x}); compute();">X</button>
+					<button id="close_${x}" onclick="removeFit(${x}); compute();" style="float: right;">X</button>
 				</div>
 				<div class="section-row">
 					<div class="section-cell">Nominal Diam.</div>
@@ -291,34 +290,38 @@
 						<input class="dynamic-input" id="dim_hole_b_${x}" readonly  data-unit="dimension" />
 					</div>
 				</div>
-				<!--</tr><tr>
-					<td class="rowlabel">Basis</td>
-					<td>
+				<div class="section-row" />
+					<div class="section-cell">Basis</div>
+					<div class="section-cell">
 						<select class="dynamic-input doublewide" id="basis_${x}" onchange="selectBasis(${x});">
 							<option value="" selected></option>
-							<option value="hole">Hole Basis</option>
-							<option value="shaft">Shaft Basis</option>
+							<option value="hole">Hole</option>
+							<option value="shaft">Shaft</option>
 						</select>
-					</td>
-					<td class="rowlabel">
+					</div>
+					<div class="section-cell">
 						Shaft
-					</td>
-					<td><input class="dynamic-input" id="dim_shaft_a_${x}" readonly  data-unit="dimension" /></td>
-					<td id="sep_shaft_${x}" style='text-align: center' >/</td>
-					<td><input class="dynamic-input" id="dim_shaft_b_${x}" readonly  data-unit="dimension" /></td>
-				</tr><tr>
-					<td class="rowlabel bottom-border">
+					</div>
+					<div class="section-cell">
+					<input class="dynamic-input" id="dim_shaft_a_${x}" readonly  data-unit="dimension" />
+					</div>
+					<div class="section-cell" id="sep_shaft_${x}" style='text-align: center' >/</div>
+					<div class="section-cell"><input class="dynamic-input" id="dim_shaft_b_${x}" readonly  data-unit="dimension" /></div>
+				</div>
+				<div class="section-row">
+					<div class="section-cell">
 						Hole/Shaft
-					</td><td id="class_td_${x}" class="bottom-border">
+					</div>
+					<div class="section-cell" id="class_td_${x}" >
 						<input class="dynamic-input input-halfwide" id="class_hole_${x}" />/<input id="class_shaft_${x}" class="dynamic-input input-halfwide" />
-					</td>
-					<td class="rowlabel bottom-border">
+					</div>
+					<div class="section-cell">
 						Interference
-					</td>
-					<td class="bottom-border"><input class="dynamic-input" id="dim_interf_a_${x}" readonly  data-unit="dimension" /></td>
-					<td class="bottom-border" id="sep_interf_${x}" style='text-align: center' >to</td>
-					<td class="bottom-border"><input class="dynamic-input" id="dim_interf_b_${x}" readonly  data-unit="dimension" /></td>
-				</tr>-->
+					</div>
+					<div class="section-cell"><input class="dynamic-input" id="dim_interf_a_${x}" readonly  data-unit="dimension" /></div>
+					<div class="section-cell" id="sep_interf_${x}" style='text-align: center' >to</div>
+					<div class="section-cell"><input class="dynamic-input" id="dim_interf_b_${x}" readonly  data-unit="dimension" /></div>
+				</div>
 			</div>`;
 		div.style = "width:100%; overflow:hidden;";
 		div.dataset.fit_id = x;
