@@ -1,0 +1,98 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css"> 
+
+<!-- Include relevant libraries -->
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/isofits.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame" ></script>
+
+<script type="text/javascript">
+	EXP_FN_BASE = 'fit_tol';
+	UNIT_MAP = {
+		'dimension': ['mm', 'in'] // ezpz
+	};
+</script>
+<script type="text/javascript">
+
+	function init() {
+		EC_onload();
+
+		UNIT_change();
+
+		registerCallbacks();
+
+		compute();
+	}
+
+	function registerCallbacks() {
+		// not an expensive calculator, just fire on all changes
+		EC_setOnInput(
+			function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	setError(1);
+		    	compute();
+		    });
+		EC_setOnKeyUp(
+			function(e) {
+		    	var key = e.keyCode ? e.keyCode : e.which;
+		    	setError(1);
+		    	compute();
+		    });
+	}
+
+	function compute() {
+		try{
+			
+		}catch(err){
+			console.log(err);
+			setError(2, err);
+			return;
+		}
+		setError(0);
+	}
+</script>
+
+<style>
+  .bigboi {
+    font-size: 144pt;
+  }
+</style>
+
+<html>
+
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+  Is the sensor in the hole?
+  
+  <input id="sensorinthehole" value="NO" class="bigboi" />
+
+</body>
+</html>
