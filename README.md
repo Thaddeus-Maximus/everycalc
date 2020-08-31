@@ -1,4 +1,4 @@
-# [EveryCalc](https://thaddeus-maximus.github.io/swissarmyengineer/)
+# [EveryCalc](https://thaddeus-maximus.github.io/everycalc/)
 A set of analysis tools for common circumstances ranging from slightly annoying, to very complex.
 
 ![Screenshot](include/preview.png)
