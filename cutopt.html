@@ -1,0 +1,168 @@
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<!DOCTYPE html>
+<link rel="stylesheet" href="include/style.css"> 
+<script type="text/javascript" src="js/motors.js"></script>
+<script type="text/javascript" src="js/orings.js"></script>
+<script type="text/javascript" src="js/belts.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/materials.js"></script>
+
+<script type="text/javascript">
+	function handleNaN(x) {
+		return isNaN(x) ? '-':x;
+	}
+
+	function init() {
+		table = document.getElementById("motor_data_table");
+		i=0;
+		for(motor in MOTOR_specs) {
+			i++;
+			row = table.insertRow(i);
+			row.innerHTML = "<th class='rowlabel'>" + MOTOR_specs[motor]["plain_name"] + "</th><td>" 
+				+ MOTOR_specs[motor]["max_speed"] + "</td><td>"
+				+ MOTOR_specs[motor]["stall_torque"].toFixed(3) + "</td><td>"
+				+ MOTOR_specs[motor]["max_power"] + "</td><td>"
+				+ MOTOR_specs[motor]["stall_current"] + "</td><td>"
+				+ MOTOR_specs[motor]["free_current"].toFixed(2) + "</td>";
+			row.classList.add(i%2 ? 'oddrow' : 'evenrow');
+		}
+
+		table = document.getElementById("unit_data_table");
+		i=0;
+		for(baseunit in UNIT_BASES) {
+			firstone = true;
+			for (tounit of UNIT_BASES[baseunit]) {
+				i++;
+				row = table.insertRow(i);
+				row.innerHTML = 
+					(firstone ? "<th class='rowlabel'>" + baseunit + "</th><td>" : "<td></td><td>") 
+					+ tounit + "</td><td>"
+					+ UNIT_CONVERSIONS[tounit] + "</td>";
+				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+				firstone = false
+			}
+		}
+
+		table = document.getElementById("belt_data_table");
+		i=0;
+		for(mfr in BELT_SIZES) {
+			firstone = true;
+			for (series in BELT_SIZES[mfr]) {
+				i++;
+				row = table.insertRow(i);
+				row.innerHTML = 
+					(firstone ? "<th class='rowlabel'>" + BELT_MFRS[mfr] + "</th><td>" : "<td></td><td>") 
+					+ series + "</td><td>"
+					+ BELT_SIZES[mfr][series].join(', ') + "</td>";
+				row.classList.add(i%2 ? 'oddrow' : 'evenrow');
+				firstone = false
+			}
+		}
+
+		table = document.getElementById("material_data_table");
+		i=0;
+		convs = {
+			"E": 1e9, "Ef": 1e9, "St": 1e6, "Sf": 1e6, "density": 1000
+		}
+		for(matl in MATERIAL_DATA) {
+			i++;
+			row = table.insertRow(i);
+			row.innerHTML = "<th class='rowlabel'>" + matl + "</th>";
+			for (property of ["E", "Ef", "St", "Sf", "density"]) {
+				row.innerHTML += '<td>' + handleNaN((MATERIAL_DATA[matl][property]/convs[property]).toFixed(3)) + "</td>";
+			}
+			row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+		}
+	}
+</script>
+
+
+
+<style>
+.oddrow {
+	background-color: #ddf;
+}
+
+.evenrow {
+	background-color: #ccf;
+}
+
+th {
+	padding: 5px;
+}
+td {
+	text-align: right;
+}
+</style>
+
+<html>
+<body onload="init()">
+<div style="float: left;" class="container">
+	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
+	<center><a href="./">Back To Index</a></center>
+
+	<div class="even">
+		<h3>Motor Specs</h3>
+		<center>
+		<table id="motor_data_table">
+			<tr>
+				<th class="collabel">Motor Name</th>
+				<th class="collabel">Free /<br/>Max RPM</th>
+				<th class="collabel">Stall/Max<br/>Torque (Nm)</th>
+				<th class="collabel">Max<br/>Power (W)</th>
+				<th class="collabel">Stall/Max<br/>Current (A)</th>
+				<th class="collabel">Free/Min<br/>Current (A)</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+	<div class="odd">
+		<h3>Unit Conversions</h3>
+		<center>All unit conversions are handled by converting into a base SI unit<br/>to perform calculations, and back out from the base SI unit.
+		<table id="unit_data_table">
+			<tr>
+				<th class="collabel">Base Unit</th>
+				<th class="collabel">Converts to</th>
+				<th class="collabel">By Factor</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+	<div class="even">
+		<h3>Belt Data</h3>
+		<center>
+		<table id="belt_data_table">
+			<tr>
+				<th class="collabel">Manufacturer</th>
+				<th class="collabel">Size</th>
+				<th class="collabel">Teeth</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+	<div class="even">
+		<h3>Material Data</h3>
+
+		<center>
+			Generic materials do not have strength properties as they vary with alloy or heat treatment.
+		<table id="material_data_table">
+			<tr>
+				<th class="collabel">Material</th>
+				<th class="collabel">Elastic Modulus [GPa]</th>
+				<th class="collabel">Flexural Modulus [GPa]</th>
+				<th class="collabel">Tensile Strength [MPa]</th>
+				<th class="collabel">Flexural Strength [MPa]</th>
+				<th class="collabel">Density [g/cm^3]</th>
+			</tr>
+		</table>
+	</center>
+	</div>
+
+</div>
+</body>
+</html>
