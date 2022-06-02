@@ -1,7 +1,8 @@
+<!DOCTYPE html>
+
 <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
 <meta content="utf-8" http-equiv="encoding">
 
-<!DOCTYPE html>
 <link rel="stylesheet" href="include/style.css"> 
 <script type="text/javascript" src="js/motors.js"></script>
 <script type="text/javascript" src="js/orings.js"></script>
@@ -10,159 +11,224 @@
 <script type="text/javascript" src="js/materials.js"></script>
 
 <script type="text/javascript">
-	function handleNaN(x) {
-		return isNaN(x) ? '-':x;
+	EXP_FN_BASE = 'fit_tol';
+	UNIT_MAP = {
+		'dimension': ['mm', 'in'] // ezpz
+	};
+</script>
+
+<script type="text/javascript">
+	/*function permuationWithVariableRepeat(remaining) {
+		const results = []
+		
+		for (const part in remaining) {
+			new_parts = {}
+			for (const part2 in remaining) {
+				n = part2 == part ? remaining[part2]-1 : remaining[part2];
+				if (n > 0)
+					new_parts[part2] = n
+			}
+
+			if (Object.keys(new_parts).length === 0) {
+				results.push([part])
+			} else {
+				const tmpresults = permuationWithVariableRepeat(new_parts)
+				//console.log(tmpresults)
+				for (const i in tmpresults)
+					results.push([part].concat(tmpresults[i]))
+			}
+		}
+		return results
+	}*/
+
+	// a part (or piece in general) is an object with operties: id, qty, length, profile
+
+	function cutStock(parts, stock_lg) {
+
+	}
+
+	function generateCutOrders(path, cutstack, unstacked_cuts, parts_remaining, stock_remaining, last_stock_use, piece_manifest, kerf_width) {
+		//console.log(path, parts_remaining)
+		/* Key insight:
+		 * From https://docs.python.org/2/library/itertools.html#itertools.combinations
+		 * "After filtering entries where the elements are not in sorted order"
+		 * 
+		 * Provide cut orders that are sorted. Doesn't matter what that order is, as long as there's some order to it.
+		 * Then, a higher level up than this function, eliminate duplicates.
+		 *
+		 * This is not a smart algorithm. It is very big.
+		 */	
+		// look at all new part options
+		let stacked_cut_options = []
+		for (const part of parts_remaining) {
+			let stacked_cuts = [];
+
+			// build what the new remaining parts BOM looks like after absorbing this part
+			let new_parts = [];
+			for (const part2 of parts_remaining) {
+				const n = part2.name == part.name ? part2.qty-1 : part2.qty;
+				if (n > 0)
+					new_parts.push({
+						name: part2.name,
+						qty: n,
+						profile: part2.profile,
+						length: part2.length
+					})
+			}
+
+			let unstacked_cuts2 = []
+			let stock_remaining2 = [...stock_remaining]
+
+			if (unstacked_cuts.map(a => piece_manifest[a].length).reduce((a,b) => a+b+kerf_width, 0) + part.length > stock_remaining[0].length) {
+
+				if (stock_remaining2[0].qty > 1){
+					stock_remaining2[0] = {
+						name: stock_remaining2[0].name,
+						length: stock_remaining2[0].length,
+						qty: stock_remaining2[0].qty-1
+					}
+				}
+				else if (stock_remaining2.length > 1){
+					stock_remaining2.shift();
+					last_stock_use = stacked_cuts.length
+				} else {
+					continue;
+				}
+
+				// out of stock. that's all that we can do, folks
+				if (part.length > stock_remaining2[0].length){
+					console.log(path, part.name, "ran out of stock.", stock_remaining2[0].name)
+					continue;
+				}
+
+				// finished off a piece of stock
+				stacked_cuts.push(unstacked_cuts);
+			} else {
+				for (const i of unstacked_cuts)
+					unstacked_cuts2.push(i);
+			}
+
+			unstacked_cuts2.push(part.name)
+			unstacked_cuts2.sort() // .sort() is in-place
+			
+			// TODO: we can only sort within the same pieces of stock, soooooooo... fix this.
+
+			if (new_parts.length <= 0) {
+				// final branch; whatever you've got at this point is all there is to it
+				let x = stacked_cuts.concat([unstacked_cuts2])
+
+				stacked_cut_options.push(
+							x.filter((e,i) => i < last_stock_use)
+							.concat(x.filter((e,i) => i >= last_stock_use).sort())
+					)
+			} else {
+				// branch out
+				try{
+					const tmp = generateCutOrders(path+part.name, cutstack.concat(stacked_cuts), unstacked_cuts2, new_parts, stock_remaining2, last_stock_use, piece_manifest, kerf_width);
+					for (const i of tmp){
+						let x = stacked_cuts.concat(i)
+
+						stacked_cut_options.push(
+							x.filter((e,i) => i < last_stock_use)
+							.concat(x.filter((e,i) => i >= last_stock_use).sort())
+							)
+					}
+				} catch (e) {
+					// out of stock presumably, which is OK
+					console.log(e);
+				}
+			}
+		}
+
+		return stacked_cut_options;
+	}
+
+	function generateCutOptions(parts, stock, kerf_width) {
+		console.log("generateCutOptions", parts, stock, kerf_width)
+		piece_manifest = {}
+		for (part of parts)
+			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
+		for (part of stock)
+			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
+		stock.sort((a,b) => b.length - a.length)
+
+		orders = Array.from(
+					new Set(
+						generateCutOrders("", [], [], parts, stock, 0, piece_manifest, kerf_width)
+						.map(a => JSON.stringify(a))
+				)).map(a => JSON.parse(a))
+
+		orders.sort(function(a, b){
+			//if (a.length != b.length)
+			return a.length - b.length;
+		})
+
+		return orders;
 	}
 
 	function init() {
-		table = document.getElementById("motor_data_table");
-		i=0;
-		for(motor in MOTOR_specs) {
-			i++;
-			row = table.insertRow(i);
-			row.innerHTML = "<th class='rowlabel'>" + MOTOR_specs[motor]["plain_name"] + "</th><td>" 
-				+ MOTOR_specs[motor]["max_speed"] + "</td><td>"
-				+ MOTOR_specs[motor]["stall_torque"].toFixed(3) + "</td><td>"
-				+ MOTOR_specs[motor]["max_power"] + "</td><td>"
-				+ MOTOR_specs[motor]["stall_current"] + "</td><td>"
-				+ MOTOR_specs[motor]["free_current"].toFixed(2) + "</td>";
-			row.classList.add(i%2 ? 'oddrow' : 'evenrow');
-		}
-
-		table = document.getElementById("unit_data_table");
-		i=0;
-		for(baseunit in UNIT_BASES) {
-			firstone = true;
-			for (tounit of UNIT_BASES[baseunit]) {
-				i++;
-				row = table.insertRow(i);
-				row.innerHTML = 
-					(firstone ? "<th class='rowlabel'>" + baseunit + "</th><td>" : "<td></td><td>") 
-					+ tounit + "</td><td>"
-					+ UNIT_CONVERSIONS[tounit] + "</td>";
-				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
-				firstone = false
-			}
-		}
-
-		table = document.getElementById("belt_data_table");
-		i=0;
-		for(mfr in BELT_SIZES) {
-			firstone = true;
-			for (series in BELT_SIZES[mfr]) {
-				i++;
-				row = table.insertRow(i);
-				row.innerHTML = 
-					(firstone ? "<th class='rowlabel'>" + BELT_MFRS[mfr] + "</th><td>" : "<td></td><td>") 
-					+ series + "</td><td>"
-					+ BELT_SIZES[mfr][series].join(', ') + "</td>";
-				row.classList.add(i%2 ? 'oddrow' : 'evenrow');
-				firstone = false
-			}
-		}
-
-		table = document.getElementById("material_data_table");
-		i=0;
-		convs = {
-			"E": 1e9, "Ef": 1e9, "St": 1e6, "Sf": 1e6, "density": 1000
-		}
-		for(matl in MATERIAL_DATA) {
-			i++;
-			row = table.insertRow(i);
-			row.innerHTML = "<th class='rowlabel'>" + matl + "</th>";
-			for (property of ["E", "Ef", "St", "Sf", "density"]) {
-				row.innerHTML += '<td>' + handleNaN((MATERIAL_DATA[matl][property]/convs[property]).toFixed(3)) + "</td>";
-			}
-			row.classList.add(i%2 ? 'evenrow' : 'oddrow');
-		}
+		console.log(generateCutOptions([{
+			name: "A",
+			qty: 3,
+			profile: "pipe",
+			length: 12
+		},{
+			name: "B",
+			qty: 3,
+			profile: "pipe",
+			length: 30
+		},{
+			name: "C",
+			qty: 4,
+			profile: "pipe",
+			length: 3
+		}],[{
+			name: "a",
+			qty: 2,
+			profile: "pipe",
+			length: 41
+		},{
+			name: "b",
+			qty: 3,
+			profile: "pipe",
+			length: 30
+		}], .125))
 	}
 </script>
 
-
-
-<style>
-.oddrow {
-	background-color: #ddf;
-}
-
-.evenrow {
-	background-color: #ccf;
-}
-
-th {
-	padding: 5px;
-}
-td {
-	text-align: right;
-}
-</style>
-
 <html>
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
 <body onload="init()">
-<div style="float: left;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
-	<center><a href="./">Back To Index</a></center>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value=0 >Millimeters</option>
+				<option value=1 selected="selected">Inches</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
 
-	<div class="even">
-		<h3>Motor Specs</h3>
-		<center>
-		<table id="motor_data_table">
-			<tr>
-				<th class="collabel">Motor Name</th>
-				<th class="collabel">Free /<br/>Max RPM</th>
-				<th class="collabel">Stall/Max<br/>Torque (Nm)</th>
-				<th class="collabel">Max<br/>Power (W)</th>
-				<th class="collabel">Stall/Max<br/>Current (A)</th>
-				<th class="collabel">Free/Min<br/>Current (A)</th>
-			</tr>
-		</table>
-	</center>
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+	<div style="float: left;" class="container">
+		<div style='display:table-row' id="fits" data-current_fit_number=0 ></div>
+		<div><button id='addFit_btn' onclick='addFit()'>Add Fit</button></div>
 	</div>
-
-	<div class="odd">
-		<h3>Unit Conversions</h3>
-		<center>All unit conversions are handled by converting into a base SI unit<br/>to perform calculations, and back out from the base SI unit.
-		<table id="unit_data_table">
-			<tr>
-				<th class="collabel">Base Unit</th>
-				<th class="collabel">Converts to</th>
-				<th class="collabel">By Factor</th>
-			</tr>
-		</table>
-	</center>
-	</div>
-
-	<div class="even">
-		<h3>Belt Data</h3>
-		<center>
-		<table id="belt_data_table">
-			<tr>
-				<th class="collabel">Manufacturer</th>
-				<th class="collabel">Size</th>
-				<th class="collabel">Teeth</th>
-			</tr>
-		</table>
-	</center>
-	</div>
-
-	<div class="even">
-		<h3>Material Data</h3>
-
-		<center>
-			Generic materials do not have strength properties as they vary with alloy or heat treatment.
-		<table id="material_data_table">
-			<tr>
-				<th class="collabel">Material</th>
-				<th class="collabel">Elastic Modulus [GPa]</th>
-				<th class="collabel">Flexural Modulus [GPa]</th>
-				<th class="collabel">Tensile Strength [MPa]</th>
-				<th class="collabel">Flexural Strength [MPa]</th>
-				<th class="collabel">Density [g/cm^3]</th>
-			</tr>
-		</table>
-	</center>
-	</div>
-
-</div>
 </body>
 </html>
