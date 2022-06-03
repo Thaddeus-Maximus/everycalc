@@ -92,13 +92,16 @@
 					stock_remaining2.shift();
 					last_stock_use = stacked_cuts.length
 				} else {
-					continue;
+					console.log(path, part.name, "ran out of stock.", stock_remaining2[0].name)
+					throw "out_of_stock";
 				}
+
+				console.log(path, part.name, part.length, stock_remaining2[0].length)
 
 				// out of stock. that's all that we can do, folks
 				if (part.length > stock_remaining2[0].length){
-					console.log(path, part.name, "ran out of stock.", stock_remaining2[0].name)
-					continue;
+					console.log(path, part.name, "cant fit in remaining stock.", stock_remaining2[0].name)
+					throw "out_of_stock";
 				}
 
 				// finished off a piece of stock
@@ -186,10 +189,10 @@
 			name: "a",
 			qty: 2,
 			profile: "pipe",
-			length: 41
+			length: 23
 		},{
 			name: "b",
-			qty: 3,
+			qty: 5,
 			profile: "pipe",
 			length: 30
 		}], .125))
