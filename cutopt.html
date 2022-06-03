@@ -47,7 +47,7 @@
 
 	}
 
-	function generateCutOrders(path, cutstack, unstacked_cuts, parts_remaining, stock_remaining, last_stock_use, piece_manifest, kerf_width) {
+	function generateCutOrders(path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width) {
 		//console.log(path, parts_remaining)
 		/* Key insight:
 		 * From https://docs.python.org/2/library/itertools.html#itertools.combinations
@@ -77,34 +77,12 @@
 			}
 
 			let unstacked_cuts2 = []
-			let stock_remaining2 = [...stock_remaining]
 
-			if (unstacked_cuts.map(a => piece_manifest[a].length).reduce((a,b) => a+b+kerf_width, 0) + part.length > stock_remaining[0].length) {
-
-				if (stock_remaining2[0].qty > 1){
-					stock_remaining2[0] = {
-						name: stock_remaining2[0].name,
-						length: stock_remaining2[0].length,
-						qty: stock_remaining2[0].qty-1
-					}
-				}
-				else if (stock_remaining2.length > 1){
-					stock_remaining2.shift();
-					last_stock_use = stacked_cuts.length
-				} else {
-					console.log(path, part.name, "ran out of stock.", stock_remaining2[0].name)
-					throw "out_of_stock";
-				}
-
-				console.log(path, part.name, part.length, stock_remaining2[0].length)
-
-				// out of stock. that's all that we can do, folks
-				if (part.length > stock_remaining2[0].length){
-					console.log(path, part.name, "cant fit in remaining stock.", stock_remaining2[0].name)
-					throw "out_of_stock";
-				}
-
+			if (unstacked_cuts.map(a => piece_manifest[a].length).reduce((a,b) => a+b+kerf_width, 0) + part.length > stock_lg) {
 				// finished off a piece of stock
+				if (part.length > stock_lg) {
+					continue; // lol, no, can't be done!
+				}
 				stacked_cuts.push(unstacked_cuts);
 			} else {
 				for (const i of unstacked_cuts)
@@ -118,23 +96,13 @@
 
 			if (new_parts.length <= 0) {
 				// final branch; whatever you've got at this point is all there is to it
-				let x = stacked_cuts.concat([unstacked_cuts2])
-
-				stacked_cut_options.push(
-							x.filter((e,i) => i < last_stock_use)
-							.concat(x.filter((e,i) => i >= last_stock_use).sort())
-					)
+				stacked_cut_options.push(stacked_cuts.concat([unstacked_cuts2]).sort())
 			} else {
 				// branch out
-				try{
-					const tmp = generateCutOrders(path+part.name, cutstack.concat(stacked_cuts), unstacked_cuts2, new_parts, stock_remaining2, last_stock_use, piece_manifest, kerf_width);
+				try{ //path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width
+					const tmp = generateCutOrders(path+part.name, unstacked_cuts2, new_parts, piece_manifest, stock_lg, kerf_width);
 					for (const i of tmp){
-						let x = stacked_cuts.concat(i)
-
-						stacked_cut_options.push(
-							x.filter((e,i) => i < last_stock_use)
-							.concat(x.filter((e,i) => i >= last_stock_use).sort())
-							)
+						stacked_cut_options.push(stacked_cuts.concat(i).sort())
 					}
 				} catch (e) {
 					// out of stock presumably, which is OK
@@ -148,29 +116,72 @@
 
 	function generateCutOptions(parts, stock, kerf_width) {
 		console.log("generateCutOptions", parts, stock, kerf_width)
-		piece_manifest = {}
-		for (part of parts)
-			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
-		for (part of stock)
-			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
-		stock.sort((a,b) => b.length - a.length)
 
-		orders = Array.from(
+		parts.sort((a,b) => b.length - a.length)
+		
+		profiles = new Set();
+		profiles_unaccounted = new Set();
+		stock_lgs = {}
+		orders_by_profile = {}
+
+		piece_manifest = {}
+		
+		for (part of parts){
+			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
+			profiles.add(part.profile)
+			profiles_unaccounted.add(part.profile)
+		}
+		
+		for (part of stock){
+			//piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
+			profiles_unaccounted.delete(part.profile);
+			stock_lgs[part.profile] = part.length;
+		}
+
+		if (profiles_unaccounted.size != 0) {
+			console.log(profiles_unaccounted)
+			throw "don't have stock defined for profiles: " + Array.from(profiles_unaccounted).join(', ');
+		}
+
+		for (profile of profiles) {
+			orders = Array.from(
 					new Set(
-						generateCutOrders("", [], [], parts, stock, 0, piece_manifest, kerf_width)
+						generateCutOrders("", [], parts, piece_manifest, stock_lgs[profile], kerf_width)
 						.map(a => JSON.stringify(a))
 				)).map(a => JSON.parse(a))
 
-		orders.sort(function(a, b){
-			//if (a.length != b.length)
-			return a.length - b.length;
-		})
+			orders.sort(function(a, b){
+				//if (a.length != b.length)
+				return a.length - b.length;
+			})
+			orders_by_profile[profile] = orders;
+		}
 
-		return orders;
+		return {manifest: piece_manifest, stock_length: stock_lgs, orders: orders_by_profile};
+	}
+
+	function representNumber(num) {
+		if (num % 1 < .001)
+			return num.toFixed(0);
+		return num.toFixed(2);
+
+	}
+
+	function representOrder(piece_manifest, stock_lg, kerf_width, order) {
+		reprs = [];
+		for (stock of order) {
+			repr = stock_lg.toFixed(2) + " = ";
+			for (piece of stock) {
+				repr += representNumber(piece_manifest[piece].length) + " + ";
+			}
+			repr += "(--" + representNumber(kerf_width*stock.length) + ") + (" + representNumber(stock_lg-kerf_width*stock.length-stock.reduce((a,b) => a+piece_manifest[b].length, 0)) + ")";
+			reprs.push(repr);
+		}
+		return reprs;
 	}
 
 	function init() {
-		console.log(generateCutOptions([{
+		opts = generateCutOptions([{
 			name: "A",
 			qty: 3,
 			profile: "pipe",
@@ -189,13 +200,16 @@
 			name: "a",
 			qty: 2,
 			profile: "pipe",
-			length: 23
-		},{
-			name: "b",
-			qty: 5,
-			profile: "pipe",
-			length: 30
-		}], .125))
+			length: 43
+		}], .125)
+
+		console.log(opts)
+
+		for (profile in opts.orders) { 
+			for (order of opts.orders[profile]) {
+				console.log(representOrder(opts.manifest, opts.stock_length[profile], .125, order))
+			}
+		}
 	}
 </script>
 
