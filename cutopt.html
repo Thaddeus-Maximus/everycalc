@@ -18,36 +18,96 @@
 </script>
 
 <script type="text/javascript">
-	/*function permuationWithVariableRepeat(remaining) {
-		const results = []
+	/*function permuationWithVariableRepeat(quantities) {
+		const permutations = [];
 		
-		for (const part in remaining) {
-			new_parts = {}
-			for (const part2 in remaining) {
-				n = part2 == part ? remaining[part2]-1 : remaining[part2];
+		for (const id_a in quantities) {
+			new_quantities = {}
+			for (const id_b in quantities) {
+				n = id_a == id_b ? quantities[id_b]-1 : quantities[id_b];
 				if (n > 0)
-					new_parts[part2] = n
+					new_quantities[id_b] = n
 			}
 
-			if (Object.keys(new_parts).length === 0) {
-				results.push([part])
+			if (Object.keys(new_quantities).length === 0) {
+				permutations.push([id_a])
 			} else {
-				const tmpresults = permuationWithVariableRepeat(new_parts)
 				//console.log(tmpresults)
-				for (const i in tmpresults)
-					results.push([part].concat(tmpresults[i]))
+				for (const i of permuationWithVariableRepeat(new_quantities))
+					permutations.push([id_a].concat(i))
 			}
 		}
-		return results
+		return permutations
 	}*/
 
 	// a part (or piece in general) is an object with operties: id, qty, length, profile
 
-	function cutStock(parts, stock_lg) {
+	function generateCutOrders(quantities, part_manifest, recieved_order, kerf_width) {
+		const orders = [];
+		
+		for (const id_a in quantities) {
+			new_quantities = {}
+			for (const id_b in quantities) {
+				n = id_a == id_b ? quantities[id_b]-1 : quantities[id_b];
+				if (n > 0)
+					new_quantities[id_b] = n
+			}
+			need_to_place_part = true;
 
+			send_order = []
+			for (line of recieved_order) {
+				piece_lg = part_manifest[id_a].length
+				if (need_to_place_part && line.remainder >= piece_lg+kerf_width) {
+					send_order.push({
+						stock_length: line.stock_length,
+						pieces: line.pieces.concat(piece_lg),
+						saw_waste: line.saw_waste + kerf_width,
+						remainder: line.remainder - piece_lg - kerf_width
+					})
+					need_to_place_part = false;
+				} else {
+					// can I just push line? idk.
+					send_order.push({
+						stock_length: line.stock_length,
+						pieces: line.pieces,
+						saw_waste: line.saw_waste,
+						remainder: line.remainder
+					})
+				}
+			}
+
+			if (need_to_place_part) {
+				// hm. well, we couldn't place this part. fail!
+				continue;
+			}
+
+			// spawn the next things
+			if (Object.keys(new_quantities).length === 0) {
+				// this is the last item in the line
+				orders.push(send_order)
+			} else {
+				//console.log(tmpresults)
+				let unique_set = new Set()
+				for (const spawned_order of generateCutOrders(new_quantities, part_manifest, send_order, kerf_width)){
+					// collect the order
+					// !!!!!!!!! AT THIS POINT, KILL NON-UNIQUE ANSWERS !!!!!!!!!
+					// generate a summary of what this particular piece is. This will be less data than taking the entire order
+					// note this isn't perfect as it only works downstream.
+					// wait but _shouldn't it still work_??????
+					// it helps a lot but it doesn't seem to be perfect
+					const summary = JSON.stringify(spawned_order.map((a) => JSON.stringify(a.pieces.sort((a,b)=>b-a).concat(a.stock_length))).sort())
+					if (! unique_set.has(summary)) {
+						unique_set.add(summary)
+						// only add orders with a unique summary
+						orders.push(spawned_order)
+					}
+				}
+			}
+		}
+		return orders
 	}
 
-	function generateCutOrders(path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width) {
+	/*function generateCutOrders(path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width) {
 		//console.log(path, parts_remaining)
 		/* Key insight:
 		 * From https://docs.python.org/2/library/itertools.html#itertools.combinations
@@ -57,7 +117,7 @@
 		 * Then, a higher level up than this function, eliminate duplicates.
 		 *
 		 * This is not a smart algorithm. It is very big.
-		 */	
+		 *	
 		// look at all new part options
 		let stacked_cut_options = []
 		for (const part of parts_remaining) {
@@ -112,7 +172,7 @@
 		}
 
 		return stacked_cut_options;
-	}
+	}*/
 
 	function generateCutOptions(parts, stock, kerf_width) {
 		console.log("generateCutOptions", parts, stock, kerf_width)
@@ -121,6 +181,7 @@
 		
 		profiles = new Set();
 		profiles_unaccounted = new Set();
+		part_quantities = {}
 		stock_lgs = {}
 		orders_by_profile = {}
 
@@ -130,12 +191,19 @@
 			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
 			profiles.add(part.profile)
 			profiles_unaccounted.add(part.profile)
+			part_quantities[part.name] = part.qty
 		}
+
+		order_template = []
 		
+		let j = 0;
 		for (part of stock){
 			//piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
 			profiles_unaccounted.delete(part.profile);
 			stock_lgs[part.profile] = part.length;
+			for (let i=0; i<part.qty; i++)
+				order_template.push({stock_length: part.length, pieces: [], saw_waste: 0, remainder: part.length, stock_id: j})
+			j+=1;
 		}
 
 		if (profiles_unaccounted.size != 0) {
@@ -143,21 +211,11 @@
 			throw "don't have stock defined for profiles: " + Array.from(profiles_unaccounted).join(', ');
 		}
 
-		for (profile of profiles) {
-			orders = Array.from(
-					new Set(
-						generateCutOrders("", [], parts, piece_manifest, stock_lgs[profile], kerf_width)
-						.map(a => JSON.stringify(a))
-				)).map(a => JSON.parse(a))
+		console.log("generateCutOrders", part_quantities, piece_manifest, order_template, kerf_width)
 
-			orders.sort(function(a, b){
-				//if (a.length != b.length)
-				return a.length - b.length;
-			})
-			orders_by_profile[profile] = orders;
-		}
+		return generateCutOrders(part_quantities, piece_manifest, order_template, kerf_width)
 
-		return {manifest: piece_manifest, stock_length: stock_lgs, orders: orders_by_profile};
+		//return {manifest: piece_manifest, stock_length: stock_lgs, orders: orders_by_profile};
 	}
 
 	function representNumber(num) {
@@ -167,28 +225,28 @@
 
 	}
 
-	function representOrder(piece_manifest, stock_lg, kerf_width, order) {
+	function representOrder(order) {
 		reprs = [];
-		for (stock of order) {
-			repr = stock_lg.toFixed(2) + " = ";
-			for (piece of stock) {
-				repr += representNumber(piece_manifest[piece].length) + " + ";
+		for (line of order) {
+			repr = representNumber(line.stock_length) + " = ";
+			for (piece of line.pieces) {
+				repr += representNumber(piece) + " + ";
 			}
-			repr += "(--" + representNumber(kerf_width*stock.length) + ") + (" + representNumber(stock_lg-kerf_width*stock.length-stock.reduce((a,b) => a+piece_manifest[b].length, 0)) + ")";
+			repr += "(--" + representNumber(line.saw_waste) + ") + (" + representNumber(line.remainder) + ")";
 			reprs.push(repr);
 		}
-		return reprs;
+		return reprs.join('\n');
 	}
 
 	function init() {
 		opts = generateCutOptions([{
 			name: "A",
-			qty: 3,
+			qty: 6,
 			profile: "pipe",
 			length: 12
 		},{
 			name: "B",
-			qty: 3,
+			qty: 4,
 			profile: "pipe",
 			length: 30
 		},{
@@ -201,14 +259,35 @@
 			qty: 2,
 			profile: "pipe",
 			length: 43
+		},{
+			name: "b",
+			qty: 4,
+			profile: "pipe",
+			length: 43
 		}], .125)
 
 		console.log(opts)
 
-		for (profile in opts.orders) { 
-			for (order of opts.orders[profile]) {
-				console.log(representOrder(opts.manifest, opts.stock_length[profile], .125, order))
+		for (order of opts) {
+			order.sort((a,b) => a.remainder-b.remainder)
+			order['remainder'] = 0;
+			for (let i = order.length-1; i>=0; i--) {
+				const line = order[i];
+				if (line.remainder == line.stock_length){
+					order.remainder += 1;
+				}
+				else{
+					// only get the first one
+					order.remainder += line.remainder/line.stock_length;
+					break;
+				}
 			}
+		}
+
+		opts.sort((a,b) => b.remainder-a.remainder)
+
+		for (order of opts) {
+			console.log(representOrder(order))
 		}
 	}
 </script>
