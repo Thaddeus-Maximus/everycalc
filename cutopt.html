@@ -4,16 +4,15 @@
 <meta content="utf-8" http-equiv="encoding">
 
 <link rel="stylesheet" href="include/style.css"> 
-<script type="text/javascript" src="js/motors.js"></script>
-<script type="text/javascript" src="js/orings.js"></script>
-<script type="text/javascript" src="js/belts.js"></script>
+<script type="text/javascript" src="js/eclib.js"></script>
 <script type="text/javascript" src="js/units.js"></script>
-<script type="text/javascript" src="js/materials.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
 
 <script type="text/javascript">
 	EXP_FN_BASE = 'fit_tol';
 	UNIT_MAP = {
-		'dimension': ['mm', 'in'] // ezpz
+		'dimension': ['mm', 'cm', 'in', '"'] // ezpz
 	};
 </script>
 
@@ -69,12 +68,7 @@
 					need_to_place_part = false;
 				} else {
 					// can I just push line? idk.
-					send_order.push({
-						stock_length: line.stock_length,
-						pieces: line.pieces,
-						saw_waste: line.saw_waste,
-						remainder: line.remainder
-					})
+					send_order.push(line)
 				}
 			}
 
@@ -237,39 +231,47 @@
 		return reprs.join('\n');
 	}
 
-	function init() {
-		opts = generateCutOptions([{
-			name: "A",
-			qty: 6,
-			profile: "pipe",
-			length: 12
-		},{
-			name: "B",
-			qty: 4,
-			profile: "pipe",
-			length: 30
-		},{
-			name: "C",
-			qty: 4,
-			profile: "pipe",
-			length: 3
-		}],[{
-			name: "a",
-			qty: 2,
-			profile: "pipe",
-			length: 43
-		},{
-			name: "b",
-			qty: 4,
-			profile: "pipe",
-			length: 45
-		}], .125)
+	var current_cut_options = [];
 
-		console.log(opts)
+	function compute() {
+		// hook for when computation is requested
+		let new_tbody = document.createElement("tbody");
+		let old_tbody = document.getElementById("tbody_cut_output");
+		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
+		new_tbody.id = 'tbody_cut_output';
+
+
+		tbody_piece_input = document.getElementById("tbody_piece_input");
+		tbody_stock_input = document.getElementById("tbody_stock_input");
+
+		pieces = []
+		stock  = []
+
+		for (row of tbody_piece_input.children) {
+			pieces.push({
+				name:    row.cells[0].children[0].value,
+				profile: row.cells[1].children[0].value,
+				length:  parseFloat(row.cells[2].children[0].value),
+				qty:     parseFloat(row.cells[3].children[0].value)
+			});
+		}
+
+		for (row of tbody_stock_input.children) {
+			stock.push({
+				name:    row.cells[0].children[0].value,
+				profile: row.cells[1].children[0].value,
+				length:  parseFloat(row.cells[2].children[0].value),
+				qty:     parseFloat(row.cells[3].children[0].value)
+			});
+		}
+
+		current_cut_options = generateCutOptions(pieces, stock, .125)
+
+		console.log(current_cut_options)
 
 		// sort the options
 		// todo: this should probably get rolled together, too many nested functions
-		for (order of opts) {
+		for (order of current_cut_options) {
 			order.sort((a,b) => a.remainder-b.remainder)
 			order['remainder'] = 0;
 			for (let i = order.length-1; i>=0; i--) {
@@ -285,11 +287,70 @@
 			}
 		}
 
-		opts.sort((a,b) => b.remainder-a.remainder)
+		current_cut_options.sort((a,b) => b.remainder-a.remainder)
 
-		for (order of opts) {
-			console.log(representOrder(order))
+		//for (order of current_cut_options)
+		//	console.log(representOrder(order))
+
+
+		let select    = document.getElementById("cut_option_select");
+		let old_val   = select.value;
+		select.innerHTML = '';
+		for (base in current_cut_options) {
+			let opt = document.createElement('option');
+			opt.innerHTML = base;
+			opt.value = base;
+			if (old_val == base) opt.selected = true;
+			select.appendChild(opt);
 		}
+
+		changeCutOption();
+
+		setError(0);	
+	}
+
+	function changeCutOption() {
+		let new_tbody = document.createElement("tbody");
+		let old_tbody = document.getElementById("tbody_cut_output");
+		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
+		new_tbody.id = 'tbody_cut_output';
+
+		let option_no = document.getElementById("cut_option_select").value;
+		let cut_option = current_cut_options[option_no];
+
+		console.log(cut_option)
+		console.log(representOrder(cut_option))
+		for (cut of cut_option) {
+			let row = document.createElement("tr");
+
+			overall   = cut.stock_length;
+			cuts      = cut.pieces.join(' + ');
+			kerfloss  = cut.saw_waste;
+			remainder = cut.remainder;
+
+			row.innerHTML = `
+				<td class='td-readout'>${overall}</td>
+				<td>=</td>
+				<td class='td-readout' style='width: 250px'>${cuts}</td>
+				<td>--</td>
+				<td class='td-readout'>${kerfloss}</td>
+				<td>--</td>
+				<td class='td-readout'>${remainder}</td>
+			`;
+
+			new_tbody.appendChild(row);
+		}
+	}
+
+	function init() {
+		// hook for initialization
+		EC_onload();
+
+		//EXP_onload();
+
+		UNIT_change();
+		//
+		compute();
 	}
 </script>
 
@@ -305,11 +366,13 @@
 			<!-- Required for unit library. You could also put this in the calculator main body -->
 			<select id="unit_select" onchange="UNIT_change(); compute();">
 				<option value=0 >Millimeters</option>
-				<option value=1 selected="selected">Inches</option>
+				<option value=1 >Centimeters</option>
+				<option value=2 selected="selected">Inches Decimal</option>
+				<option value=3>Inches Fractional</option>
 			</select>
 		</div>
-		<div class="topbar-ctr" id="topbar_title">Fit Clearance/Interference Calculator</div>
-		<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ra selectable" onclick="compute();" id="topbar_status"><span></span><span class='ttt'></span></div>
 		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
 		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
 		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
@@ -323,9 +386,103 @@
 	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="float: left;" class="container">
-		<div style='display:table-row' id="fits" data-current_fit_number=0 ></div>
-		<div><button id='addFit_btn' onclick='addFit()'>Add Fit</button></div>
+	<div style="float: left;" class="container odd">
+		<table id="table_piece_input">
+			<tr>
+				<th class="rowlabel bold" colspan="4" style="text-align: center;">Pieces</th>
+			</tr>
+			<tr>
+				<td>Name</td>
+				<td>Profile</td>
+				<td>Length <span class="unit" data-unit="dimension"></span></td>
+				<td>Quantity</td>
+			</tr>
+			<tbody id="tbody_piece_input">
+			<tr id='piece_1_row'>
+				<td><input id='piece_name_1'    data-unit='dimension' value='' /></td>
+				<td><input id='piece_profile_1' data-unit='dimension' value='' /></td>
+				<td><input id='piece_length_1'  data-unit='dimension' value='' /></td>
+				<td><input id='piece_qty_1'     data-unit='dimension' value='' /></td>
+			</tr>
+			<tr id='piece_2_row'>
+				<td><input id='piece_name_2'    data-unit='dimension' value='' /></td>
+				<td><input id='piece_profile_2' data-unit='dimension' value='' /></td>
+				<td><input id='piece_length_2'  data-unit='dimension' value='' /></td>
+				<td><input id='piece_qty_2'     data-unit='dimension' value='' /></td>
+			</tr>
+			<tr id='piece_3_row'>
+				<td><input id='piece_name_3'    data-unit='dimension' value='' /></td>
+				<td><input id='piece_profile_3' data-unit='dimension' value='' /></td>
+				<td><input id='piece_length_3'  data-unit='dimension' value='' /></td>
+				<td><input id='piece_qty_3'     data-unit='dimension' value='' /></td>
+			</tr>
+		</tbody>
+		</table>
+	</div>
+	
+	<div style="float: left;" class="container even">
+		<table id="table_stock_input">
+			<tr>
+				<th class="rowlabel bold" colspan="4" style="text-align: center;">Stock</th>
+			</tr>
+			<tr>
+				<td>Name</td>
+				<td>Profile</td>
+				<td>Length <span class="unit" data-unit="dimension"></span></td>
+				<td>Quantity</td>
+			</tr>
+			<tbody id="tbody_stock_input">
+			<tr id='stock_1_row'>
+				<td><input id='stock_name_1'    data-unit='dimension' value='' /></td>
+				<td><input id='stock_profile_1' data-unit='dimension' value='' /></td>
+				<td><input id='stock_length_1'  data-unit='dimension' value='' /></td>
+				<td><input id='stock_qty_1'     data-unit='dimension' value='' /></td>
+			</tr>
+			<tr id='stock_2_row'>
+				<td><input id='stock_name_2'    data-unit='dimension' value='' /></td>
+				<td><input id='stock_profile_2' data-unit='dimension' value='' /></td>
+				<td><input id='stock_length_2'  data-unit='dimension' value='' /></td>
+				<td><input id='stock_qty_2'     data-unit='dimension' value='' /></td>
+			</tr>
+			<tr id='stock_3_row'>
+				<td><input id='stock_name_3'    data-unit='dimension' value='' /></td>
+				<td><input id='stock_profile_3' data-unit='dimension' value='' /></td>
+				<td><input id='stock_length_3'  data-unit='dimension' value='' /></td>
+				<td><input id='stock_qty_3'     data-unit='dimension' value='' /></td>
+			</tr>
+		</tbody>
+		</table>
+	</div>
+	
+	<div style="float: left;" class="container output">
+		<table id="table_cut_output">
+			<tr>
+				<th class="rowlabel bold" colspan="7" style="text-align: left;">Cut Option 
+					<select id="cut_option_select" onchange="changeCutOption();">
+					</select>
+				</th>
+			</tr>
+			<tr>
+				<td colspan>Stock Lg.</td>
+				<td>=</td>
+				<td colspan>Cuts</td>
+				<td>--</td>
+				<td colspan>Kerf Loss</td>
+				<td>--</td>
+				<td colspan>Spare</td>
+			</tr>
+			<tbody id="tbody_cut_output">
+				<tr id='cut_1_row' class="cut_row">
+					<td id="cut_overall_1"></td>
+					<td>=</td>
+					<td id="cut_pieces_1"></td>
+					<td>--</td>
+					<td id="cut_kerfloss_1"></td>
+					<td>--</td>
+					<td id="cut_remainder_1"></td>
+				</tr>
+			</tbody>
+		</table>		
 	</div>
 </body>
 </html>

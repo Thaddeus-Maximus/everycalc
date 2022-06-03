@@ -266,7 +266,11 @@ html {
   background-color: #fff5d5;
 }
 
-input {
+input{
+  font-family: "Oxanium", "Courier New", monospace;
+}
+
+.td-readout{
   font-family: "Oxanium", "Courier New", monospace;
 }
 

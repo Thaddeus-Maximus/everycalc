@@ -58,6 +58,8 @@ function getV(id, default_value, pct_err_en) {
 		return getV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
 	} else if (v=='') {
 		v = default_value;
+	} else if (UNIT_MAP[unit][UNIT_sys] == "\"") {
+		console.log("its fractional")
 	} else {
 		v = eval(v); // I trust you to not abuse this power.
 	}
@@ -77,14 +79,18 @@ function setV(id, value, places, show_sign, leading_zero) {
 		if (typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
-		if (typeof places === 'undefined') {
-			// log10|value| is roughly the order of magnitude the number is.
-			// Invert it to get the number of places to it
-			// Add a couple extra places for significance
-			places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
+		if (UNIT_MAP[unit][UNIT_sys] == "\"") {
+			console.log("its fractional")
+		} else {
+			if (typeof places === 'undefined') {
+				// log10|value| is roughly the order of magnitude the number is.
+				// Invert it to get the number of places to it
+				// Add a couple extra places for significance
+				places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
+			}
+			let v = value.toFixed(places);
+			document.getElementById(id).value = (show_sign && value>0 ? "+":"") + v;
 		}
-		let v = value.toFixed(places);
-		document.getElementById(id).value = (show_sign && value>0 ? "+":"") + v;
 	}
 }
 
@@ -122,7 +128,7 @@ function convertFromTo(number, from_unit, to_unit) {
 
 // '1 of this unit to <base unit>'
 var UNIT_BASES = {
-	'm': ['m', 'mm', 'in', 'ft'],
+	'm': ['m', 'mm', 'in', 'ft', "\""],
 	'N-m': ['ft-lbf', 'in-lbf', 'ozf-in', 'N-m', 'N-mm'],
 	'N': ['N', 'lbf', 'kgf', 'ozf'],
 	'kg': ['kg', 'g', 'lbm', 'slug'],
@@ -152,6 +158,7 @@ var UNIT_CONVERSIONS = {
 	"m":  1,
 	"mm": 1e-3,
 	"in": 0.0254,
+	"\"": 0.0254,
 	"thou": 0.0254e-3,
 	"ft": 0.3048,
 
