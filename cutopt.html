@@ -45,6 +45,8 @@
 	function generateCutOrders(quantities, part_manifest, recieved_order, kerf_width) {
 		const orders = [];
 		
+		let unique_set = new Set()
+
 		for (const id_a in quantities) {
 			new_quantities = {}
 			for (const id_b in quantities) {
@@ -87,14 +89,11 @@
 				orders.push(send_order)
 			} else {
 				//console.log(tmpresults)
-				let unique_set = new Set()
 				for (const spawned_order of generateCutOrders(new_quantities, part_manifest, send_order, kerf_width)){
 					// collect the order
-					// !!!!!!!!! AT THIS POINT, KILL NON-UNIQUE ANSWERS !!!!!!!!!
-					// generate a summary of what this particular piece is. This will be less data than taking the entire order
-					// note this isn't perfect as it only works downstream.
-					// wait but _shouldn't it still work_??????
-					// it helps a lot but it doesn't seem to be perfect
+					// at this point, only accept unique cut orders.
+					// this doesn't actually prevent us from going down rabbit holes that are useless, it's merely filtering
+					// it at leasts prevents us from storing as much data as possible upfront
 					const summary = JSON.stringify(spawned_order.map((a) => JSON.stringify(a.pieces.sort((a,b)=>b-a).concat(a.stock_length))).sort())
 					if (! unique_set.has(summary)) {
 						unique_set.add(summary)
@@ -263,11 +262,13 @@
 			name: "b",
 			qty: 4,
 			profile: "pipe",
-			length: 43
+			length: 45
 		}], .125)
 
 		console.log(opts)
 
+		// sort the options
+		// todo: this should probably get rolled together, too many nested functions
 		for (order of opts) {
 			order.sort((a,b) => a.remainder-b.remainder)
 			order['remainder'] = 0;
