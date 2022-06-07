@@ -17,29 +17,6 @@
 </script>
 
 <script type="text/javascript">
-	/*function permuationWithVariableRepeat(quantities) {
-		const permutations = [];
-		
-		for (const id_a in quantities) {
-			new_quantities = {}
-			for (const id_b in quantities) {
-				n = id_a == id_b ? quantities[id_b]-1 : quantities[id_b];
-				if (n > 0)
-					new_quantities[id_b] = n
-			}
-
-			if (Object.keys(new_quantities).length === 0) {
-				permutations.push([id_a])
-			} else {
-				//console.log(tmpresults)
-				for (const i of permuationWithVariableRepeat(new_quantities))
-					permutations.push([id_a].concat(i))
-			}
-		}
-		return permutations
-	}*/
-
-	// a part (or piece in general) is an object with operties: id, qty, length, profile
 
 	function generateCutOrders(quantities, part_manifest, recieved_order, kerf_width) {
 		const orders = [];
@@ -100,102 +77,43 @@
 		return orders
 	}
 
-	/*function generateCutOrders(path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width) {
-		//console.log(path, parts_remaining)
-		/* Key insight:
-		 * From https://docs.python.org/2/library/itertools.html#itertools.combinations
-		 * "After filtering entries where the elements are not in sorted order"
-		 * 
-		 * Provide cut orders that are sorted. Doesn't matter what that order is, as long as there's some order to it.
-		 * Then, a higher level up than this function, eliminate duplicates.
-		 *
-		 * This is not a smart algorithm. It is very big.
-		 *	
-		// look at all new part options
-		let stacked_cut_options = []
-		for (const part of parts_remaining) {
-			let stacked_cuts = [];
-
-			// build what the new remaining parts BOM looks like after absorbing this part
-			let new_parts = [];
-			for (const part2 of parts_remaining) {
-				const n = part2.name == part.name ? part2.qty-1 : part2.qty;
-				if (n > 0)
-					new_parts.push({
-						name: part2.name,
-						qty: n,
-						profile: part2.profile,
-						length: part2.length
-					})
-			}
-
-			let unstacked_cuts2 = []
-
-			if (unstacked_cuts.map(a => piece_manifest[a].length).reduce((a,b) => a+b+kerf_width, 0) + part.length > stock_lg) {
-				// finished off a piece of stock
-				if (part.length > stock_lg) {
-					continue; // lol, no, can't be done!
-				}
-				stacked_cuts.push(unstacked_cuts);
-			} else {
-				for (const i of unstacked_cuts)
-					unstacked_cuts2.push(i);
-			}
-
-			unstacked_cuts2.push(part.name)
-			unstacked_cuts2.sort() // .sort() is in-place
-			
-			// TODO: we can only sort within the same pieces of stock, soooooooo... fix this.
-
-			if (new_parts.length <= 0) {
-				// final branch; whatever you've got at this point is all there is to it
-				stacked_cut_options.push(stacked_cuts.concat([unstacked_cuts2]).sort())
-			} else {
-				// branch out
-				try{ //path, unstacked_cuts, parts_remaining, piece_manifest, stock_lg, kerf_width
-					const tmp = generateCutOrders(path+part.name, unstacked_cuts2, new_parts, piece_manifest, stock_lg, kerf_width);
-					for (const i of tmp){
-						stacked_cut_options.push(stacked_cuts.concat(i).sort())
-					}
-				} catch (e) {
-					// out of stock presumably, which is OK
-					console.log(e);
-				}
-			}
-		}
-
-		return stacked_cut_options;
-	}*/
-
 	function generateCutOptions(parts, stock, kerf_width) {
 		console.log("generateCutOptions", parts, stock, kerf_width)
 
 		parts.sort((a,b) => b.length - a.length)
 		
-		profiles = new Set();
+		let profiles = new Set();
 		profiles_unaccounted = new Set();
-		part_quantities = {}
-		stock_lgs = {}
-		orders_by_profile = {}
+		let part_quantities = {}
+		let stock_lgs = {}
+		let orders_by_profile = {}
 
-		piece_manifest = {}
+		let piece_manifest = {}
 		
 		for (part of parts){
-			piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
+			piece_manifest[part.id] = {qty: part.qty, profile: part.profile, length: part.length}
 			profiles.add(part.profile)
 			profiles_unaccounted.add(part.profile)
-			part_quantities[part.name] = part.qty
+			
+			if (typeof part_quantities[part.profile] === 'undefined')
+				part_quantities[part.profile] = {}
+			
+			part_quantities[part.profile][part.id] = part.qty
 		}
 
-		order_template = []
+		let order_template = {}
 		
 		let j = 0;
 		for (part of stock){
-			//piece_manifest[part.name] = {qty: part.qty, profile: part.profile, length: part.length}
 			profiles_unaccounted.delete(part.profile);
 			stock_lgs[part.profile] = part.length;
+
+
+			if (typeof order_template[part.profile] === 'undefined')
+				order_template[part.profile] = []
+
 			for (let i=0; i<part.qty; i++)
-				order_template.push({stock_length: part.length, pieces: [], saw_waste: 0, remainder: part.length, stock_id: j})
+				order_template[part.profile].push({stock_length: part.length, pieces: [], saw_waste: 0, remainder: part.length, stock_id: j})
 			j+=1;
 		}
 
@@ -204,11 +122,13 @@
 			throw "don't have stock defined for profiles: " + Array.from(profiles_unaccounted).join(', ');
 		}
 
-		console.log("generateCutOrders", part_quantities, piece_manifest, order_template, kerf_width)
+		orders = {}
 
-		return generateCutOrders(part_quantities, piece_manifest, order_template, kerf_width)
+		for (profile of profiles.values()) {
+			orders[profile] = generateCutOrders(part_quantities[profile], piece_manifest, order_template[profile], kerf_width)
+		}
 
-		//return {manifest: piece_manifest, stock_length: stock_lgs, orders: orders_by_profile};
+		return orders;
 	}
 
 	function representNumber(num) {
@@ -247,22 +167,38 @@
 		pieces = []
 		stock  = []
 
-		for (row of tbody_piece_input.children) {
-			pieces.push({
-				name:    row.cells[0].children[0].value,
-				profile: row.cells[1].children[0].value,
-				length:  parseFloat(row.cells[2].children[0].value),
-				qty:     parseFloat(row.cells[3].children[0].value)
-			});
+		for (let row=0; row<tbody_piece_input.children.length; row++) {
+
+			profile = getV(`piece_profile_${row}`);
+			length  = getV(`piece_length_${row}`);
+			qty     = getV(`piece_qty_${row}`);
+			console.log('piece', length, qty)
+
+			if (length && qty) {
+				pieces.push({
+					id:      row,
+					profile: profile,
+					length:  length,
+					qty:     qty
+				});
+			}
 		}
 
-		for (row of tbody_stock_input.children) {
-			stock.push({
-				name:    row.cells[0].children[0].value,
-				profile: row.cells[1].children[0].value,
-				length:  parseFloat(row.cells[2].children[0].value),
-				qty:     parseFloat(row.cells[3].children[0].value)
-			});
+		for (let row=0; row<tbody_piece_input.children.length; row++) {
+
+			profile = getV(`stock_profile_${row}`);
+			length  = getV(`stock_length_${row}`);
+			qty     = getV(`stock_qty_${row}`);
+			console.log('stock', length, qty)
+
+			if (length && qty) {
+				stock.push({
+					profile: profile,
+					length:  length,
+					qty:     qty
+				});
+			}
+
 		}
 
 		current_cut_options = generateCutOptions(pieces, stock, .125)
@@ -271,37 +207,34 @@
 
 		// sort the options
 		// todo: this should probably get rolled together, too many nested functions
-		for (order of current_cut_options) {
-			order.sort((a,b) => a.remainder-b.remainder)
-			order['remainder'] = 0;
-			for (let i = order.length-1; i>=0; i--) {
-				const line = order[i];
-				if (line.remainder == line.stock_length){
-					order.remainder += 1;
-				}
-				else{
-					// only get the first one
-					order.remainder += line.remainder/line.stock_length;
-					break;
+		for (profile in current_cut_options) {
+			for (order of current_cut_options[profile]) {
+				order.sort((a,b) => a.remainder-b.remainder)
+				order['remainder'] = 0;
+				for (let i = order.length-1; i>=0; i--) {
+					const line = order[i];
+					if (line.remainder == line.stock_length) {
+						order.remainder += 1;
+					}
+					else{
+						// only get the first one
+						order.remainder += line.remainder/line.stock_length;
+						break;
+					}
 				}
 			}
-		}
+			current_cut_options[profile].sort((a,b) => b.remainder-a.remainder);
 
-		current_cut_options.sort((a,b) => b.remainder-a.remainder)
-
-		//for (order of current_cut_options)
-		//	console.log(representOrder(order))
-
-
-		let select    = document.getElementById("cut_option_select");
-		let old_val   = select.value;
-		select.innerHTML = '';
-		for (base in current_cut_options) {
-			let opt = document.createElement('option');
-			opt.innerHTML = base;
-			opt.value = base;
-			if (old_val == base) opt.selected = true;
-			select.appendChild(opt);
+			let select    = document.getElementById("cut_option_select");
+			let old_val   = select.value;
+			select.innerHTML = '';
+			for (base in current_cut_options[profile]) {
+				let opt = document.createElement('option');
+				opt.innerHTML = base;
+				opt.value = base;
+				if (old_val == base) opt.selected = true;
+				select.appendChild(opt);
+			}
 		}
 
 		changeCutOption();
@@ -316,7 +249,7 @@
 		new_tbody.id = 'tbody_cut_output';
 
 		let option_no = document.getElementById("cut_option_select").value;
-		let cut_option = current_cut_options[option_no];
+		let cut_option = current_cut_options[undefined][option_no];
 
 		console.log(cut_option)
 		console.log(representOrder(cut_option))
@@ -409,6 +342,12 @@
 				<td>Quantity</td>
 			</tr>
 			<tbody id="tbody_piece_input">
+			<tr id='piece_0_row'>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_0"></td>
+			</tr>
 			<tr id='piece_1_row'>
 				<td contenteditable="true" class="table-cell-input" id="piece_name_1"></td>
 				<td contenteditable="true" class="table-cell-input" id="piece_profile_1"></td>
@@ -420,12 +359,6 @@
 				<td contenteditable="true" class="table-cell-input" id="piece_profile_2"></td>
 				<td contenteditable="true" class="table-cell-input" id="piece_length_2"></td>
 				<td contenteditable="true" class="table-cell-input" id="piece_qty_2"></td>
-			</tr>
-			<tr id='piece_3_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_3"></td>
 			</tr>
 		</tbody>
 		</table>
@@ -443,6 +376,12 @@
 				<td>Quantity</td>
 			</tr>
 			<tbody id="tbody_stock_input">
+			<tr id='stock_3_row'>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_0"></td>
+			</tr>
 			<tr id='stock_1_row'>
 				<td contenteditable="true" class="table-cell-input" id="stock_name_1"></td>
 				<td contenteditable="true" class="table-cell-input" id="stock_profile_1"></td>
@@ -454,12 +393,6 @@
 				<td contenteditable="true" class="table-cell-input" id="stock_profile_2"></td>
 				<td contenteditable="true" class="table-cell-input" id="stock_length_2"></td>
 				<td contenteditable="true" class="table-cell-input" id="stock_qty_2"></td>
-			</tr>
-			<tr id='stock_3_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_3"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_3"></td>
 			</tr>
 		</tbody>
 		</table>
