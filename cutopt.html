@@ -12,7 +12,7 @@
 <script type="text/javascript">
 	EXP_FN_BASE = 'fit_tol';
 	UNIT_MAP = {
-		'dimension': ['mm', 'cm', 'in', '"'] // ezpz
+		'dimension': ['-', '-'] // ezpz
 	};
 </script>
 
@@ -348,6 +348,19 @@
 
 		//EXP_onload();
 
+		for (inp of document.getElementsByTagName('TD')) {
+			if (inp.contentEditable == 'true') {
+				inp.addEventListener('keydown', (evt) => {
+				    if (evt.keyCode === 13) {
+				        evt.preventDefault();
+				        // TODO: enter; go down
+				    }
+				    // TODO: other arrow keys
+				});
+			}
+		}
+
+		document.getElementById('idContentEditable')
 		UNIT_change();
 		//
 		compute();
@@ -365,10 +378,8 @@
 		<div class="topbar-la" id='topbar_unit'>
 			<!-- Required for unit library. You could also put this in the calculator main body -->
 			<select id="unit_select" onchange="UNIT_change(); compute();">
-				<option value=0 >Millimeters</option>
-				<option value=1 >Centimeters</option>
-				<option value=2 selected="selected">Inches Decimal</option>
-				<option value=3>Inches Fractional</option>
+				<option value=0 selected="selected">Decimal</option>
+				<option value=1 >Fractional</option>
 			</select>
 		</div>
 		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Fit Clearance/Interference Calculator</div>
@@ -394,27 +405,27 @@
 			<tr>
 				<td>Name</td>
 				<td>Profile</td>
-				<td>Length <span class="unit" data-unit="dimension"></span></td>
+				<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
 				<td>Quantity</td>
 			</tr>
 			<tbody id="tbody_piece_input">
 			<tr id='piece_1_row'>
-				<td><input id='piece_name_1'    data-unit='dimension' value='' /></td>
-				<td><input id='piece_profile_1' data-unit='dimension' value='' /></td>
-				<td><input id='piece_length_1'  data-unit='dimension' value='' /></td>
-				<td><input id='piece_qty_1'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_1"></td>
 			</tr>
 			<tr id='piece_2_row'>
-				<td><input id='piece_name_2'    data-unit='dimension' value='' /></td>
-				<td><input id='piece_profile_2' data-unit='dimension' value='' /></td>
-				<td><input id='piece_length_2'  data-unit='dimension' value='' /></td>
-				<td><input id='piece_qty_2'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_2"></td>
 			</tr>
 			<tr id='piece_3_row'>
-				<td><input id='piece_name_3'    data-unit='dimension' value='' /></td>
-				<td><input id='piece_profile_3' data-unit='dimension' value='' /></td>
-				<td><input id='piece_length_3'  data-unit='dimension' value='' /></td>
-				<td><input id='piece_qty_3'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_3"></td>
 			</tr>
 		</tbody>
 		</table>
@@ -428,27 +439,27 @@
 			<tr>
 				<td>Name</td>
 				<td>Profile</td>
-				<td>Length <span class="unit" data-unit="dimension"></span></td>
+				<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
 				<td>Quantity</td>
 			</tr>
 			<tbody id="tbody_stock_input">
 			<tr id='stock_1_row'>
-				<td><input id='stock_name_1'    data-unit='dimension' value='' /></td>
-				<td><input id='stock_profile_1' data-unit='dimension' value='' /></td>
-				<td><input id='stock_length_1'  data-unit='dimension' value='' /></td>
-				<td><input id='stock_qty_1'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_1"></td>
 			</tr>
 			<tr id='stock_2_row'>
-				<td><input id='stock_name_2'    data-unit='dimension' value='' /></td>
-				<td><input id='stock_profile_2' data-unit='dimension' value='' /></td>
-				<td><input id='stock_length_2'  data-unit='dimension' value='' /></td>
-				<td><input id='stock_qty_2'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_2"></td>
 			</tr>
 			<tr id='stock_3_row'>
-				<td><input id='stock_name_3'    data-unit='dimension' value='' /></td>
-				<td><input id='stock_profile_3' data-unit='dimension' value='' /></td>
-				<td><input id='stock_length_3'  data-unit='dimension' value='' /></td>
-				<td><input id='stock_qty_3'     data-unit='dimension' value='' /></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_3"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_3"></td>
 			</tr>
 		</tbody>
 		</table>

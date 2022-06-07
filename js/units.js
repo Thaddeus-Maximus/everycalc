@@ -53,34 +53,62 @@ function getV(id, default_value, pct_err_en) {
 			If enabled, will presume that the queried id ends in _err, strip off the _err, query the element, and return getV(non_errored_entry) times the percentage.
 	*/
 	let unit = document.getElementById(id).dataset.unit;
-	let v =  document.getElementById(id).value;
+	let v = "";
+
+	if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
+		v = document.getElementById(id).innerText;
+	} else {
+		v = document.getElementById(id).value;
+	}
+
+	const rx = /([0-9])\s([0-9])/g;
+	v = v.replaceAll(rx, '$1+$2')
+
 	if (pct_err_en && typeof v === 'string' && v.slice(-1) == '%') {
 		return getV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
 	} else if (v=='') {
 		v = default_value;
-	} else if (UNIT_MAP[unit][UNIT_sys] == "\"") {
-		console.log("its fractional")
 	} else {
 		v = eval(v); // I trust you to not abuse this power.
 	}
-	
-	if (typeof UNIT_MAP[unit] !== 'undefined') {
+
+	if (typeof unit !== 'undefined' && typeof UNIT_MAP[unit] !== 'undefined') {
 		v = convertFrom(v, UNIT_MAP[unit][UNIT_sys]);
 	}
 	return v;
 }
 
 // TODO: leading zeroes
-function setV(id, value, places, show_sign, leading_zero) {
+function setV(id, value, places, show_sign, leading_zero, fractional) {
 	let unit = document.getElementById(id).dataset.unit;
 	if (typeof value === 'string') {
 		document.getElementById(id).value = value;
 	} else {
-		if (typeof UNIT_MAP[unit] !== 'undefined'){
+		if (typeof unit !== 'undefined' && typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
-		if (UNIT_MAP[unit][UNIT_sys] == "\"") {
-			console.log("its fractional")
+		if (fractional) {
+			const remainder = Math.abs(value % 1.0);
+			const whole     = Math.abs(Math.trunc(value));
+
+			if (typeof places === 'undefined') {
+				places = 64;
+			}
+
+			denominator = Math.round(remainder*places)
+
+			while (places%2 == 0 && denominator != 0 && denominator % 2 == 0) {
+				denominator /= 2;
+				places /= 2;
+			}
+
+			let v = (show_sign && value>0 ? "+":"") + (value>0 ? "":"-") + whole + (denominator > 0 ? ' ' + denominator + "/" + places : '');
+
+			if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
+				document.getElementById(id).innerText = v;
+			} else {
+				document.getElementById(id).value = v;
+			}
 		} else {
 			if (typeof places === 'undefined') {
 				// log10|value| is roughly the order of magnitude the number is.
@@ -88,8 +116,14 @@ function setV(id, value, places, show_sign, leading_zero) {
 				// Add a couple extra places for significance
 				places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
 			}
-			let v = value.toFixed(places);
-			document.getElementById(id).value = (show_sign && value>0 ? "+":"") + v;
+			let v = (show_sign && value>0 ? "+":"") + value.toFixed(places);
+
+
+			if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
+				document.getElementById(id).innerText = v;
+			} else {
+				document.getElementById(id).value = v;
+			}
 		}
 	}
 }
