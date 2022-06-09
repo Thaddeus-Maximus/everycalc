@@ -59,7 +59,6 @@
 				// this is the last item in the line
 				orders.push(send_order)
 			} else {
-				//console.log(tmpresults)
 				for (const spawned_order of generateCutOrders(new_quantities, part_manifest, send_order, kerf_width)){
 					// collect the order
 					// at this point, only accept unique cut orders.
@@ -78,8 +77,6 @@
 	}
 
 	function generateCutOptions(parts, stock, kerf_width) {
-		console.log("generateCutOptions", parts, stock, kerf_width)
-
 		parts.sort((a,b) => b.length - a.length)
 		
 		let profiles = new Set();
@@ -118,7 +115,6 @@
 		}
 
 		if (profiles_unaccounted.size != 0) {
-			console.log(profiles_unaccounted)
 			throw "don't have stock defined for profiles: " + Array.from(profiles_unaccounted).join(', ');
 		}
 
@@ -153,44 +149,69 @@
 
 	var current_cut_options = [];
 
-	function onInput(event) {
+	function onKeyDown(event) {
+	    if (event.keyCode === 13) {
+	        event.preventDefault();
+	        // TODO: enter; go down
+	    }
+	    // TODO: other arrow keys
+		
+	}
+
+	function onKeyUp(event) {
 		setError(1);
 
-		let last_populated = 0;
-		let i = 0;
-		for (row of tbody_stock_input.children) {
-			for (cell of row.children) {
-				console.log(cell.innerHTML)
-				if (! /^(\s|&nbsp;|<br>)*$/.test(cell.innerHTML)) {
-					console.log("this is true")
-					last_populated = i;
-				}
-			}
-			i ++;
-		}
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
 
-		console.log(last_populated);
+		for (tbody of [tbody_stock_input, tbody_piece_input]) {
+			for (row of Array.prototype.slice.call(tbody.children)) {
+				let empty = true;
+				for (cell of row.children) {
+					if (! /^(\s|&nbsp;|<br>)*$/.test(getTableText(cell))) {
+						empty = false;
+					}
+				}
+				if (empty)
+					row.remove();
+			}
+
+			// then, add an empty row
+
+			row = document.createElement("tr");
+			for (let i=0; i<4; i++) {
+				cell = document.createElement("td");
+				cell.classList.add("table-cell-input");
+				cell.contentEditable = true;
+				cell.innerHTML = '&nbsp;';
+
+				cell.addEventListener('keydown', onKeyDown);
+				cell.addEventListener('keyup', onKeyUp);
+
+				row.appendChild(cell);
+			}
+			tbody.appendChild(row);
+		}
+	}
+
+	function getTableText(cell) {
+		text = cell.innerText.replace(/<[^>]*>?/gm, '').trim();
+		//console.log("getTableText(", cell, ") = ", text);
+		return text;
 	}
 
 	function compute() {
-		// hook for when computation is requested
-		let new_tbody = document.createElement("tbody");
-		let old_tbody = document.getElementById("tbody_cut_output");
-		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
-		new_tbody.id = 'tbody_cut_output';
-
-
-		tbody_piece_input = document.getElementById("tbody_piece_input");
-		tbody_stock_input = document.getElementById("tbody_stock_input");
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
 
 		pieces = []
 		stock  = []
 
 		row_i = 0;
 		for (row of tbody_piece_input.children) {
-			profile = getV(row.children[1]);
+			profile = getTableText(row.children[1]);
 			length  = getV(row.children[2]);
-			qty     = getV(row.children[3]);
+			qty     = getV(row.children[3], 1);
 
 			if (length && qty) {
 				pieces.push({
@@ -204,9 +225,9 @@
 		}
 
 		for (row of tbody_stock_input.children) {
-			profile = getV(row.children[1]);
+			profile = getTableText(row.children[1]);
 			length  = getV(row.children[2]);
-			qty     = getV(row.children[3]);
+			qty     = getV(row.children[3], 1);
 
 			if (length && qty) {
 				stock.push({
@@ -217,9 +238,12 @@
 			}
 		}
 
-		current_cut_options = generateCutOptions(pieces, stock, .125)
+		current_cut_options = generateCutOptions(pieces, stock, getV("kerf_width"))
 
-		console.log(current_cut_options)
+		output_container = document.getElementById('output_container');
+		output_container.innerHTML = '';
+
+
 
 		// sort the options
 		// todo: this should probably get rolled together, too many nested functions
@@ -241,7 +265,32 @@
 			}
 			current_cut_options[profile].sort((a,b) => b.remainder-a.remainder);
 
-			let select    = document.getElementById("cut_option_select");
+			div = document.createElement('div');
+			div.classList.add('container');
+			div.classList.add('output');
+			div.innerHTML = `
+				<table id="table_cut_output_${profile}" style="word-wrap: unset; white-space: nowrap;">
+					<tr>
+						<th class="rowlabel bold" colspan="7" style="text-align: left;">
+							${profile}
+							<select id="cut_option_select_${profile}" onchange='changeCutOption("${profile}");'>
+							</select>
+						</th>
+					</tr>
+					<tr>
+						<td colspan>Stock Lg.</td>
+						<td>=</td>
+						<td colspan>Cuts</td>
+						<td>--</td>
+						<td colspan>Kerf Loss</td>
+						<td>--</td>
+						<td colspan>Spare</td>
+					</tr>
+					<tbody id="tbody_cut_output_${profile}"></tbody>
+				</table>`
+			output_container.appendChild(div);
+
+			let select    = document.getElementById(`cut_option_select_${profile}`);
 			let old_val   = select.value;
 			select.innerHTML = '';
 			for (base in current_cut_options[profile]) {
@@ -251,21 +300,23 @@
 				if (old_val == base) opt.selected = true;
 				select.appendChild(opt);
 			}
+			changeCutOption(profile);
 		}
 
-		changeCutOption();
+		
 
 		setError(0);	
 	}
 
-	function changeCutOption() {
-		let new_tbody = document.createElement("tbody");
-		let old_tbody = document.getElementById("tbody_cut_output");
-		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
-		new_tbody.id = 'tbody_cut_output';
+	function changeCutOption(profile) {
 
-		let option_no = document.getElementById("cut_option_select").value;
-		let cut_option = current_cut_options[undefined][option_no];
+		let new_tbody = document.createElement("tbody");
+		let old_tbody = document.getElementById(`tbody_cut_output_${profile}`);
+		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
+		new_tbody.id = `tbody_cut_output_${profile}`;
+
+		let option_no = document.getElementById(`cut_option_select_${profile}`).value;
+		let cut_option = current_cut_options[profile][option_no];
 
 
 
@@ -273,8 +324,6 @@
 		const places       = parseInt(UNIT_sys.substring(1))
 		const show_sign    = false;
 		const leading_zero = true;
-
-		console.log(cut_option)
 
 		for (cut of cut_option) {
 			let row = document.createElement("tr");
@@ -304,7 +353,8 @@
 				span.innerText = " + ";
 				cell.appendChild(span);
 			}
-			cell.removeChild(cell.lastChild);
+			if (cell.lastChild) 
+				cell.removeChild(cell.lastChild);
 
 			cell = document.createElement("td");
 			cell.classList.add("td-readout");
@@ -348,16 +398,8 @@
 
 		for (inp of document.getElementsByTagName('TD')) {
 			if (inp.contentEditable == 'true') {
-				inp.addEventListener('keydown', (evt) => {
-				    if (evt.keyCode === 13) {
-				        evt.preventDefault();
-				        // TODO: enter; go down
-				    }
-				    // TODO: other arrow keys
-					
-					// always
-				});
-				inp.addEventListener('keyup', onInput);
+				inp.addEventListener('keydown', onKeyDown);
+				inp.addEventListener('keyup', onKeyUp);
 
 			}
 		}
@@ -390,7 +432,7 @@
 				<option value='f64' >64ths</option>
 			</select>
 		</div>
-		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Fit Clearance/Interference Calculator</div>
+		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Linear Stock Cut Orderer</div>
 		<div class="topbar-ra selectable" onclick="compute();" id="topbar_status"><span></span><span class='ttt'></span></div>
 		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
 		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
@@ -405,103 +447,92 @@
 	</svg>
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="float: left;" class="container odd">
-		<table id="table_piece_input" style="word-wrap: unset; white-space: nowrap;">
-			<tr>
-				<th class="rowlabel bold" colspan="4" style="text-align: center;">Pieces</th>
-			</tr>
-			<tr>
-				<td>Name</td>
-				<td>Profile</td>
-				<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
-				<td>Quantity</td>
-			</tr>
-			<tbody id="tbody_piece_input">
-			<tr id='piece_0_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_0">&nbsp;</td>
-			</tr>
-			<tr id='piece_1_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_1">&nbsp;</td>
-			</tr>
-			<tr id='piece_2_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_2">&nbsp;</td>
-			</tr>
-		</tbody>
-		</table>
-	</div>
-	
-	<div style="float: left;" class="container even">
-		<table id="table_stock_input" style="word-wrap: unset; white-space: nowrap;">
-			<tr>
-				<th class="rowlabel bold" colspan="4" style="text-align: center;">Stock</th>
-			</tr>
-			<tr>
-				<td>Name</td>
-				<td>Profile</td>
-				<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
-				<td>Quantity</td>
-			</tr>
-			<tbody id="tbody_stock_input">
-			<tr id='stock_3_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_0">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_0">&nbsp;</td>
-			</tr>
-			<tr id='stock_1_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_1">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_1">&nbsp;</td>
-			</tr>
-			<tr id='stock_2_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_2">&nbsp;</td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_2">&nbsp;</td>
-			</tr>
-		</tbody>
-		</table>
-	</div>
-	
-	<div style="float: left;" class="container output">
-		<table id="table_cut_output" style="word-wrap: unset; white-space: nowrap;">
-			<tr>
-				<th class="rowlabel bold" colspan="7" style="text-align: left;">Cut Option 
-					<select id="cut_option_select" onchange="changeCutOption();">
-					</select>
-				</th>
-			</tr>
-			<tr>
-				<td colspan>Stock Lg.</td>
-				<td>=</td>
-				<td colspan>Cuts</td>
-				<td>--</td>
-				<td colspan>Kerf Loss</td>
-				<td>--</td>
-				<td colspan>Spare</td>
-			</tr>
-			<tbody id="tbody_cut_output">
-				<tr id='cut_1_row' class="cut_row">
-					<td id="cut_overall_1"></td>
-					<td>=</td>
-					<td id="cut_pieces_1"></td>
-					<td>--</td>
-					<td id="cut_kerfloss_1"></td>
-					<td>--</td>
-					<td id="cut_remainder_1"></td>
+<div style="float: left; display: table-cell;" class="container">
+	<div style="" >
+		<div style="float: left;" class="odd">
+			<table id="table_piece_input" style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<th class="rowlabel bold" colspan="4" style="text-align: center;">Pieces</th>
+				</tr>
+				<tr>
+					<td>Note</td>
+					<td>Profile</td>
+					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
+					<td>Quantity</td>
+				</tr>
+				<tbody id="tbody_piece_input">
+				<tr id='piece_0_row'>
+					<td contenteditable="true" class="table-cell-input" id="piece_name_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_profile_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_length_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_qty_0"></td>
+				</tr>
+				<tr id='piece_1_row'>
+					<td contenteditable="true" class="table-cell-input" id="piece_name_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_profile_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_length_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_qty_1"></td>
+				</tr>
+				<tr id='piece_2_row'>
+					<td contenteditable="true" class="table-cell-input" id="piece_name_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_profile_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_length_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="piece_qty_2"></td>
 				</tr>
 			</tbody>
-		</table>		
+			</table>
+		</div>
+
+		<div style="float: left;" class="even">
+			<table style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<!--<th class="rowlabel bold" colspan="4" style="text-align: center;">Cut Settings</th>-->
+					<button onclick="compute();" style="width: 100%; text-align: center; font-weight: bold;">Cut!</button>
+				</tr>
+				<tr>
+					<td>Kerf Width</td>
+					<td><input id="kerf_width" value="1/8"/></td>
+				</tr>
+			</table>
+		</div>
+
+		<div style="float: left;" class="odd">
+			<table id="table_stock_input" style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<th class="rowlabel bold" colspan="4" style="text-align: center;">Stock</th>
+				</tr>
+				<tr>
+					<td>Note</td>
+					<td>Profile</td>
+					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
+					<td>Quantity</td>
+				</tr>
+				<tbody id="tbody_stock_input">
+				<tr id='stock_3_row'>
+					<td contenteditable="true" class="table-cell-input" id="stock_name_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_profile_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_length_0"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_qty_0"></td>
+				</tr>
+				<tr id='stock_1_row'>
+					<td contenteditable="true" class="table-cell-input" id="stock_name_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_profile_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_length_1"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_qty_1"></td>
+				</tr>
+				<tr id='stock_2_row'>
+					<td contenteditable="true" class="table-cell-input" id="stock_name_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_profile_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_length_2"></td>
+					<td contenteditable="true" class="table-cell-input" id="stock_qty_2"></td>
+				</tr>
+			</tbody>
+			</table>
+		</div>
+
+		
 	</div>
+	<div class="output" id="output_container"></div>
+</div>
 </body>
 </html>

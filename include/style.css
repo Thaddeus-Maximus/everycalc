@@ -272,10 +272,12 @@ input {
 
 .td-readout {
   font-family: "Oxanium", "Courier New", monospace;
+  text-align:  right;
 }
 
 .span-readout {
   font-family: "Oxanium", "Courier New", monospace;
+  text-align:  right;
 }
 
 
@@ -326,6 +328,7 @@ th {
   width:  100%;
   height:  100%;
   font-family: "Oxanium", "Courier New", monospace;
+  text-align:  right;
 }
 
 select, input {
