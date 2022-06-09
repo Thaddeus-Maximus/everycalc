@@ -131,7 +131,7 @@
 		return orders;
 	}
 
-	function representNumber(num) {
+	/*function representNumber(num) {
 		if (num % 1 < .001)
 			return num.toFixed(0);
 		return num.toFixed(2);
@@ -149,7 +149,7 @@
 			reprs.push(repr);
 		}
 		return reprs.join('\n');
-	}
+	}*/
 
 	var current_cut_options = [];
 
@@ -251,25 +251,74 @@
 		let option_no = document.getElementById("cut_option_select").value;
 		let cut_option = current_cut_options[undefined][option_no];
 
+
+
+		const fractional   = parseInt(UNIT_sys) ? true : false;
+		const places       = fractional ? 64 : 3;
+		const show_sign    = false;
+		const leading_zero = true;
+
 		console.log(cut_option)
-		console.log(representOrder(cut_option))
+		
 		for (cut of cut_option) {
 			let row = document.createElement("tr");
 
-			overall   = cut.stock_length;
-			cuts      = cut.pieces.join(' + ');
-			kerfloss  = cut.saw_waste;
-			remainder = cut.remainder;
+			let cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.stock_length, places, show_sign, leading_zero, fractional);
 
-			row.innerHTML = `
-				<td class='td-readout'>${overall}</td>
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, "=");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+
+			for (piece of cut.pieces) {
+				let span = document.createElement("span");
+				span.classList.add("span-readout");
+				cell.appendChild(span);
+				setV(span, piece, places, show_sign, leading_zero, fractional);
+
+				span = document.createElement("span");
+				span.classList.add("span-readout");
+				span.innerText = " + ";
+				cell.appendChild(span);
+			}
+			cell.removeChild(cell.lastChild);
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, "--");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.saw_waste, places, show_sign, leading_zero, fractional);
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, "--");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.remainder, places, show_sign, leading_zero, fractional);
+
+			/*row.innerHTML = `
+				<td class='td-readout'><span class="span-readout" id="$"></span></td>
 				<td>=</td>
 				<td class='td-readout' style='width: 250px'>${cuts}</td>
 				<td>--</td>
 				<td class='td-readout'>${kerfloss}</td>
 				<td>--</td>
 				<td class='td-readout'>${remainder}</td>
-			`;
+			`;*/
 
 			new_tbody.appendChild(row);
 		}
@@ -311,8 +360,8 @@
 		<div class="topbar-la" id='topbar_unit'>
 			<!-- Required for unit library. You could also put this in the calculator main body -->
 			<select id="unit_select" onchange="UNIT_change(); compute();">
-				<option value=0 selected="selected">Decimal</option>
-				<option value=1 >Fractional</option>
+				<option value=0 selected="selected">3-places</option>
+				<option value=1 >64ths</option>
 			</select>
 		</div>
 		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Fit Clearance/Interference Calculator</div>

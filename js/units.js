@@ -52,13 +52,17 @@ function getV(id, default_value, pct_err_en) {
 		pct_err_en: enable processing of percentage errors.
 			If enabled, will presume that the queried id ends in _err, strip off the _err, query the element, and return getV(non_errored_entry) times the percentage.
 	*/
-	let unit = document.getElementById(id).dataset.unit;
+	let element = id;
+	if (typeof element === 'string' || element instanceof String)
+		element = document.getElementById(id);
+
+	let unit = element.dataset.unit;
 	let v = "";
 
-	if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
-		v = document.getElementById(id).innerText;
+	if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+		v = element.innerText;
 	} else {
-		v = document.getElementById(id).value;
+		v = element.value;
 	}
 
 	const rx = /([0-9])\s([0-9])/g;
@@ -80,9 +84,18 @@ function getV(id, default_value, pct_err_en) {
 
 // TODO: leading zeroes
 function setV(id, value, places, show_sign, leading_zero, fractional) {
-	let unit = document.getElementById(id).dataset.unit;
+
+	let element = id;
+	if (typeof element === 'string' || element instanceof String)
+		element = document.getElementById(id);
+
+	let unit = element.dataset.unit;
 	if (typeof value === 'string') {
-		document.getElementById(id).value = value;
+		if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+			element.innerText = value;
+		} else {
+			element.value = value;
+		}
 	} else {
 		if (typeof unit !== 'undefined' && typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
@@ -102,12 +115,12 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 				places /= 2;
 			}
 
-			let v = (show_sign && value>0 ? "+":"") + (value>0 ? "":"-") + whole + (denominator > 0 ? ' ' + denominator + "/" + places : '');
+			let v = (whole ? (show_sign && value>0 ? "+":"") + (value>0 ? "":"-") + whole : "") + ' ' + (denominator > 0 ? denominator + "/" + places : '');
 
-			if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
-				document.getElementById(id).innerText = v;
+			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+				element.innerText = v;
 			} else {
-				document.getElementById(id).value = v;
+				element.value = v;
 			}
 		} else {
 			if (typeof places === 'undefined') {
@@ -119,10 +132,10 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 			let v = (show_sign && value>0 ? "+":"") + value.toFixed(places);
 
 
-			if (['TD', 'SPAN', 'DIV'].includes(document.getElementById(id).nodeName)) {
-				document.getElementById(id).innerText = v;
+			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+				element.innerText = v;
 			} else {
-				document.getElementById(id).value = v;
+				element.value = v;
 			}
 		}
 	}

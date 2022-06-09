@@ -274,6 +274,11 @@ input {
   font-family: "Oxanium", "Courier New", monospace;
 }
 
+.span-readout {
+  font-family: "Oxanium", "Courier New", monospace;
+}
+
+
 .bold {
   font-weight: bold;
 }
