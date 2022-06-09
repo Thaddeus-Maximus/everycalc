@@ -253,13 +253,13 @@
 
 
 
-		const fractional   = parseInt(UNIT_sys) ? true : false;
-		const places       = fractional ? 64 : 3;
+		const fractional   = UNIT_sys[0]=='f' ? true : false;
+		const places       = parseInt(UNIT_sys.substring(1))
 		const show_sign    = false;
 		const leading_zero = true;
 
 		console.log(cut_option)
-		
+
 		for (cut of cut_option) {
 			let row = document.createElement("tr");
 
@@ -360,8 +360,14 @@
 		<div class="topbar-la" id='topbar_unit'>
 			<!-- Required for unit library. You could also put this in the calculator main body -->
 			<select id="unit_select" onchange="UNIT_change(); compute();">
-				<option value=0 selected="selected">3-places</option>
-				<option value=1 >64ths</option>
+				<option value='d0'>Wholes</option>
+				<option value='d2'>2-places</option>
+				<option value='d3' selected="selected">3-places</option>
+				<option value='d4'>4-places</option>
+				<option value='f8' >8ths</option>
+				<option value='f16' >16ths</option>
+				<option value='f32' >32nds</option>
+				<option value='f64' >64ths</option>
 			</select>
 		</div>
 		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Fit Clearance/Interference Calculator</div>
