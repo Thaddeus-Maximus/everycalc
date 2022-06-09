@@ -153,6 +153,25 @@
 
 	var current_cut_options = [];
 
+	function onInput(event) {
+		setError(1);
+
+		let last_populated = 0;
+		let i = 0;
+		for (row of tbody_stock_input.children) {
+			for (cell of row.children) {
+				console.log(cell.innerHTML)
+				if (! /^(\s|&nbsp;|<br>)*$/.test(cell.innerHTML)) {
+					console.log("this is true")
+					last_populated = i;
+				}
+			}
+			i ++;
+		}
+
+		console.log(last_populated);
+	}
+
 	function compute() {
 		// hook for when computation is requested
 		let new_tbody = document.createElement("tbody");
@@ -167,29 +186,27 @@
 		pieces = []
 		stock  = []
 
-		for (let row=0; row<tbody_piece_input.children.length; row++) {
-
-			profile = getV(`piece_profile_${row}`);
-			length  = getV(`piece_length_${row}`);
-			qty     = getV(`piece_qty_${row}`);
-			console.log('piece', length, qty)
+		row_i = 0;
+		for (row of tbody_piece_input.children) {
+			profile = getV(row.children[1]);
+			length  = getV(row.children[2]);
+			qty     = getV(row.children[3]);
 
 			if (length && qty) {
 				pieces.push({
-					id:      row,
+					id:      row_i,
 					profile: profile,
 					length:  length,
 					qty:     qty
 				});
 			}
+			row_i++;
 		}
 
-		for (let row=0; row<tbody_piece_input.children.length; row++) {
-
-			profile = getV(`stock_profile_${row}`);
-			length  = getV(`stock_length_${row}`);
-			qty     = getV(`stock_qty_${row}`);
-			console.log('stock', length, qty)
+		for (row of tbody_stock_input.children) {
+			profile = getV(row.children[1]);
+			length  = getV(row.children[2]);
+			qty     = getV(row.children[3]);
 
 			if (length && qty) {
 				stock.push({
@@ -198,7 +215,6 @@
 					qty:     qty
 				});
 			}
-
 		}
 
 		current_cut_options = generateCutOptions(pieces, stock, .125)
@@ -338,7 +354,11 @@
 				        // TODO: enter; go down
 				    }
 				    // TODO: other arrow keys
+					
+					// always
 				});
+				inp.addEventListener('keyup', onInput);
+
 			}
 		}
 
@@ -386,7 +406,7 @@
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 	<div style="float: left;" class="container odd">
-		<table id="table_piece_input">
+		<table id="table_piece_input" style="word-wrap: unset; white-space: nowrap;">
 			<tr>
 				<th class="rowlabel bold" colspan="4" style="text-align: center;">Pieces</th>
 			</tr>
@@ -398,29 +418,29 @@
 			</tr>
 			<tbody id="tbody_piece_input">
 			<tr id='piece_0_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_0">&nbsp;</td>
 			</tr>
 			<tr id='piece_1_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_1">&nbsp;</td>
 			</tr>
 			<tr id='piece_2_row'>
-				<td contenteditable="true" class="table-cell-input" id="piece_name_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_profile_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_length_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="piece_qty_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="piece_name_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_profile_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_length_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="piece_qty_2">&nbsp;</td>
 			</tr>
 		</tbody>
 		</table>
 	</div>
 	
 	<div style="float: left;" class="container even">
-		<table id="table_stock_input">
+		<table id="table_stock_input" style="word-wrap: unset; white-space: nowrap;">
 			<tr>
 				<th class="rowlabel bold" colspan="4" style="text-align: center;">Stock</th>
 			</tr>
@@ -432,29 +452,29 @@
 			</tr>
 			<tbody id="tbody_stock_input">
 			<tr id='stock_3_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_0"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_0"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_0">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_0">&nbsp;</td>
 			</tr>
 			<tr id='stock_1_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_1"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_1"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_1">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_1">&nbsp;</td>
 			</tr>
 			<tr id='stock_2_row'>
-				<td contenteditable="true" class="table-cell-input" id="stock_name_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_profile_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_length_2"></td>
-				<td contenteditable="true" class="table-cell-input" id="stock_qty_2"></td>
+				<td contenteditable="true" class="table-cell-input" id="stock_name_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_profile_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_length_2">&nbsp;</td>
+				<td contenteditable="true" class="table-cell-input" id="stock_qty_2">&nbsp;</td>
 			</tr>
 		</tbody>
 		</table>
 	</div>
 	
 	<div style="float: left;" class="container output">
-		<table id="table_cut_output">
+		<table id="table_cut_output" style="word-wrap: unset; white-space: nowrap;">
 			<tr>
 				<th class="rowlabel bold" colspan="7" style="text-align: left;">Cut Option 
 					<select id="cut_option_select" onchange="changeCutOption();">
