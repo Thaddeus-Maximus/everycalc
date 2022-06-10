@@ -52,8 +52,22 @@ function getV(id, default_value, pct_err_en) {
 		pct_err_en: enable processing of percentage errors.
 			If enabled, will presume that the queried id ends in _err, strip off the _err, query the element, and return getV(non_errored_entry) times the percentage.
 	*/
-	let unit = document.getElementById(id).dataset.unit;
-	let v =  document.getElementById(id).value;
+	let element = id;
+	if (typeof element === 'string' || element instanceof String)
+		element = document.getElementById(id);
+
+	let unit = element.dataset.unit;
+	let v = "";
+
+	if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+		v = element.textContent;
+	} else {
+		v = element.value;
+	}
+
+	const rx = /([0-9])\s([0-9])/g;
+	v = v.replaceAll(rx, '$1+$2')
+
 	if (pct_err_en && typeof v === 'string' && v.slice(-1) == '%') {
 		return getV(id.slice(0,-4), default_value, 0)*eval(v.slice(0,-1)/100);
 	} else if (v=='') {
@@ -61,30 +75,69 @@ function getV(id, default_value, pct_err_en) {
 	} else {
 		v = eval(v); // I trust you to not abuse this power.
 	}
-	
-	if (typeof UNIT_MAP[unit] !== 'undefined') {
+
+	if (typeof unit !== 'undefined' && typeof UNIT_MAP[unit] !== 'undefined') {
 		v = convertFrom(v, UNIT_MAP[unit][UNIT_sys]);
 	}
 	return v;
 }
 
 // TODO: leading zeroes
-function setV(id, value, places, show_sign, leading_zero) {
-	let unit = document.getElementById(id).dataset.unit;
+function setV(id, value, places, show_sign, leading_zero, fractional) {
+
+	let element = id;
+	if (typeof element === 'string' || element instanceof String)
+		element = document.getElementById(id);
+
+	let unit = element.dataset.unit;
 	if (typeof value === 'string') {
-		document.getElementById(id).value = value;
+		if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+			element.textContent = value;
+		} else {
+			element.value = value;
+		}
 	} else {
-		if (typeof UNIT_MAP[unit] !== 'undefined'){
+		if (typeof unit !== 'undefined' && typeof UNIT_MAP[unit] !== 'undefined'){
 			value = convertTo(value, UNIT_MAP[unit][UNIT_sys]);
 		}
-		if (typeof places === 'undefined') {
-			// log10|value| is roughly the order of magnitude the number is.
-			// Invert it to get the number of places to it
-			// Add a couple extra places for significance
-			places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
+		if (fractional) {
+			const remainder = Math.abs(value % 1.0);
+			const whole     = Math.abs(Math.trunc(value));
+
+			if (typeof places === 'undefined') {
+				places = 64;
+			}
+
+			denominator = Math.round(remainder*places)
+
+			while (places%2 == 0 && denominator != 0 && denominator % 2 == 0) {
+				denominator /= 2;
+				places /= 2;
+			}
+
+			let v = (whole ? (show_sign && value>0 ? "+":"") + (value>0 ? "":"-") + whole : "") + ' ' + (denominator > 0 ? denominator + "/" + places : '');
+
+			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+				element.textContent = v;
+			} else {
+				element.value = v;
+			}
+		} else {
+			if (typeof places === 'undefined') {
+				// log10|value| is roughly the order of magnitude the number is.
+				// Invert it to get the number of places to it
+				// Add a couple extra places for significance
+				places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
+			}
+			let v = (show_sign && value>0 ? "+":"") + value.toFixed(places);
+
+
+			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
+				element.textContent = v;
+			} else {
+				element.value = v;
+			}
 		}
-		let v = value.toFixed(places);
-		document.getElementById(id).value = (show_sign && value>0 ? "+":"") + v;
 	}
 }
 
@@ -122,7 +175,7 @@ function convertFromTo(number, from_unit, to_unit) {
 
 // '1 of this unit to <base unit>'
 var UNIT_BASES = {
-	'm': ['m', 'mm', 'in', 'ft'],
+	'm': ['m', 'mm', 'in', 'ft', "\""],
 	'N-m': ['ft-lbf', 'in-lbf', 'ozf-in', 'N-m', 'N-mm'],
 	'N': ['N', 'lbf', 'kgf', 'ozf'],
 	'kg': ['kg', 'g', 'lbm', 'slug'],
@@ -152,6 +205,7 @@ var UNIT_CONVERSIONS = {
 	"m":  1,
 	"mm": 1e-3,
 	"in": 0.0254,
+	"\"": 0.0254,
 	"thou": 0.0254e-3,
 	"ft": 0.3048,
 

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<link rel="stylesheet" href="include/style.css"> 
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+
+<script type="text/javascript">
+	EXP_FN_BASE = 'cut_opt';
+	UNIT_MAP = {
+		'dimension': ['-', '-'] // ezpz
+	};
+</script>
+
+<script type="text/javascript">
+
+	function generateCutOrders(quantities, part_manifest, recieved_order, kerf_width) {
+		const orders = [];
+		
+		let unique_set = new Set()
+
+		for (const id_a in quantities) {
+			new_quantities = {}
+			for (const id_b in quantities) {
+				n = id_a == id_b ? quantities[id_b]-1 : quantities[id_b];
+				if (n > 0)
+					new_quantities[id_b] = n
+			}
+			need_to_place_part = true;
+
+			send_order = []
+			for (line of recieved_order) {
+				piece_lg = part_manifest[id_a].length
+				if (need_to_place_part && line.remainder >= piece_lg+kerf_width) {
+					send_order.push({
+						stock_length: line.stock_length,
+						pieces: line.pieces.concat(piece_lg),
+						saw_waste: line.saw_waste + kerf_width,
+						remainder: line.remainder - piece_lg - kerf_width
+					})
+					need_to_place_part = false;
+				} else {
+					// can I just push line? idk.
+					send_order.push(line)
+				}
+			}
+
+			if (need_to_place_part) {
+				// hm. well, we couldn't place this part. fail!
+				continue;
+			}
+
+			// spawn the next things
+			if (Object.keys(new_quantities).length === 0) {
+				// this is the last item in the line
+				orders.push(send_order)
+			} else {
+				for (const spawned_order of generateCutOrders(new_quantities, part_manifest, send_order, kerf_width)){
+					// collect the order
+					// at this point, only accept unique cut orders.
+					// this doesn't actually prevent us from going down rabbit holes that are useless, it's merely filtering
+					// it at leasts prevents us from storing as much data as possible upfront
+					const summary = JSON.stringify(spawned_order.map((a) => JSON.stringify(a.pieces.sort((a,b)=>b-a).concat(a.stock_length))).sort())
+					if (! unique_set.has(summary)) {
+						unique_set.add(summary)
+						// only add orders with a unique summary
+						orders.push(spawned_order)
+					}
+				}
+			}
+		}
+		return orders
+	}
+
+	function generateCutOptions(parts, stock, kerf_width) {
+		parts.sort((a,b) => b.length - a.length)
+		
+		let profiles = new Set();
+		profiles_unaccounted = new Set();
+		let part_quantities = {}
+		let stock_lgs = {}
+		let orders_by_profile = {}
+
+		let part_manifest = {}
+		
+		for (part of parts){
+			part_manifest[part.id] = {qty: part.qty, profile: part.profile, length: part.length}
+			profiles.add(part.profile)
+			profiles_unaccounted.add(part.profile)
+			
+			if (typeof part_quantities[part.profile] === 'undefined')
+				part_quantities[part.profile] = {}
+			
+			part_quantities[part.profile][part.id] = part.qty
+		}
+
+		let order_template = {}
+		
+		let j = 0;
+		for (part of stock){
+			profiles_unaccounted.delete(part.profile);
+			stock_lgs[part.profile] = part.length;
+
+
+			if (typeof order_template[part.profile] === 'undefined')
+				order_template[part.profile] = []
+
+			for (let i=0; i<part.qty; i++)
+				order_template[part.profile].push({stock_length: part.length, pieces: [], saw_waste: 0, remainder: part.length, stock_id: j})
+			j+=1;
+		}
+
+		if (profiles_unaccounted.size != 0) {
+			throw "don't have stock defined for profiles: " + Array.from(profiles_unaccounted).join(', ');
+		}
+
+		orders = {}
+
+		for (profile of profiles.values()) {
+			orders[profile] = generateCutOrders(part_quantities[profile], part_manifest, order_template[profile], kerf_width)
+		}
+
+		return orders;
+	}
+
+	var current_cut_options = [];
+
+	function onKeyDown(event) {
+	    if (event.keyCode === 13) {
+	        event.preventDefault();
+	        // TODO: enter; go down
+	    }
+	    // TODO: other arrow keys
+		
+	}
+
+	function onKeyUp(event) {
+		setError(1);
+
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+
+		for (tbody of [tbody_stock_input, tbody_piece_input]) {
+			for (row of Array.prototype.slice.call(tbody.children)) {
+				let empty = true;
+				for (cell of row.children) {
+					if (! /^(\s|&nbsp;|<br>)*$/.test(getTableText(cell))) {
+						empty = false;
+					}
+				}
+				if (empty)
+					row.remove();
+			}
+
+			// then, add an empty row
+
+			row = document.createElement("tr");
+			for (let i=0; i<4; i++) {
+				cell = document.createElement("td");
+				cell.classList.add("table-cell-input");
+				cell.contentEditable = true;
+				cell.innerHTML = '&nbsp;';
+
+				registerHandlers(cell);
+
+				row.appendChild(cell);
+			}
+			tbody.appendChild(row);
+		}
+	}
+
+	function onFocus() {
+		var cell = this;
+		  // select all text in contenteditable
+		  // see http://stackoverflow.com/a/6150060/145346
+		  var range, selection;
+		  if (document.body.createTextRange) {
+		    range = document.body.createTextRange();
+		    range.moveToElementText(cell);
+		    range.select();
+		  } else if (window.getSelection) {
+		    selection = window.getSelection();
+		    range = document.createRange();
+		    range.selectNodeContents(cell);
+		    selection.removeAllRanges();
+		    selection.addRange(range);
+		  }
+	}
+
+	function registerHandlers(cell) {
+		cell.addEventListener('keydown', onKeyDown);
+		cell.addEventListener('keyup', onKeyUp);
+		cell.addEventListener('focus', onFocus);
+	}
+
+	function makeInputTables(arrays) {
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+		const tbodies = {pieces: tbody_piece_input, stock: tbody_stock_input}
+		for (key in tbodies) {
+			tbody = tbodies[key];
+
+			tbody.innerHTML = '';
+
+			for (row of arrays[key]) {
+				let tr = document.createElement('tr');
+				tbody.appendChild(tr);
+
+				for (let i=0; i<4; i++) {
+					let cell = document.createElement('td');
+					cell.classList.add('table-cell-input')
+					cell.contentEditable = true;
+					cell.textContent = row[i];
+					registerHandlers(cell);
+					tr.appendChild(cell);
+				}
+			}
+		}
+	}
+
+	function loadDynamicPersistence() {
+		let arrays = JSON.parse(getLocalStorage('cutopt'));
+
+		makeInputTables(arrays);
+	}
+
+	function dumpDynamicPersistence() {
+		let arrays = {pieces:[], stock:[]}; //, kerf_width: document.getElementById('kerf_width').value};
+
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+		const tbodies = {pieces: tbody_piece_input, stock: tbody_stock_input}
+
+		for (key in tbodies) {
+			tbody = tbodies[key];
+
+			
+			arrays[key] = [];
+
+			for (row of tbody.children) {
+				cells = []
+				for (cell of row.children) {
+					cells.push(cell.textContent);
+				}
+				arrays[key].push(cells)
+			}
+			
+		}
+		setLocalStorage('cutopt', JSON.stringify(arrays));
+	}
+
+	function getTableText(cell) {
+		text = cell.textContent.replace(/<[^>]*>?/gm, '').trim();
+		return text;
+	}
+
+	function compute() {
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+
+		pieces = []
+		stock  = []
+
+		row_i = 0;
+		for (row of tbody_piece_input.children) {
+			profile = getTableText(row.children[1]);
+			length  = getV(row.children[2]);
+			qty     = getV(row.children[3], 1);
+
+			if (length && qty) {
+				pieces.push({
+					id:      row_i,
+					profile: profile,
+					length:  length,
+					qty:     qty
+				});
+			}
+			row_i++;
+		}
+
+		for (row of tbody_stock_input.children) {
+			profile = getTableText(row.children[1]);
+			length  = getV(row.children[2]);
+			qty     = getV(row.children[3], 1);
+
+			if (length && qty) {
+				stock.push({
+					profile: profile,
+					length:  length,
+					qty:     qty
+				});
+			}
+		}
+
+		current_cut_options = generateCutOptions(pieces, stock, getV("kerf_width"))
+
+		output_container = document.getElementById('output_container');
+		output_container.innerHTML = '';
+
+		// sort the options
+		// todo: this should probably get rolled together, too many nested functions
+		for (profile in current_cut_options) {
+			for (order of current_cut_options[profile]) {
+				order.sort((a,b) => a.remainder-b.remainder)
+				order['remainder'] = 0;
+				for (let i = order.length-1; i>=0; i--) {
+					const line = order[i];
+					if (line.remainder == line.stock_length) {
+						order.remainder += 1;
+					}
+					else{
+						// only get the first one
+						order.remainder += line.remainder/line.stock_length;
+						break;
+					}
+				}
+			}
+			current_cut_options[profile].sort((a,b) => b.remainder-a.remainder);
+
+			div = document.createElement('div');
+			//div.classList.add('container');
+			div.classList.add('output');
+			div.style.width = '100%';
+			div.innerHTML = `
+				<table id="table_cut_output_${profile}" style="word-wrap: unset; white-space: nowrap; width: 100%;">
+					<tr>
+						<th class="rowlabel bold" colspan="7" style="text-align: left;">
+							${profile}
+							<select id="cut_option_select_${profile}" onchange='changeCutOption("${profile}");'>
+							</select>
+						</th>
+					</tr>
+					<tr>
+						<td colspan style='text-align: right;'>Stock Lg.</td>
+						<td class='table-decorator'>=</td>
+						<td colspan style='text-align: right;'>Cuts</td>
+						<td class='table-decorator'>--</td>
+						<td colspan style='text-align: right;'>Kerf Loss</td>
+						<td class='table-decorator'>--</td>
+						<td colspan style='text-align: right;'>Spare</td>
+					</tr>
+					<tbody id="tbody_cut_output_${profile}"></tbody>
+				</table>`
+			output_container.appendChild(div);
+
+			let select    = document.getElementById(`cut_option_select_${profile}`);
+			let old_val   = select.value;
+			select.innerHTML = '';
+			for (base in current_cut_options[profile]) {
+				let opt = document.createElement('option');
+				opt.innerHTML = base;
+				opt.value = base;
+				if (old_val == base) opt.selected = true;
+				select.appendChild(opt);
+			}
+			changeCutOption(profile);
+		}
+
+		
+
+		setError(0);
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
+	}
+
+	function changeCutOption(profile) {
+		let new_tbody = document.createElement("tbody");
+		let old_tbody = document.getElementById(`tbody_cut_output_${profile}`);
+		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
+		new_tbody.id = `tbody_cut_output_${profile}`;
+
+		let option_no = document.getElementById(`cut_option_select_${profile}`).value;
+		let cut_option = current_cut_options[profile][option_no];
+
+		const fractional   = UNIT_sys[0]=='f' ? true : false;
+		const places       = parseInt(UNIT_sys.substring(1))
+		const show_sign    = false;
+		const leading_zero = true;
+
+		for (cut of cut_option) {
+			let row = document.createElement("tr");
+
+			let cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.stock_length, places, show_sign, leading_zero, fractional);
+
+			cell = document.createElement("td");
+			cell.classList.add("table-decorator");
+			row.appendChild(cell);
+			setV(cell, "=");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+
+			for (piece of cut.pieces) {
+				let span = document.createElement("span");
+				span.classList.add("span-readout");
+				cell.appendChild(span);
+				setV(span, piece, places, show_sign, leading_zero, fractional);
+
+				span = document.createElement("span");
+				span.classList.add("span-readout");
+				span.textContent = ", ";
+				cell.appendChild(span);
+			}
+			if (cell.lastChild) 
+				cell.removeChild(cell.lastChild);
+
+			cell = document.createElement("td");
+			cell.classList.add("table-decorator");
+			row.appendChild(cell);
+			setV(cell, "--");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.saw_waste, places, show_sign, leading_zero, fractional);
+
+			cell = document.createElement("td");
+			cell.classList.add("table-decorator");
+			row.appendChild(cell);
+			setV(cell, "--");
+
+			cell = document.createElement("td");
+			cell.classList.add("td-readout");
+			row.appendChild(cell);
+			setV(cell, cut.remainder, places, show_sign, leading_zero, fractional);
+
+			new_tbody.appendChild(row);
+		}
+	}
+
+	function init() {
+		// hook for initialization
+		EC_onload();
+
+		UNIT_sys = 'd3';
+		
+		const b = '\u00a0';
+		makeInputTables({stock: [[b,b,b,b]], pieces: [[b,b,b,b]]})
+
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
+		}
+
+		//WALK_onload();
+
+		UNIT_change();
+		compute();
+	}
+</script>
+
+<html>
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-la" id='topbar_version'></div>
+		<div class="topbar-la" id='topbar_filename'></div>
+		<div class="topbar-la" id='topbar_unit'>
+			<!-- Required for unit library. You could also put this in the calculator main body -->
+			<select id="unit_select" onchange="UNIT_change(); compute();">
+				<option value='d0'>Wholes</option>
+				<option value='d2'>2-places</option>
+				<option value='d3' selected="selected">3-places</option>
+				<option value='d4'>4-places</option>
+				<option value='f8' >8ths</option>
+				<option value='f16' >16ths</option>
+				<option value='f32' >32nds</option>
+				<option value='f64' >64ths</option>
+			</select>
+		</div>
+		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Linear Stock Cut Orderer</div>
+		<div class="topbar-ra selectable" onclick="compute();" id="topbar_status"><span></span><span class='ttt'></span></div>
+		<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+		<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+		<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="float: left; display: table-cell;" class="container">
+	<div style="">
+		<div style="float: left;" class="odd">
+			<table id="table_piece_input" style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<th class="rowlabel bold" colspan="4" style="text-align: center;">Pieces</th>
+				</tr>
+				<tr>
+					<td>Note</td>
+					<td>Profile</td>
+					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
+					<td>Quantity</td>
+				</tr>
+				<tbody id="tbody_piece_input"></tbody>
+			</table>
+		</div>
+		<div style="float: left;" class="even">
+			<table style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<!--<th class="rowlabel bold" colspan="4" style="text-align: center;">Cut Settings</th>-->
+					<button onclick="compute();" style="width: 100%; text-align: center; font-weight: bold;">Cut!</button>
+				</tr>
+				<tr>
+					<td>Kerf Width</td>
+					<td><input id="kerf_width" value="1/8"/></td>
+				</tr>
+			</table>
+		</div>
+		<div style="float: left;" class="odd">
+			<table id="table_stock_input" style="word-wrap: unset; white-space: nowrap;">
+				<tr>
+					<th class="rowlabel bold" colspan="4" style="text-align: center;">Stock</th>
+				</tr>
+				<tr>
+					<td>Note</td>
+					<td>Profile</td>
+					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
+					<td>Quantity</td>
+				</tr>
+				<tbody id="tbody_stock_input"></tbody>
+			</table>
+		</div>
+	</div>
+	<div class="" id="output_container" style="width: 100%;"></div>
+</div>
+</body>
+</html>
