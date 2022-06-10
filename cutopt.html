@@ -35,12 +35,12 @@
 			send_order = []
 			for (line of recieved_order) {
 				piece_lg = part_manifest[id_a].length
-				if (need_to_place_part && line.remainder >= piece_lg+kerf_width) {
+				if (need_to_place_part && line.remainder > piece_lg) {
 					send_order.push({
 						stock_length: line.stock_length,
 						pieces: line.pieces.concat(piece_lg),
 						saw_waste: line.saw_waste + kerf_width,
-						remainder: line.remainder - piece_lg - kerf_width
+						remainder: max(line.remainder - piece_lg - kerf_width, 0)
 					})
 					need_to_place_part = false;
 				} else {
