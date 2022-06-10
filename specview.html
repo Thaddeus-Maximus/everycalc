@@ -27,7 +27,7 @@
 				+ MOTOR_specs[motor]["max_power"] + "</td><td>"
 				+ MOTOR_specs[motor]["stall_current"] + "</td><td>"
 				+ MOTOR_specs[motor]["free_current"].toFixed(2) + "</td>";
-			row.classList.add(i%2 ? 'oddrow' : 'evenrow');
+			row.classList.add(i%2 ? 'odd' : 'even');
 		}
 
 		table = document.getElementById("unit_data_table");
@@ -41,7 +41,7 @@
 					(firstone ? "<th class='rowlabel'>" + baseunit + "</th><td>" : "<td></td><td>") 
 					+ tounit + "</td><td>"
 					+ UNIT_CONVERSIONS[tounit] + "</td>";
-				row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+				row.classList.add(i%2 ? 'even' : 'odd');
 				firstone = false
 			}
 		}
@@ -57,7 +57,7 @@
 					(firstone ? "<th class='rowlabel'>" + BELT_MFRS[mfr] + "</th><td>" : "<td></td><td>") 
 					+ series + "</td><td>"
 					+ BELT_SIZES[mfr][series].join(', ') + "</td>";
-				row.classList.add(i%2 ? 'oddrow' : 'evenrow');
+				row.classList.add(i%2 ? 'even' : 'odd');
 				firstone = false
 			}
 		}
@@ -74,14 +74,12 @@
 			for (property of ["E", "Ef", "St", "Sf", "density"]) {
 				row.innerHTML += '<td>' + handleNaN((MATERIAL_DATA[matl][property]/convs[property]).toFixed(3)) + "</td>";
 			}
-			row.classList.add(i%2 ? 'evenrow' : 'oddrow');
+			row.classList.add(i%2 ? 'even' : 'odd');
 		}
 	}
 </script>
 
-
-
-<style>
+<!--<style>
 .oddrow {
 	background-color: #ddf;
 }
@@ -96,13 +94,24 @@ th {
 td {
 	text-align: right;
 }
-</style>
+</style>-->
 
 <html>
 <body onload="init()">
-<div style="float: left;" class="container">
-	<h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s Mechanism Calculator</h3>
-	<center><a href="./">Back To Index</a></center>
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Spec Viewer</div>
+		<a id="download_frame" hidden></a>
+	</div>	
+
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="float: left; display: table-cell;" class="container">
 
 	<div class="even">
 		<h3>Motor Specs</h3>
@@ -150,7 +159,7 @@ td {
 		<h3>Material Data</h3>
 
 		<center>
-			Generic materials do not have strength properties as they vary with alloy or heat treatment.
+			Some materials do not have strength properties as they vary with alloy or heat treatment.
 		<table id="material_data_table">
 			<tr>
 				<th class="collabel">Material</th>
