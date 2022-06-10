@@ -3,23 +3,46 @@
 <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
 <meta content="utf-8" http-equiv="encoding">
 
-<link rel="stylesheet" href="include/style.css"> 
+<link rel="stylesheet" href="include/style.css">
 
 <html>
-<body>
-<div style="float: center;" class="container">
-	<center><h3><a href="http://thaddeus-maximus.github.io">Thad</a>'s EveryCalc - Documentation</h3>
-	<a href="./">Back To Index</a><br/><br/>
+<!-- Make sure to call your init function on document load -->
+<!-- You can copy the topbar template here -->
+<body onload="init()">
+	<div id="topbar">
+		<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+		<div class="topbar-ctr" id="topbar_title" onclick="compute();">Documentation</div>
+		<a id="download_frame" hidden></a>
+	</div>	
 
-	<a href="./docs/generalmech.pdf">General Mechanism</a><br>
-	<a href="./docs/trajectories.pdf">Trajectories</a><br>
-	<a href="./docs/beltcalc.pdf">Belt Calculator</a><br>
-	<a href="./docs/adiabatic_cylinder_model.pdf">Adiabatic Cylinder</a><br>
-	<a href="./docs/rocker_pod_model.pdf">Rocker Pod</a><br>
-	<a href="./docs/beamcalc.pdf">Beam Tool</a><br>
-	<a href="./docs/pitchers.pdf">Pitchers</a><br>
-	<a href="./docs/transstrength.pdf">Transmission Strength</a><br>
-</center>
+	<svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
+		<path id="walkthrough_frame" ></path>
+		<text id="walkthrough_text" ></text>
+		<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+	</svg>
+
+<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
+<div style="float: center;	text-align: center;	margin: 0; margin-top: 28px;">
+	<table class="odd" style="width: 100%;">
+		<tr><td colspan="2" style="text-align: center;"><h3>Whitepapers</h3></td></tr>
+		<tr><td colspan="2">These whitepapers talk about the underlying models and algorithms for some of the tools in EveryCalc.</td></tr>
+		<tr><td style="text-align: right; width:50%;"><a href="./docs/generalmech.pdf">General Mechanism</a></td>
+			<td style="text-align: left;">Motor mechanics and numerical differential equations.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/trajectories.pdf">Trajectories</a></td>
+			<td style="text-align: left;">Kinematics, with some aerodynamics.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/beltcalc.pdf">Belt Calculator</a></td>
+			<td style="text-align: left;">Geometry.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/adiabatic_cylinder_model.pdf">Adiabatic Cylinder</a></td>
+			<td style="text-align: left;">Pneumatics, thermodynamics.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/rocker_pod_model.pdf">Rocker Pod</a></td>
+			<td style="text-align: left;">Statics and kinematics.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/beamcalc.pdf">Beam Tool</a></td>
+			<td style="text-align: left;">Finite-element analysis.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/pitchers.pdf">Pitchers</a></td>
+			<td style="text-align: left;">Friction, motor mechanics, kinematics, differential questions.</td></tr>
+		<tr><td style="text-align: right;"><a href="./docs/transstrength.pdf">Transmission Strength</a></td>
+			<td style="text-align: left;">Statics, mechanics of materials, machine component design.</td></tr>
+	</table>
 </div>
 </body>
 </html>
