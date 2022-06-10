@@ -60,7 +60,7 @@ function getV(id, default_value, pct_err_en) {
 	let v = "";
 
 	if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
-		v = element.innerText;
+		v = element.textContent;
 	} else {
 		v = element.value;
 	}
@@ -92,7 +92,7 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 	let unit = element.dataset.unit;
 	if (typeof value === 'string') {
 		if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
-			element.innerText = value;
+			element.textContent = value;
 		} else {
 			element.value = value;
 		}
@@ -118,7 +118,7 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 			let v = (whole ? (show_sign && value>0 ? "+":"") + (value>0 ? "":"-") + whole : "") + ' ' + (denominator > 0 ? denominator + "/" + places : '');
 
 			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
-				element.innerText = v;
+				element.textContent = v;
 			} else {
 				element.value = v;
 			}
@@ -133,7 +133,7 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 
 
 			if (['TD', 'SPAN', 'DIV'].includes(element.nodeName)) {
-				element.innerText = v;
+				element.textContent = v;
 			} else {
 				element.value = v;
 			}

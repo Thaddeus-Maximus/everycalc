@@ -187,6 +187,13 @@ function EXP_dumpPersistence() {
 			setLocalStorage(`inputs/${input.id}`, input.checked);
 		}
 	}
+	/*for (cell of document.getElementsByTagName('td')) {
+		if (cell.contentEditable == 'true') {
+			setLocalStorage(`inputs/${cell.id}`, cell.textContent);
+		}
+	}
+	// untested
+	*/
 	for (input of document.getElementsByTagName('select')) {
 		if (input.classList.contains("dynamic-input")) continue; // deal with dynamic inputs outside of here
 		

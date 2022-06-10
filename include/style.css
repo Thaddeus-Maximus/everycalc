@@ -331,6 +331,11 @@ th {
   text-align:  right;
 }
 
+.table-decorator {
+  font-family:  "Oxanium", "Courier New", monospace;
+  text-align:  center;
+}
+
 select, input {
   border: 1px solid #aaa;
   width: 90px;

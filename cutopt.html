@@ -10,7 +10,7 @@
 <script type="text/javascript" src="js/walkthrough.js"></script>
 
 <script type="text/javascript">
-	EXP_FN_BASE = 'fit_tol';
+	EXP_FN_BASE = 'cut_opt';
 	UNIT_MAP = {
 		'dimension': ['-', '-'] // ezpz
 	};
@@ -85,10 +85,10 @@
 		let stock_lgs = {}
 		let orders_by_profile = {}
 
-		let piece_manifest = {}
+		let part_manifest = {}
 		
 		for (part of parts){
-			piece_manifest[part.id] = {qty: part.qty, profile: part.profile, length: part.length}
+			part_manifest[part.id] = {qty: part.qty, profile: part.profile, length: part.length}
 			profiles.add(part.profile)
 			profiles_unaccounted.add(part.profile)
 			
@@ -121,31 +121,11 @@
 		orders = {}
 
 		for (profile of profiles.values()) {
-			orders[profile] = generateCutOrders(part_quantities[profile], piece_manifest, order_template[profile], kerf_width)
+			orders[profile] = generateCutOrders(part_quantities[profile], part_manifest, order_template[profile], kerf_width)
 		}
 
 		return orders;
 	}
-
-	/*function representNumber(num) {
-		if (num % 1 < .001)
-			return num.toFixed(0);
-		return num.toFixed(2);
-
-	}
-
-	function representOrder(order) {
-		reprs = [];
-		for (line of order) {
-			repr = representNumber(line.stock_length) + " = ";
-			for (piece of line.pieces) {
-				repr += representNumber(piece) + " + ";
-			}
-			repr += "(--" + representNumber(line.saw_waste) + ") + (" + representNumber(line.remainder) + ")";
-			reprs.push(repr);
-		}
-		return reprs.join('\n');
-	}*/
 
 	var current_cut_options = [];
 
@@ -185,8 +165,7 @@
 				cell.contentEditable = true;
 				cell.innerHTML = '&nbsp;';
 
-				cell.addEventListener('keydown', onKeyDown);
-				cell.addEventListener('keyup', onKeyUp);
+				registerHandlers(cell);
 
 				row.appendChild(cell);
 			}
@@ -194,9 +173,88 @@
 		}
 	}
 
+	function onFocus() {
+		var cell = this;
+		  // select all text in contenteditable
+		  // see http://stackoverflow.com/a/6150060/145346
+		  var range, selection;
+		  if (document.body.createTextRange) {
+		    range = document.body.createTextRange();
+		    range.moveToElementText(cell);
+		    range.select();
+		  } else if (window.getSelection) {
+		    selection = window.getSelection();
+		    range = document.createRange();
+		    range.selectNodeContents(cell);
+		    selection.removeAllRanges();
+		    selection.addRange(range);
+		  }
+	}
+
+	function registerHandlers(cell) {
+		cell.addEventListener('keydown', onKeyDown);
+		cell.addEventListener('keyup', onKeyUp);
+		cell.addEventListener('focus', onFocus);
+	}
+
+	function makeInputTables(arrays) {
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+		const tbodies = {pieces: tbody_piece_input, stock: tbody_stock_input}
+		for (key in tbodies) {
+			tbody = tbodies[key];
+
+			tbody.innerHTML = '';
+
+			for (row of arrays[key]) {
+				let tr = document.createElement('tr');
+				tbody.appendChild(tr);
+
+				for (let i=0; i<4; i++) {
+					let cell = document.createElement('td');
+					cell.classList.add('table-cell-input')
+					cell.contentEditable = true;
+					cell.textContent = row[i];
+					registerHandlers(cell);
+					tr.appendChild(cell);
+				}
+			}
+		}
+	}
+
+	function loadDynamicPersistence() {
+		let arrays = JSON.parse(getLocalStorage('cutopt'));
+
+		makeInputTables(arrays);
+	}
+
+	function dumpDynamicPersistence() {
+		let arrays = {pieces:[], stock:[]}; //, kerf_width: document.getElementById('kerf_width').value};
+
+		const tbody_piece_input = document.getElementById("tbody_piece_input");
+		const tbody_stock_input = document.getElementById("tbody_stock_input");
+		const tbodies = {pieces: tbody_piece_input, stock: tbody_stock_input}
+
+		for (key in tbodies) {
+			tbody = tbodies[key];
+
+			
+			arrays[key] = [];
+
+			for (row of tbody.children) {
+				cells = []
+				for (cell of row.children) {
+					cells.push(cell.textContent);
+				}
+				arrays[key].push(cells)
+			}
+			
+		}
+		setLocalStorage('cutopt', JSON.stringify(arrays));
+	}
+
 	function getTableText(cell) {
-		text = cell.innerText.replace(/<[^>]*>?/gm, '').trim();
-		//console.log("getTableText(", cell, ") = ", text);
+		text = cell.textContent.replace(/<[^>]*>?/gm, '').trim();
 		return text;
 	}
 
@@ -243,8 +301,6 @@
 		output_container = document.getElementById('output_container');
 		output_container.innerHTML = '';
 
-
-
 		// sort the options
 		// todo: this should probably get rolled together, too many nested functions
 		for (profile in current_cut_options) {
@@ -266,10 +322,11 @@
 			current_cut_options[profile].sort((a,b) => b.remainder-a.remainder);
 
 			div = document.createElement('div');
-			div.classList.add('container');
+			//div.classList.add('container');
 			div.classList.add('output');
+			div.style.width = '100%';
 			div.innerHTML = `
-				<table id="table_cut_output_${profile}" style="word-wrap: unset; white-space: nowrap;">
+				<table id="table_cut_output_${profile}" style="word-wrap: unset; white-space: nowrap; width: 100%;">
 					<tr>
 						<th class="rowlabel bold" colspan="7" style="text-align: left;">
 							${profile}
@@ -278,13 +335,13 @@
 						</th>
 					</tr>
 					<tr>
-						<td colspan>Stock Lg.</td>
-						<td>=</td>
-						<td colspan>Cuts</td>
-						<td>--</td>
-						<td colspan>Kerf Loss</td>
-						<td>--</td>
-						<td colspan>Spare</td>
+						<td colspan style='text-align: right;'>Stock Lg.</td>
+						<td class='table-decorator'>=</td>
+						<td colspan style='text-align: right;'>Cuts</td>
+						<td class='table-decorator'>--</td>
+						<td colspan style='text-align: right;'>Kerf Loss</td>
+						<td class='table-decorator'>--</td>
+						<td colspan style='text-align: right;'>Spare</td>
 					</tr>
 					<tbody id="tbody_cut_output_${profile}"></tbody>
 				</table>`
@@ -305,11 +362,12 @@
 
 		
 
-		setError(0);	
+		setError(0);
+		if (EXP_dumpPersistence())
+			dumpDynamicPersistence();
 	}
 
 	function changeCutOption(profile) {
-
 		let new_tbody = document.createElement("tbody");
 		let old_tbody = document.getElementById(`tbody_cut_output_${profile}`);
 		old_tbody.parentNode.replaceChild(new_tbody, old_tbody);
@@ -317,8 +375,6 @@
 
 		let option_no = document.getElementById(`cut_option_select_${profile}`).value;
 		let cut_option = current_cut_options[profile][option_no];
-
-
 
 		const fractional   = UNIT_sys[0]=='f' ? true : false;
 		const places       = parseInt(UNIT_sys.substring(1))
@@ -334,7 +390,7 @@
 			setV(cell, cut.stock_length, places, show_sign, leading_zero, fractional);
 
 			cell = document.createElement("td");
-			cell.classList.add("td-readout");
+			cell.classList.add("table-decorator");
 			row.appendChild(cell);
 			setV(cell, "=");
 
@@ -350,14 +406,14 @@
 
 				span = document.createElement("span");
 				span.classList.add("span-readout");
-				span.innerText = " + ";
+				span.textContent = ", ";
 				cell.appendChild(span);
 			}
 			if (cell.lastChild) 
 				cell.removeChild(cell.lastChild);
 
 			cell = document.createElement("td");
-			cell.classList.add("td-readout");
+			cell.classList.add("table-decorator");
 			row.appendChild(cell);
 			setV(cell, "--");
 
@@ -367,7 +423,7 @@
 			setV(cell, cut.saw_waste, places, show_sign, leading_zero, fractional);
 
 			cell = document.createElement("td");
-			cell.classList.add("td-readout");
+			cell.classList.add("table-decorator");
 			row.appendChild(cell);
 			setV(cell, "--");
 
@@ -375,16 +431,6 @@
 			cell.classList.add("td-readout");
 			row.appendChild(cell);
 			setV(cell, cut.remainder, places, show_sign, leading_zero, fractional);
-
-			/*row.innerHTML = `
-				<td class='td-readout'><span class="span-readout" id="$"></span></td>
-				<td>=</td>
-				<td class='td-readout' style='width: 250px'>${cuts}</td>
-				<td>--</td>
-				<td class='td-readout'>${kerfloss}</td>
-				<td>--</td>
-				<td class='td-readout'>${remainder}</td>
-			`;*/
 
 			new_tbody.appendChild(row);
 		}
@@ -394,19 +440,24 @@
 		// hook for initialization
 		EC_onload();
 
-		//EXP_onload();
+		UNIT_sys = 'd3';
+		
+		const b = '\u00a0';
+		makeInputTables({stock: [[b,b,b,b]], pieces: [[b,b,b,b]]})
 
-		for (inp of document.getElementsByTagName('TD')) {
-			if (inp.contentEditable == 'true') {
-				inp.addEventListener('keydown', onKeyDown);
-				inp.addEventListener('keyup', onKeyUp);
-
-			}
+		switch(EXP_onload()) {
+			case 0: // run when nothing loads
+				break;
+			case 1: // run when export loads
+				break;
+			case 2: // run when local storage loads
+				loadDynamicPersistence();
+				break;
 		}
 
-		document.getElementById('idContentEditable')
+		//WALK_onload();
+
 		UNIT_change();
-		//
 		compute();
 	}
 </script>
@@ -448,7 +499,7 @@
 
 <!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
 <div style="float: left; display: table-cell;" class="container">
-	<div style="" >
+	<div style="">
 		<div style="float: left;" class="odd">
 			<table id="table_piece_input" style="word-wrap: unset; white-space: nowrap;">
 				<tr>
@@ -460,29 +511,9 @@
 					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
 					<td>Quantity</td>
 				</tr>
-				<tbody id="tbody_piece_input">
-				<tr id='piece_0_row'>
-					<td contenteditable="true" class="table-cell-input" id="piece_name_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_profile_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_length_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_qty_0"></td>
-				</tr>
-				<tr id='piece_1_row'>
-					<td contenteditable="true" class="table-cell-input" id="piece_name_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_profile_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_length_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_qty_1"></td>
-				</tr>
-				<tr id='piece_2_row'>
-					<td contenteditable="true" class="table-cell-input" id="piece_name_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_profile_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_length_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="piece_qty_2"></td>
-				</tr>
-			</tbody>
+				<tbody id="tbody_piece_input"></tbody>
 			</table>
 		</div>
-
 		<div style="float: left;" class="even">
 			<table style="word-wrap: unset; white-space: nowrap;">
 				<tr>
@@ -495,7 +526,6 @@
 				</tr>
 			</table>
 		</div>
-
 		<div style="float: left;" class="odd">
 			<table id="table_stock_input" style="word-wrap: unset; white-space: nowrap;">
 				<tr>
@@ -507,32 +537,11 @@
 					<td>Length<!--<span class="unit" data-unit="dimension"></span>--></td>
 					<td>Quantity</td>
 				</tr>
-				<tbody id="tbody_stock_input">
-				<tr id='stock_3_row'>
-					<td contenteditable="true" class="table-cell-input" id="stock_name_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_profile_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_length_0"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_qty_0"></td>
-				</tr>
-				<tr id='stock_1_row'>
-					<td contenteditable="true" class="table-cell-input" id="stock_name_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_profile_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_length_1"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_qty_1"></td>
-				</tr>
-				<tr id='stock_2_row'>
-					<td contenteditable="true" class="table-cell-input" id="stock_name_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_profile_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_length_2"></td>
-					<td contenteditable="true" class="table-cell-input" id="stock_qty_2"></td>
-				</tr>
-			</tbody>
+				<tbody id="tbody_stock_input"></tbody>
 			</table>
 		</div>
-
-		
 	</div>
-	<div class="output" id="output_container"></div>
+	<div class="" id="output_container" style="width: 100%;"></div>
 </div>
 </body>
 </html>
