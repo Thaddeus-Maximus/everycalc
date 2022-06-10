@@ -40,7 +40,7 @@
 						stock_length: line.stock_length,
 						pieces: line.pieces.concat(piece_lg),
 						saw_waste: line.saw_waste + kerf_width,
-						remainder: max(line.remainder - piece_lg - kerf_width, 0)
+						remainder: Math.max(line.remainder - piece_lg - kerf_width, 0)
 					})
 					need_to_place_part = false;
 				} else {
