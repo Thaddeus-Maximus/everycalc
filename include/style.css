@@ -28,255 +28,70 @@ html,body{font-size:10pt;line-height:1.3}html{overflow-x:hidden}
 h1,h2,h3,h4,h5,h6{font-weight:400;margin:10px 0}.w3-wide{letter-spacing:4px}
 hr{border:0;border-top:1px solid #eee;margin:20px 0}
 
-/*
-@import url('https://fonts.googleapis.com/css?family=Noto+Sans&display=swap');
-@import url('https://fonts.googleapis.com/css?family=Arvo&display=swap');
-*/
-
 /* arvo-regular - latin */
 @font-face {
-  font-family: 'Arvo';
+  font-family: 'Lexend';
   font-style: normal;
   font-weight: 400;
-  src: url('./fonts/arvo-v20-latin-regular.eot'); /* IE9 Compat Modes */
   src: local(''),
-       url('./fonts/arvo-v20-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/arvo-v20-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/arvo-v20-latin-regular.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/arvo-v20-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/arvo-v20-latin-regular.svg#Arvo') format('svg'); /* Legacy iOS */
+       url('./fonts/Lexend-Regular.woff2') format('woff2');
 }
 
-/* arvo-italic - latin */
 @font-face {
-  font-family: 'Arvo';
-  font-style: italic;
-  font-weight: 400;
-  src: url('./fonts/arvo-v20-latin-italic.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/arvo-v20-latin-italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/arvo-v20-latin-italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/arvo-v20-latin-italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/arvo-v20-latin-italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/arvo-v20-latin-italic.svg#Arvo') format('svg'); /* Legacy iOS */
-}
-
-/* arvo-700 - latin */
-@font-face {
-  font-family: 'Arvo';
-  font-style: normal;
+  font-family: 'Lexend';
+  font-style: bold;
   font-weight: 700;
-  src: url('./fonts/arvo-v20-latin-700.eot'); /* IE9 Compat Modes */
   src: local(''),
-       url('./fonts/arvo-v20-latin-700.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/arvo-v20-latin-700.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/arvo-v20-latin-700.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/arvo-v20-latin-700.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/arvo-v20-latin-700.svg#Arvo') format('svg'); /* Legacy iOS */
+       url('./fonts/Lexend-Bold.woff2') format('woff2');
+
 }
 
-/* arvo-700italic - latin */
 @font-face {
-  font-family: 'Arvo';
-  font-style: italic;
+  font-family: 'Thadscript';
+  font-style: bold;
   font-weight: 700;
-  src: url('./fonts/arvo-v20-latin-700italic.eot'); /* IE9 Compat Modes */
   src: local(''),
-       url('./fonts/arvo-v20-latin-700italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/arvo-v20-latin-700italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/arvo-v20-latin-700italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/arvo-v20-latin-700italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/arvo-v20-latin-700italic.svg#Arvo') format('svg'); /* Legacy iOS */
-}
+       url('./fonts/Thadscript-Regular.woff2') format('woff2');
 
-/* noto-serif-regular - latin */
-@font-face {
-  font-family: 'Noto Serif';
-  font-style: normal;
-  font-weight: 400;
-  src: url('./fonts/noto-serif-v21-latin-regular.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/noto-serif-v21-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/noto-serif-v21-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-regular.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/noto-serif-v21-latin-regular.svg#NotoSerif') format('svg'); /* Legacy iOS */
 }
-
-/* noto-serif-italic - latin */
-@font-face {
-  font-family: 'Noto Serif';
-  font-style: italic;
-  font-weight: 400;
-  src: url('./fonts/noto-serif-v21-latin-italic.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/noto-serif-v21-latin-italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/noto-serif-v21-latin-italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/noto-serif-v21-latin-italic.svg#NotoSerif') format('svg'); /* Legacy iOS */
-}
-
-/* noto-serif-700 - latin */
-@font-face {
-  font-family: 'Noto Serif';
-  font-style: normal;
-  font-weight: 700;
-  src: url('./fonts/noto-serif-v21-latin-700.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/noto-serif-v21-latin-700.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/noto-serif-v21-latin-700.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-700.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-700.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/noto-serif-v21-latin-700.svg#NotoSerif') format('svg'); /* Legacy iOS */
-}
-
-/* noto-serif-700italic - latin */
-@font-face {
-  font-family: 'Noto Serif';
-  font-style: italic;
-  font-weight: 700;
-  src: url('./fonts/noto-serif-v21-latin-700italic.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/noto-serif-v21-latin-700italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/noto-serif-v21-latin-700italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-700italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/noto-serif-v21-latin-700italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/noto-serif-v21-latin-700italic.svg#NotoSerif') format('svg'); /* Legacy iOS */
-}
-
-/* pt-serif-regular - latin */
-@font-face {
-  font-family: 'PT Serif';
-  font-style: normal;
-  font-weight: 400;
-  src: url('./fonts/pt-serif-v17-latin-regular.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/pt-serif-v17-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/pt-serif-v17-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-regular.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/pt-serif-v17-latin-regular.svg#PTSerif') format('svg'); /* Legacy iOS */
-}
-
-/* pt-serif-italic - latin */
-@font-face {
-  font-family: 'PT Serif';
-  font-style: italic;
-  font-weight: 400;
-  src: url('./fonts/pt-serif-v17-latin-italic.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/pt-serif-v17-latin-italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/pt-serif-v17-latin-italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/pt-serif-v17-latin-italic.svg#PTSerif') format('svg'); /* Legacy iOS */
-}
-
-/* pt-serif-700 - latin */
-@font-face {
-  font-family: 'PT Serif';
-  font-style: normal;
-  font-weight: 700;
-  src: url('./fonts/pt-serif-v17-latin-700.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/pt-serif-v17-latin-700.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/pt-serif-v17-latin-700.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-700.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-700.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/pt-serif-v17-latin-700.svg#PTSerif') format('svg'); /* Legacy iOS */
-}
-
-/* pt-serif-700italic - latin */
-@font-face {
-  font-family: 'PT Serif';
-  font-style: italic;
-  font-weight: 700;
-  src: url('./fonts/pt-serif-v17-latin-700italic.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/pt-serif-v17-latin-700italic.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/pt-serif-v17-latin-700italic.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-700italic.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/pt-serif-v17-latin-700italic.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/pt-serif-v17-latin-700italic.svg#PTSerif') format('svg'); /* Legacy iOS */
-}
-
-/* oxanium-regular - latin */
-@font-face {
-  font-family: 'Oxanium';
-  font-style: normal;
-  font-weight: 400;
-  src: url('./fonts/oxanium-v13-latin-regular.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/oxanium-v13-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/oxanium-v13-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/oxanium-v13-latin-regular.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/oxanium-v13-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/oxanium-v13-latin-regular.svg#Oxanium') format('svg'); /* Legacy iOS */
-}
-
-/* oxanium-500 - latin */
-@font-face {
-  font-family: 'Oxanium';
-  font-style: normal;
-  font-weight: 500;
-  src: url('./fonts/oxanium-v13-latin-500.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/oxanium-v13-latin-500.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/oxanium-v13-latin-500.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/oxanium-v13-latin-500.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/oxanium-v13-latin-500.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/oxanium-v13-latin-500.svg#Oxanium') format('svg'); /* Legacy iOS */
-}
-
-/* oxanium-300 - latin */
-@font-face {
-  font-family: 'Oxanium';
-  font-style: normal;
-  font-weight: 300;
-  src: url('./fonts/oxanium-v13-latin-300.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/oxanium-v13-latin-300.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/oxanium-v13-latin-300.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/oxanium-v13-latin-300.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/oxanium-v13-latin-300.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/oxanium-v13-latin-300.svg#Oxanium') format('svg'); /* Legacy iOS */
-}
-
-/* oxanium-700 - latin */
-@font-face {
-  font-family: 'Oxanium';
-  font-style: normal;
-  font-weight: 700;
-  src: url('./fonts/oxanium-v13-latin-700.eot'); /* IE9 Compat Modes */
-  src: local(''),
-       url('./fonts/oxanium-v13-latin-700.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
-       url('./fonts/oxanium-v13-latin-700.woff2') format('woff2'), /* Super Modern Browsers */
-       url('./fonts/oxanium-v13-latin-700.woff') format('woff'), /* Modern Browsers */
-       url('./fonts/oxanium-v13-latin-700.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('./fonts/oxanium-v13-latin-700.svg#Oxanium') format('svg'); /* Legacy iOS */
-}
-
 
 * {
-  font-family: "Arvo", "Segoe UI", sans-serif;
+  font-family: "Lexend", "Segoe UI", sans-serif;
 }
 
 html {
-  background-color: #fff5d5;
+/*  background-color: #fff5d5;*/
+    background:
+        linear-gradient(-90deg, rgba(0,0,0,.05) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), 
+        linear-gradient(-90deg, rgba(0, 0, 0, .04) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px),
+        /*linear-gradient(transparent 3px, #f2f2f2 3px, #f2f2f2 78px, transparent 78px),
+        linear-gradient(-90deg, #aaa 1px, transparent 1px),
+        linear-gradient(-90deg, transparent 3px, #f2f2f2 3px, #f2f2f2 78px, transparent 78px),
+        linear-gradient(#aaa 1px, transparent 1px),*/
+        #fafafa;
+    background-size:
+        10px 10px,
+        10px 10px,
+        80px 80px,
+        80px 80px/*,
+        80px 80px,
+        80px 80px,
+        80px 80px,
+        80px 80px*/;
+
 }
 
-input {
-  font-family: "Oxanium", "Courier New", monospace;
+input, .span-readout, .td-readout{
+  font-family: "Lexend", "Courier New", monospace;
 }
 
 .td-readout {
-  font-family: "Oxanium", "Courier New", monospace;
   text-align:  right;
 }
 
 .span-readout {
-  font-family: "Oxanium", "Courier New", monospace;
   text-align:  right;
 }
 
@@ -308,20 +123,20 @@ th {
 .odd {
 	margin: none;
 	padding: none;
-	background-color: #ffe6c2;
+	background-color: #e0e0e0a0;
 }
 .even {
 	margin: none;
 	padding: none;
-	background-color: #fae2bd;
+	background-color: #d0d0d0a0;
 }
 .output {
 	margin: none;
 	padding: none;
-	background-color: #c7e09a;
+	background-color: #fff;
 }
 .output-plot {
-  background-color: #c7e09a;
+  background-color: #fff;
 }
 
 .table-cell-input, .span-input {
@@ -430,7 +245,7 @@ button {
 }
 
 .plot-background {
-  fill: #e5f0e0;
+  fill: #ffffff;
 }
 
 .plot-axis {
@@ -554,7 +369,7 @@ input[type=checkbox].dropdown {
 label.dropdown {
   box-sizing: border-box;
   display: inline-block;
-  background-color: #eec;
+  background-color: #eee;
   cursor: pointer;
   text-align: center;
   padding: 2px;
