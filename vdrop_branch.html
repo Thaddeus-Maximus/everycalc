@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<link rel="stylesheet" href="include/style.css">
+
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+
+<script id="EXP_inputs_frame"></script>
+
+<script type="text/javascript">
+EXP_FN_BASE = 'vdrop_branch';
+
+// Copper Ω/m at 20°C (same data as vdrop.html)
+const AWG_TABLE = [
+	['30', '30 AWG', 0.33864], ['28', '28 AWG', 0.21296], ['26', '26 AWG', 0.13385],
+	['24', '24 AWG', 0.08421], ['22', '22 AWG', 0.05294], ['20', '20 AWG', 0.03331],
+	['18', '18 AWG', 0.02095], ['16', '16 AWG', 0.01317], ['14', '14 AWG', 0.008286],
+	['12', '12 AWG', 0.005211], ['10', '10 AWG', 0.003277], ['8',  '8 AWG',  0.002061],
+	['6',  '6 AWG',  0.001296], ['4',  '4 AWG',  0.0008152], ['2', '2 AWG',  0.0005127],
+	['1',  '1 AWG',  0.0004066], ['0', '1/0 AWG', 0.0003224], ['-1', '2/0 AWG', 0.0002557],
+	['-2', '3/0 AWG', 0.0002028], ['-3', '4/0 AWG', 0.0001608],
+];
+// [key, label, ρ factor vs Cu, α /°C]
+const MAT_TABLE = [
+	['cu', 'Copper',   1.000, 0.00393], ['al', 'Aluminum', 1.640, 0.00429],
+	['ag', 'Silver',   0.924, 0.00380], ['au', 'Gold',     1.419, 0.00340],
+	['ni', 'Nickel',   4.064, 0.00600],
+];
+
+// ─── Tree model ───────────────────────────────────────────────────────────────
+let _nextId = 0;
+
+function mkWire(gauge='14', length=10, unit='ft', material='cu') {
+	return { id: _nextId++, type:'wire', gauge, length, unit, material, children:[] };
+}
+function mkLoad(current=10) {
+	return { id: _nextId++, type:'load', current };
+}
+
+function findNode(root, id) {
+	if (root.id === id) return root;
+	for (let c of (root.children||[])) { let r = findNode(c, id); if (r) return r; }
+	return null;
+}
+function findParent(root, id) {
+	for (let c of (root.children||[])) {
+		if (c.id === id) return root;
+		let r = findParent(c, id); if (r) return r;
+	}
+	return null;
+}
+function maxId(node) {
+	let m = node.id;
+	for (let c of (node.children||[])) m = Math.max(m, maxId(c));
+	return m;
+}
+
+// ─── Tree mutations (trigger full re-render) ──────────────────────────────────
+function tAddLoad(parentId) {
+	let p = findNode(_tree, parentId);
+	if (p && p.type === 'wire') { p.children.push(mkLoad(10)); rerender(); }
+}
+function tAddWire(parentId) {
+	let p = findNode(_tree, parentId);
+	if (p && p.type === 'wire') {
+		let defUnit = document.getElementById('g_unit').value;
+		p.children.push(mkWire('14', 5, defUnit, p.material));
+		rerender();
+	}
+}
+function tRemove(nodeId) {
+	let p = findParent(_tree, nodeId);
+	if (p) { p.children = p.children.filter(c => c.id !== nodeId); rerender(); }
+}
+
+// ─── Value updates (no re-render, just recompute) ────────────────────────────
+function tUpdate(nodeId, field, rawVal) {
+	let node = findNode(_tree, nodeId);
+	if (!node) return;
+	node[field] = (field === 'length' || field === 'current') ? (parseFloat(rawVal)||0) : rawVal;
+	compute();
+	persist();
+}
+
+// ─── Computation ──────────────────────────────────────────────────────────────
+function autoScale(val, base) {
+	let a = Math.abs(val);
+	if (a === 0) return ['0.00', base];
+	let [pfx, sc] = a < 1e-6 ? ['n',1e9] : a < 1e-3 ? ['μ',1e6] : a < 1 ? ['m',1e3] : ['',1];
+	let s = val * sc;
+	let dp = Math.max(2, Math.ceil(3 - Math.log10(Math.abs(s)||1)));
+	return [s.toFixed(dp), pfx + base];
+}
+
+function subtreeCurrent(node) {
+	if (node.type === 'load') return Math.max(0, parseFloat(node.current)||0);
+	return (node.children||[]).reduce((s,c) => s + subtreeCurrent(c), 0);
+}
+
+function wireR(node) {
+	let arow = AWG_TABLE.find(r => r[0] === node.gauge);
+	let mrow = MAT_TABLE.find(r => r[0] === node.material);
+	if (!arow || !mrow) return NaN;
+	let T  = parseFloat(document.getElementById('g_temp').value) || 20;
+	let Tf = 1 + mrow[3] * (T - 20);
+	let Lm = node.unit === 'ft' ? (parseFloat(node.length)||0) * 0.3048 : (parseFloat(node.length)||0);
+	return arow[2] * mrow[2] * Tf * Lm;
+}
+
+function computeNode(node, Vin) {
+	if (node.type !== 'wire') return;
+	let I     = subtreeCurrent(node);
+	let R     = wireR(node);
+	let Vdrop = I * R;
+	let Vend  = isNaN(Vin) ? NaN : Vin - Vdrop;
+	node._res = { I, R, Vdrop, Vend, ok: !isNaN(R) };
+	let nextV = isNaN(Vend) ? NaN : Vend;
+	for (let c of node.children) computeNode(c, nextV);
+}
+
+function compute() {
+	try {
+		let Vs = parseFloat(document.getElementById('g_vsrc').value);
+		computeNode(_tree, Vs);
+		refreshResults(_tree);
+		setError(0);
+	} catch(err) {
+		console.log(err);
+		setError(2, err);
+	}
+}
+
+function refreshResults(node) {
+	if (node.type !== 'wire') return;
+	let el = document.getElementById('res_' + node.id);
+	if (el) {
+		let r = node._res;
+		if (!r || !r.ok) { el.textContent = 'invalid input'; return; }
+		let [Rv,Ru] = autoScale(r.R,     'Ω');
+		let [Dv,Du] = autoScale(r.Vdrop, 'V');
+		let html = `<span class="rtag">I</span>${r.I.toFixed(2)}\u202FA &thinsp;`
+		         + `<span class="rtag">R</span>${Rv}\u202F${Ru} &thinsp;`
+		         + `<span class="rtag">ΔV</span>${Dv}\u202F${Du}`;
+		if (!isNaN(r.Vend)) {
+			let [Ev,Eu] = autoScale(r.Vend, 'V');
+			let pct = (r.Vdrop / (parseFloat(document.getElementById('g_vsrc').value)||NaN) * 100);
+			html += ` &thinsp;<span class="rtag v-tag">V</span>${Ev}\u202F${Eu}`;
+			if (!isNaN(pct)) html += ` &thinsp;<span class="rtag p-tag">${pct.toFixed(1)}%&thinsp;drop</span>`;
+		}
+		el.innerHTML = html;
+	}
+	for (let c of node.children) refreshResults(c);
+}
+
+// ─── HTML generation ──────────────────────────────────────────────────────────
+const DEPTH_COLORS = ['#1565C0','#C62828','#2E7D32','#E65100','#6A1B9A','#00695C'];
+
+function awgOpts(sel) {
+	return AWG_TABLE.map(([k,l]) => `<option value="${k}"${k===String(sel)?' selected':''}>${l}</option>`).join('');
+}
+function matOpts(sel) {
+	return MAT_TABLE.map(([k,l]) => `<option value="${k}"${k===sel?' selected':''}>${l}</option>`).join('');
+}
+function unitOpts(sel) {
+	return ['ft','m'].map(u => `<option value="${u}"${u===sel?' selected':''}>${u}</option>`).join('');
+}
+
+function renderNode(node, depth, isRoot) {
+	let col = DEPTH_COLORS[depth % DEPTH_COLORS.length];
+	let ml  = depth * 28;
+
+	if (node.type === 'wire') {
+		let kids = (node.children||[]).map(c => renderNode(c, depth+1, false)).join('');
+		return `<div class="vb-wire" id="vbn_${node.id}" style="border-left:3px solid ${col}; margin-left:${ml}px">
+  <div class="vb-row">
+    <span class="vb-lbl" style="color:${col}; border-color:${col}">Wire</span>
+    <select class="vb-sel-awg" onchange="tUpdate(${node.id},'gauge',this.value)">${awgOpts(node.gauge)}</select>
+    <input class="vb-inp-len" type="number" value="${node.length}" min="0" step="any"
+      oninput="tUpdate(${node.id},'length',this.value)">
+    <select class="vb-sel-unit" onchange="tUpdate(${node.id},'unit',this.value)">${unitOpts(node.unit)}</select>
+    <select class="vb-sel-mat" onchange="tUpdate(${node.id},'material',this.value)">${matOpts(node.material)}</select>
+    <span class="vb-result" id="res_${node.id}"></span>
+    <span class="vb-btns">
+      <button onclick="tAddLoad(${node.id})" title="Add a current draw at the end of this wire">+ Load</button>
+      <button onclick="tAddWire(${node.id})" title="Add a branching sub-wire from the end of this wire">+ Wire</button>
+      ${!isRoot ? `<button class="vb-del" onclick="tRemove(${node.id})" title="Remove this wire and all its children">✕</button>` : ''}
+    </span>
+  </div>
+  <div class="vb-children">${kids}</div>
+</div>`;
+	} else { // load
+		return `<div class="vb-load" id="vbn_${node.id}" style="border-left:3px solid ${col}; margin-left:${ml+28}px">
+  <span class="vb-lbl vb-lbl-load" style="border-color:${col}">Load</span>
+  <input class="vb-inp-cur" type="number" value="${node.current}" min="0" step="any"
+    oninput="tUpdate(${node.id},'current',this.value)">
+  <span class="vb-unit-txt">A</span>
+  <button class="vb-del" onclick="tRemove(${node.id})" title="Remove this load">✕</button>
+</div>`;
+	}
+}
+
+function rerender() {
+	document.getElementById('tree_container').innerHTML = renderNode(_tree, 0, true);
+	compute();
+	persist();
+}
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+function persist() {
+	// Strip computed _res fields before serializing
+	function strip(n) {
+		let { _res, ...clean } = n;
+		return { ...clean, children: (n.children||[]).map(strip) };
+	}
+	document.getElementById('tree_json').value = JSON.stringify({ tree: strip(_tree), nextId: _nextId });
+	EXP_dumpPersistence();
+}
+
+function tryRestoreTree() {
+	let raw = document.getElementById('tree_json').value;
+	if (!raw) return false;
+	try {
+		let p = JSON.parse(raw);
+		_tree   = p.tree;
+		_nextId = p.nextId !== undefined ? p.nextId : (maxId(p.tree) + 1);
+		return true;
+	} catch(e) { return false; }
+}
+
+function buildDefault() {
+	_nextId = 0;
+	_tree = mkWire('2', 10, 'ft', 'cu');
+	let load1 = mkLoad(10);
+	let sub   = mkWire('18', 5, 'ft', 'cu');
+	sub.children.push(mkLoad(5));
+	_tree.children.push(load1, sub);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+let _tree;
+
+function init() {
+	EC_onload();
+	buildDefault();
+
+	// Restore persisted state (sets tree_json.value before we read it)
+	let loadResult = EXP_onload();
+	if (loadResult === 1 || loadResult === 2) tryRestoreTree();
+
+	rerender();
+}
+</script>
+
+<style>
+/* ── Tree node layout ── */
+.vb-wire {
+	margin-top: 3px;
+	padding-left: 6px;
+}
+.vb-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 3px;
+	padding: 3px 4px;
+	background: #f0f2f5;
+	border-radius: 2px;
+}
+.vb-load {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: 2px;
+	padding: 2px 6px 2px 6px;
+	background: #f8f8f8;
+	border-radius: 2px;
+}
+.vb-children {
+	/* vertical connector line down the left side of this wire's children */
+	border-left: 1px dashed #ccc;
+	margin-left: 10px;
+	padding-left: 0;
+}
+
+/* ── Labels ── */
+.vb-lbl {
+	font-size: 0.8em;
+	font-weight: bold;
+	padding: 1px 5px;
+	border-radius: 3px;
+	border: 1.5px solid;
+	min-width: 34px;
+	text-align: center;
+	flex-shrink: 0;
+}
+.vb-lbl-load {
+	color: #888 !important;
+	border-color: #bbb !important;
+}
+
+/* ── Form controls inside tree ── */
+.vb-sel-awg  { width: 88px; }
+.vb-sel-unit { width: 44px; }
+.vb-sel-mat  { width: 94px; }
+.vb-inp-len  { width: 58px; }
+.vb-inp-cur  { width: 66px; }
+.vb-unit-txt { font-size: 0.88em; color: #555; }
+
+/* ── Result tags ── */
+.vb-result {
+	flex: 1;
+	min-width: 200px;
+	font-size: 0.85em;
+	font-family: "Oxanium", "Courier New", monospace;
+	color: #333;
+	white-space: nowrap;
+}
+.rtag {
+	display: inline-block;
+	font-size: 0.78em;
+	font-weight: bold;
+	padding: 1px 3px;
+	border-radius: 2px;
+	background: #d8dde2;
+	color: #445;
+	margin-right: 1px;
+}
+.v-tag { background: #c8e6c9; color: #1b5e20; }
+.p-tag { background: #ffe0b2; color: #bf360c; font-weight: normal; }
+
+/* ── Action buttons ── */
+.vb-btns {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+.vb-del {
+	color: #b00;
+	font-weight: bold;
+	border-color: #faa;
+}
+
+/* ── Settings bar ── */
+.vb-settings {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 6px 10px;
+	background: #e4e8eb;
+	border-bottom: 1px solid #c0c8cc;
+	font-size: 0.9em;
+}
+.vb-settings input { width: 72px; }
+.vb-settings select { width: 52px; }
+.vb-settings label { display: flex; align-items: center; gap: 4px; }
+.vb-sep { color: #aaa; user-select: none; }
+
+/* ── Tree container ── */
+#tree_container { padding: 8px; }
+
+/* ── Full-width container override ── */
+.vb-container {
+	float: left;
+	width: calc(100vw - 20px);
+	margin-top: 28px;
+}
+</style>
+
+<html>
+<body onload="init()">
+<div id="topbar">
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-ctr" id="topbar_title">Wire Voltage Drop — Branch</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
+</div>
+
+<div class="vb-container">
+
+	<!-- Global settings bar -->
+	<div class="vb-settings">
+		<a href="vdrop" class="selectable" style="font-size:0.9em; font-weight:bold;">← Simple</a>
+		<span class="vb-sep">|</span>
+		<label>Source Voltage
+			<input id="g_vsrc" placeholder="(optional)" oninput="compute(); persist();">
+			<span class="vb-unit-txt">V</span>
+		</label>
+		<label>Temperature
+			<input id="g_temp" placeholder="20" oninput="compute(); persist();">
+			<span class="vb-unit-txt">°C</span>
+		</label>
+		<label>New wire unit
+			<select id="g_unit">
+				<option value="ft">ft</option>
+				<option value="m">m</option>
+			</select>
+		</label>
+		<span class="vb-sep">|</span>
+		<button onclick="buildDefault(); rerender();" title="Reset tree to the default example">Reset</button>
+	</div>
+
+	<!-- Rendered tree -->
+	<div id="tree_container"></div>
+
+	<!-- Hidden input that carries tree JSON through persistence/export -->
+	<input type="text" id="tree_json" style="display:none">
+
+</div>
+</body>
+</html>
