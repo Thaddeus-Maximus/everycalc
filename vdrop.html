@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<link rel="stylesheet" href="include/style.css">
+
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame"></script>
+
+<script type="text/javascript">
+EXP_FN_BASE = 'vdrop';
+
+// Copper resistance per meter at 20°C (Ω/m), from standard AWG tables.
+// Derived from: d = 0.127 × 92^((36-n)/39) mm, R/L = ρ_Cu / (π/4 × d²)
+// For n/0 gauges: 1/0→n=0, 2/0→n=-1, 3/0→n=-2, 4/0→n=-3
+const AWG_TABLE = [
+	// [key,  label,       copper Ω/m at 20°C]
+	['30',  '30 AWG',    0.33864],
+	['28',  '28 AWG',    0.21296],
+	['26',  '26 AWG',    0.13385],
+	['24',  '24 AWG',    0.08421],
+	['22',  '22 AWG',    0.05294],
+	['20',  '20 AWG',    0.03331],
+	['18',  '18 AWG',    0.02095],
+	['16',  '16 AWG',    0.01317],
+	['14',  '14 AWG',    0.008286],
+	['12',  '12 AWG',    0.005211],
+	['10',  '10 AWG',    0.003277],
+	['8',   '8 AWG',     0.002061],
+	['6',   '6 AWG',     0.001296],
+	['4',   '4 AWG',     0.0008152],
+	['2',   '2 AWG',     0.0005127],
+	['1',   '1 AWG',     0.0004066],
+	['0',   '1/0 AWG',   0.0003224],
+	['-1',  '2/0 AWG',   0.0002557],
+	['-2',  '3/0 AWG',   0.0002028],
+	['-3',  '4/0 AWG',   0.0001608],
+];
+
+// Material resistivity factor relative to copper at 20°C,
+// and temperature coefficient α (per °C) for R(T) = R(20°C)×(1+α×(T−20))
+const MAT_TABLE = [
+	// [key,  label,       ρ factor vs Cu,  α /°C]
+	['cu',  'Copper',     1.000,  0.00393],
+	['al',  'Aluminum',   1.640,  0.00429],
+	['ag',  'Silver',     0.924,  0.00380],
+	['au',  'Gold',       1.419,  0.00340],
+	['ni',  'Nickel',     4.064,  0.00600],
+];
+
+function init() {
+	EC_onload();
+
+	// Populate selects before restoring persistence
+	let awgSel = document.getElementById('awg');
+	for (let [key, label] of AWG_TABLE)
+		awgSel.innerHTML += `<option value="${key}">${label}</option>`;
+	awgSel.value = '14';
+
+	let matSel = document.getElementById('material');
+	for (let [key, label] of MAT_TABLE)
+		matSel.innerHTML += `<option value="${key}">${label}</option>`;
+
+	EXP_onload();
+
+	EC_setOnInput(function(e) { setError(1); compute(); });
+	EC_setOnKeyUp(function(e) { if ((e.keyCode||e.which) == 13) compute(); });
+
+	compute();
+}
+
+// Format a value with SI prefix scaling. Returns [display_string, unit_string].
+function autoScale(val, base_unit) {
+	let abs = Math.abs(val);
+	let prefix, scale;
+	if      (abs < 1e-6) { prefix = 'n'; scale = 1e9; }
+	else if (abs < 1e-3) { prefix = 'μ'; scale = 1e6; }
+	else if (abs < 1)    { prefix = 'm'; scale = 1e3; }
+	else                 { prefix = '';  scale = 1;   }
+	let scaled = val * scale;
+	let places = Math.max(2, Math.ceil(3 - Math.log10(Math.abs(scaled) || 1)));
+	return [scaled.toFixed(places), prefix + base_unit];
+}
+
+function compute() {
+	try {
+		// --- Wire length ---
+		let L_raw = parseFloat(document.getElementById('length').value);
+		if (isNaN(L_raw) || L_raw <= 0) throw 'Enter a positive wire length.';
+
+		let length_unit = document.getElementById('length_unit').value;
+		let L_m = (length_unit === 'ft') ? L_raw * 0.3048 : L_raw;
+
+		// One-way entry means we double for the round-trip circuit
+		if (document.getElementById('lm_oneway').checked) L_m *= 2;
+
+		// --- AWG lookup ---
+		let awg_key = document.getElementById('awg').value;
+		let awg_row = AWG_TABLE.find(r => r[0] === awg_key);
+		let r_cu_20 = awg_row[2]; // copper Ω/m at 20°C
+
+		// --- Material factors ---
+		let mat_key = document.getElementById('material').value;
+		let mat_row = MAT_TABLE.find(r => r[0] === mat_key);
+		let [,, mat_factor, mat_alpha] = mat_row;
+
+		// --- Temperature correction ---
+		let T_str = document.getElementById('temperature').value.trim();
+		let T = (T_str === '') ? 20 : parseFloat(T_str);
+		if (isNaN(T)) throw 'Enter a valid temperature, or leave blank for 20 °C.';
+		let T_factor = 1 + mat_alpha * (T - 20);
+
+		// --- Resistance ---
+		let R = r_cu_20 * mat_factor * T_factor * L_m;
+
+		// --- Current ---
+		let I = parseFloat(document.getElementById('current').value);
+		if (isNaN(I) || I < 0) throw 'Enter a non-negative current.';
+
+		// --- Voltage drop ---
+		let V_drop = I * R;
+
+		// --- Display outputs ---
+		let [R_val, R_unit] = autoScale(R, 'Ω');
+		document.getElementById('out_resistance').value = R_val;
+		document.getElementById('unit_resistance').textContent = '[' + R_unit + ']';
+
+		let [Vd_val, Vd_unit] = autoScale(V_drop, 'V');
+		document.getElementById('out_vdrop').value = Vd_val;
+		document.getElementById('unit_vdrop').textContent = '[' + Vd_unit + ']';
+
+		// --- Optional: source voltage dependent outputs ---
+		let vs_str = document.getElementById('vsource').value.trim();
+		let V_s = (vs_str === '') ? NaN : parseFloat(vs_str);
+		let has_vsource = (!isNaN(V_s) && V_s > 0);
+
+		if (has_vsource) {
+			let V_final    = V_s - V_drop;
+			let pct_drop   = (V_drop / V_s) * 100;
+			let efficiency = (V_final / V_s) * 100;
+
+			let [Vf_val, Vf_unit] = autoScale(V_final, 'V');
+			document.getElementById('out_vfinal').value = Vf_val;
+			document.getElementById('unit_vfinal').textContent = '[' + Vf_unit + ']';
+			document.getElementById('out_pctdrop').value   = pct_drop.toFixed(2);
+			document.getElementById('out_efficiency').value = efficiency.toFixed(2);
+		} else {
+			for (let id of ['out_vfinal', 'out_pctdrop', 'out_efficiency'])
+				document.getElementById(id).value = '—';
+			document.getElementById('unit_vfinal').textContent = '[V]';
+		}
+
+		setError(0);
+		EXP_dumpPersistence();
+	} catch(err) {
+		console.log(err);
+		setError(2, err);
+	}
+}
+</script>
+
+<style>
+input.wide {
+	width: 100px;
+}
+select.unit-sel {
+	width: 50px;
+}
+.section-header td {
+	font-weight: bold;
+	background: #c8d0d4;
+	text-align: center;
+	padding: 4px 8px;
+}
+.optional-note {
+	color: #888;
+	font-size: 0.85em;
+	font-style: italic;
+}
+td.pad-top {
+	padding-top: 10px;
+}
+</style>
+
+<html>
+<body onload="init()">
+<div id="topbar">
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id='topbar_version'></div>
+	<div class="topbar-la" id='topbar_filename'></div>
+	<div class="topbar-ctr" id="topbar_title">Wire Voltage Drop</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class='ttt'></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<a id="download_frame" hidden></a>
+</div>
+
+<div class="container" style="float: left;">
+<div style="display: table-row;">
+
+	<!-- ===== INPUT PANEL ===== -->
+	<div class="odd" style="display: table-cell; padding: 8px; vertical-align: top;">
+		<table>
+			<tr class="section-header"><td colspan="4">Wire Parameters</td></tr>
+
+			<tr>
+				<th class="rowlabel">Wire Gauge</th>
+				<td colspan="3">
+					<select id="awg" class="doublewide" onchange="compute()">
+						<!-- Populated by JS -->
+					</select>
+				</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Conductor
+					<span class="ttt">Resistivity factor relative to copper at 20 °C: Cu=1.00×, Al=1.64×, Ag=0.92×, Au=1.42×, Ni=4.06×</span>
+				</th>
+				<td colspan="3">
+					<select id="material" class="doublewide" onchange="compute()">
+						<!-- Populated by JS -->
+					</select>
+				</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Temperature
+					<span class="ttt">Operating temperature for resistance correction. Leave blank to use 20 °C (standard tables).</span>
+				</th>
+				<td><input id="temperature" class="wide" placeholder="20"></td>
+				<td class="unit">[°C]</td>
+			</tr>
+
+			<tr class="section-header"><td colspan="4" class="pad-top">Circuit</td></tr>
+
+			<tr>
+				<th class="rowlabel">Length Mode
+					<span class="ttt">One-way: enter distance from source to load; calculator doubles it for the return conductor. Total: enter the full round-trip wire length.</span>
+				</th>
+				<td colspan="3">
+					<label><input type="radio" id="lm_oneway" name="length_mode" value="oneway" checked onchange="compute()"> One-way</label>
+					&nbsp;
+					<label><input type="radio" id="lm_total"  name="length_mode" value="total"  onchange="compute()"> Total</label>
+				</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Wire Length</th>
+				<td><input id="length" class="wide" value="10"></td>
+				<td>
+					<select id="length_unit" class="unit-sel" onchange="compute()">
+						<option value="ft">ft</option>
+						<option value="m">m</option>
+					</select>
+				</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Current</th>
+				<td><input id="current" class="wide" value="10"></td>
+				<td class="unit">[A]</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Source Voltage
+					<span class="ttt">Optional. Required for final voltage, % drop, and efficiency outputs.</span>
+				</th>
+				<td><input id="vsource" class="wide" placeholder="(optional)"></td>
+				<td class="unit">[V]</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- ===== OUTPUT PANEL ===== -->
+	<div class="output" style="display: table-cell; padding: 8px; vertical-align: top;">
+		<table>
+			<tr class="section-header"><td colspan="3">Results</td></tr>
+
+			<tr>
+				<th class="rowlabel">Wire Resistance</th>
+				<td><input id="out_resistance" readonly class="wide"></td>
+				<td class="unit" id="unit_resistance">[Ω]</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Voltage Drop ΔV</th>
+				<td><input id="out_vdrop" readonly class="wide"></td>
+				<td class="unit" id="unit_vdrop">[V]</td>
+			</tr>
+
+			<tr class="section-header"><td colspan="3" class="pad-top">
+				Requires source voltage
+			</td></tr>
+
+			<tr>
+				<th class="rowlabel">Final Voltage</th>
+				<td><input id="out_vfinal" readonly class="wide"></td>
+				<td class="unit" id="unit_vfinal">[V]</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">% Voltage Drop</th>
+				<td><input id="out_pctdrop" readonly class="wide"></td>
+				<td class="unit">[%]</td>
+			</tr>
+
+			<tr>
+				<th class="rowlabel">Efficiency</th>
+				<td><input id="out_efficiency" readonly class="wide"></td>
+				<td class="unit">[%]</td>
+			</tr>
+		</table>
+	</div>
+
+</div>
+</div>
+</body>
+</html>
