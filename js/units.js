@@ -128,6 +128,9 @@ function setV(id, value, places, show_sign, leading_zero, fractional) {
 				// Invert it to get the number of places to it
 				// Add a couple extra places for significance
 				places = Math.max(0, Math.ceil(3-Math.log10(Math.abs(value))));
+				// value of 0 -> log10 is -Infinity -> places is Infinity; NaN -> NaN.
+				// toFixed() rejects both, so fall back to a sane default.
+				if (!isFinite(places)) places = 2;
 			}
 			let v = (show_sign && value>0 ? "+":"") + value.toFixed(places);
 

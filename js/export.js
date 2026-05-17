@@ -39,7 +39,7 @@ function packInputs() {
 		if (input.type == "text") {
 			packed_inputs[input.id] = input.value;
 		}
-		if (input.type == "radio") {
+		if (input.type == "radio" || input.type == "checkbox") {
 			packed_inputs[input.id] = input.checked;
 		}
 	}

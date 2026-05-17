@@ -35,30 +35,35 @@
 	}
 	WALK_STEPS = [{
 			poi: 'user_input_material',
-			desc: 'Select material.',
+			desc: 'Select material. Shear modulus G is needed for torsion.',
 			halign: 'left',
 			valign: 'below'
 		},{
 			poi: 'user_input_section',
-			desc: 'Define cross-section.',
+			desc: 'Define cross-section. Polar MOI J drives torsional stiffness.',
 			halign: 'left',
 			valign: 'below'
 		},{
 			poi: 'loads',
-			desc: 'Define loads and constraints.',
+			desc: 'Every entry handles four components — X lateral, Y vertical, θ bending, ψ torsion. Each has a Displacement field and a Load field: leave Fix unchecked and enter a Load (the displacement is computed), or check Fix and enter a Displacement (the reaction is computed). The preset selector is a shortcut for common Fix patterns.',
 			halign: 'left',
 			valign: 'above'
 		},{
 			poi: 'addLoad_btn',
-			desc: 'More loads can be added.',
+			desc: 'Add as many loads/constraints as you need.',
 			halign: 'left',
 			valign: 'above'
 		},{
-			poi: 'chart_background',
-			desc: 'Deflection diagram will appear here.'
+			poi: 'plot_tabs',
+			desc: 'Switch the diagram between bending, axial, and torsion results.',
+			halign: 'left',
+			valign: 'below'
 		},{
 			poi: 'chart_background',
-			desc: 'Click on the graph to poll particular points for values.'
+			desc: 'The selected diagram appears here.'
+		},{
+			poi: 'chart_background',
+			desc: 'Click on the graph to poll particular points for values, including combined stress.'
 		},{
 			poi: 'beam_background',
 			desc: 'Loads and constraints are visualized here.'
@@ -71,8 +76,24 @@
 			halign: 'left',
 			valign: 'above'
 		}];
+
+	// the four degrees of freedom handled at every load point
+	const DOFS = ['x','y','t','p'];   // x: axial, y: transverse, t: bending, p: torsion
+
+	// common Fix-checkbox configurations offered in the preset selector
+	const PRESETS = [
+		{ key:'free',   label:'Free Load',           fix:[false,false,false,false] },
+		{ key:'roller', label:'Roller — Y',          fix:[false,true, false,false] },
+		{ key:'pinned', label:'Pinned — X,Y',        fix:[true, true, false,false] },
+		{ key:'bend',   label:'Bending Clamp — Y,θ', fix:[false,true, true, false] },
+		{ key:'fixed',  label:'Fully Fixed — all',   fix:[true, true, true, true ] },
+		{ key:'axial',  label:'Axial Anchor — X',    fix:[true, false,false,false] },
+		{ key:'twist',  label:'Torsional — ψ',       fix:[false,false,false,true ] }
+	];
 </script>
 <script type="text/javascript">
+	var channels = {}; // global so query handlers can read solved fields
+
 	function init() {
 		// basic loading, create options dynamically
 		EC_onload();
@@ -81,12 +102,13 @@
 		// load persistence or exported values
 		switch(EXP_onload()) {
 			case 0: // run when nothing loads
-				addLoad({where: 10, amount: 0, type: 0});
-				addLoad({where: 50, amount: 0, type: 0});
-				addLoad({where: 90, amount: 100, type: 2});
-				addLoad({where: 10, amount: -10, type: 3});
+				addLoad({where: 10, preset: 'fixed'});                 // fully fixed end
+				addLoad({where: 90, preset: 'roller'});                // roller support
+				addLoad({where: 50, load: ['','100','','']});          // transverse force
+				addLoad({where: 30, load: ['200','','','']});          // axial force
+				addLoad({where: 70, load: ['','','','50']});           // torque
 				document.getElementById('length').value = 100;
-				document.getElementById('material').value = 'Aluminum';
+				document.getElementById('material_base').value = 'Aluminum';
 				break;
 			case 1: // run when export loads
 				break;
@@ -101,6 +123,7 @@
 		selectMaterial();
 		selectShape();
 		computeMOI();
+		refreshAllLoads();
 
 		registerCallbacks();
 
@@ -124,19 +147,29 @@
 	function computeMOI() {
 		setError(1);
 		shape = document.getElementById('section').value;
-		var moi, area, rmax, rmin;
+		var moi, area, rmax, rmin, J, rtors;
+		var exact = false; // true => torsion result is exact (round sections only)
 		flip = document.getElementById('section_flip').checked;
 		if (shape == 'rndbar') {
 			d = getV('section_1');
 			rmax = rmin = d/2;
 			area = Math.PI/4 * d*d;
 			moi = Math.PI/64*Math.pow(d,4);
+			J = Math.PI/32*Math.pow(d,4);
+			rtors = d/2;
+			exact = true;
 		} else if (shape == 'boxbar') {
 			w = getV('section_1');
 			h = getV('section_2');
 			rmax = rmin = h/2;
 			area = w*h;
 			moi = w*Math.pow(h,3)/12;
+			// solid rectangle: Saint-Venant approximation
+			let lo = Math.min(w,h), hi = Math.max(w,h);
+			let rr = lo/hi;
+			let b1 = 1/3 - 0.21*rr*(1 - Math.pow(rr,4)/12);
+			J = hi*Math.pow(lo,3)*b1;
+			rtors = (3 + 1.8*lo/hi)*lo*b1; // gives peak shear at mid of long side
 		} else if (shape == 'boxtube') {
 			w = getV('section_1');
 			h = getV('section_2');
@@ -144,6 +177,11 @@
 			rmax = rmin = h/2;
 			area = w*h - (w-2*t)*(h-2*t);
 			moi = (w*Math.pow(h,3) - (w-2*t)*Math.pow(h-2*t,3))/12;
+			// closed thin-wall rectangle (Bredt)
+			let Ae = (w-t)*(h-t);
+			let pm = 2*((w-t)+(h-t));
+			J = 4*Ae*Ae*t/pm;
+			rtors = 2*Ae/pm;
 		} else if (shape == 'angle') {
 			a = getV('section_1');
 			b = getV('section_2');
@@ -159,6 +197,9 @@
 				rmax = rmin;
 				rmin = tmp;
 			}
+			// open thin-wall: J = 1/3 sum(b*t^3)
+			J = 1/3*(a + b - t)*Math.pow(t,3);
+			rtors = t;
 		} else if (shape == 'channel') {
 			b = getV('section_1');
 			d = getV('section_2');
@@ -174,19 +215,28 @@
 				rmin = rmax = d/2;
 				moi  = (b*d*d*d - h*h*h*(b-t))/12;
 			}
+			// open thin-wall: J = 1/3 sum(b*t^3)
+			J = 1/3*(2*b + d)*Math.pow(t,3);
+			rtors = t;
 		} else if (shape == 'rndtube') {
 			d = getV('section_1');
 			t = getV('section_2');
 			rmax = rmin = d/2;
 			area = Math.PI/4 * (d*d-(d-2*t)*(d-2*t));
 			moi = Math.PI/64*(Math.pow(d,4)-Math.pow(d-2*t,4));
+			J = Math.PI/32*(Math.pow(d,4)-Math.pow(d-2*t,4));
+			rtors = d/2;
+			exact = true;
 		} else if (shape == 'hex') {
-			a = getV('section_1')/2; //side length
+			a = getV('section_1')/2; //apothem (width across flats / 2)
 			id = getV('section_2');
 			if (isNaN(id)) id = 0;
 			area = Math.sqrt(3)*3/2*a*a 			- Math.PI/4 * id*id;
 			moi  = 5/16*Math.sqrt(3)*Math.pow(a, 4) - Math.PI/64*Math.pow(id,4);
 			rmax = rmin = flip ? a : (a*2/Math.sqrt(3));
+			// approximate: polar moment as torsion constant
+			J = 2*moi;
+			rtors = rmax;
 		}
 
 		if (shape != 'custom') {
@@ -194,8 +244,13 @@
 			setV("area", area);
 			setV("rmax", rmax);
 			setV("rmin", rmin);
+			setV("J", J);
+			setV("rtors", rtors);
 		}
 
+		// mark the torsion constant as approximate for non-round sections
+		let jlabel = document.getElementById('J_label');
+		jlabel.childNodes[0].nodeValue = exact ? 'Torsion Const. J ' : 'Torsion Const. J * ';
 	}
 
 	function selectShape(disable_recompute) {
@@ -205,6 +260,8 @@
 		document.getElementById('area').readOnly = true;
 		document.getElementById('rmax').readOnly = true;
 		document.getElementById('rmin').readOnly = true;
+		document.getElementById('J').readOnly = true;
+		document.getElementById('rtors').readOnly = true;
 		if (typeof EXP_inputs == 'undefined')
 			document.getElementById('section_img').src = 'include/section_' + shape + '.svg'; // workaround: only set the image if not exported
 		if (shape == 'custom') {
@@ -212,6 +269,8 @@
 			document.getElementById('area').readOnly = false;
 			document.getElementById('rmax').readOnly = false;
 			document.getElementById('rmin').readOnly = false;
+			document.getElementById('J').readOnly    = false;
+			document.getElementById('rtors').readOnly = false;
 			document.getElementById('section_flip_row').style.display = 'none';
 			for (i=1;i<=4;i++)
 				document.getElementById('section_'+i+'_row').style.display = 'none';
@@ -285,131 +344,151 @@
 		}
 	}
 
+	// per-DOF metadata. fu = force/torque unit (free mode); du = displacement unit (fixed mode)
+	const DOF_INFO = {
+		x: { sym:'X', desc:'lateral',  fu:'force',  du:'deflection' },
+		y: { sym:'Y', desc:'vertical', fu:'force',  du:'deflection' },
+		t: { sym:'θ', desc:'bending',  fu:'torque', du:'slope' },
+		p: { sym:'ψ', desc:'torsion',  fu:'torque', du:'slope' }
+	};
+	const DOF_TIP = 'Fix unchecked: enter an applied force/moment in the Load column — the resulting displacement is reported. Fix checked: enter a prescribed displacement in the Displacement column (blank or 0 = an ordinary support) — the reaction is reported in Load.';
+
 	function addLoad(params) {
 		setError(1);
 		let loads = document.getElementById('loads');
 		let load_div = document.createElement('div');
-		x = loads.dataset.current_load_number;
+		let id = loads.dataset.current_load_number;
 		loads.dataset.current_load_number ++;
+
+		let presetOpts = PRESETS.map(p => `<option value="${p.key}">${p.label}</option>`).join('')
+		               + `<option value="custom">Custom</option>`;
+
+		let rows = '';
+		for (let d of DOFS) {
+			let info = DOF_INFO[d];
+			rows +=
+			`<tr>
+				<th class="rowlabel">${info.sym} <small>${info.desc}</small><span class="ttt">${DOF_TIP}</span></th>
+				<td class="tiny"><input type="checkbox" class="dynamic-input" id="load_${id}_fix_${d}" onchange="dofToggled(${id},'${d}'); compute();" /></td>
+				<td><input id="load_${id}_disp_${d}" class="dynamic-input narrow" data-unit="${info.du}" /></td>
+				<td class="unit" data-unit="${info.du}"></td>
+				<td><input id="load_${id}_load_${d}" class="dynamic-input narrow" onchange="drawBeam()" data-unit="${info.fu}" /></td>
+				<td class="unit" data-unit="${info.fu}"></td>
+			</tr>`;
+		}
+
 		load_div.innerHTML =
-		`<table data-load_id=${x}>
+		`<table data-load_id=${id}>
 			<tr>
-				<td>[${x}] <button onclick="removeLoad(${x}); compute();" title="Remove">-</button></td>
-				<td><select class="dynamic-input" id="load_type_${x}" onchange="selectLoadType(${x}); compute();">
-					<option value="pin" selected='selected' >Pinned</option>
-					<option value="fix">Fixed</option>
-					<option value="force">Force </option>
-					<option value="moment">Moment</option>
-					<option value="displacement">Displacement</option>
-					<option value="slope">Slope</option>
+				<td>[${id}] <button onclick="removeLoad(${id}); compute();" title="Remove">-</button></td>
+				<td colspan=5><select class="dynamic-input doublewide" id="load_${id}_preset" onchange="applyPreset(${id}); compute();">
+					${presetOpts}
 				</select></td>
 			</tr>
-			<tr id="load_${x}_1_row">
-				<th class="rowlabel" id="load_${x}_1_label">L1</th>
-				<td><input id="load_${x}_1" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
-				<td class="unit" id="load_${x}_1_unit" data-unit="dimension"></td>
-			</tr><tr id="load_${x}_2_row">
-				<th class="rowlabel" id="load_${x}_2_label">L2</th>
-				<td><input id="load_${x}_2" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
-				<td class="unit" id="load_${x}_2_unit" data-unit="dimension"></td>
-			</tr><tr id="load_${x}_3_row">
-				<th class="rowlabel" id="load_${x}_3_label">L3</th>
-				<td><input id="load_${x}_3" class="dynamic-input" onchange="drawBeam()" data-unit="dimension" /></td>
-				<td class="unit" id="load_${x}_3_unit" data-unit="dimension"></td>
-			</tr><tr id="load_${x}_4_row">
-				<th class="rowlabel" id="load_${x}_4_label">L4</th>
-				<td><input id="load_${x}_4" class="dynamic-input" onchange="drawBeam()" data-unit="dimension"/></td>
-				<td class="unit" id="load_${x}_4_unit" data-unit="dimension"></td>
+			<tr>
+				<th class="rowlabel">At x=</th>
+				<td colspan=3><input id="load_${id}_pos" class="dynamic-input narrow" onchange="drawBeam()" data-unit="dimension" /></td>
+				<td class="unit" colspan=2 data-unit="dimension"></td>
 			</tr>
+			<tr>
+				<th></th>
+				<th class="collabel tiny" title="Fix this component">Fix</th>
+				<th class="collabel" colspan=2>Displacement</th>
+				<th class="collabel" colspan=2>Load</th>
+			</tr>
+			${rows}
 		</table>`;
-		load_div.dataset.load_id = x;
-		load_div.classList.add(x%2 ? 'even' : 'odd');
+		load_div.dataset.load_id = id;
+		load_div.classList.add(id%2 ? 'even' : 'odd');
 		load_div.classList.add('load');
 		loads.insertBefore(load_div, loads.lastChild);
 
 		if (typeof params != 'undefined') {
-			document.getElementById(`load_${x}_1`).value = params.where;
-			document.getElementById(`load_${x}_2`).value = params.amount;
-			document.getElementById(`load_type_${x}`).selectedIndex = params.type;
+			if (typeof params.where != 'undefined') document.getElementById(`load_${id}_pos`).value = params.where;
+			// accept an explicit fix array, or a named preset
+			let fixArr = params.fix;
+			if (!fixArr && typeof params.preset != 'undefined') {
+				let p = PRESETS.find(p => p.key == params.preset);
+				if (p) fixArr = p.fix;
+			}
+			if (fixArr) {
+				for (let k=0;k<DOFS.length;k++)
+					document.getElementById(`load_${id}_fix_${DOFS[k]}`).checked = fixArr[k];
+			}
+			if (typeof params.disp != 'undefined') {
+				for (let k=0;k<DOFS.length;k++)
+					document.getElementById(`load_${id}_disp_${DOFS[k]}`).value = params.disp[k];
+			}
+			if (typeof params.load != 'undefined') {
+				for (let k=0;k<DOFS.length;k++)
+					document.getElementById(`load_${id}_load_${DOFS[k]}`).value = params.load[k];
+			}
 		}
-		selectLoadType(x);
+		syncPreset(id);   // point the preset selector at whatever the checkboxes spell out
+		updateLoadRow(id);
+		UNIT_change();    // label the freshly-created unit cells
 		registerCallbacks();
 	}
 
-	function selectLoadType(i) {
+	// find the preset key whose Fix pattern matches the given array, else 'custom'
+	function presetFromFix(fixArr) {
+		for (let p of PRESETS)
+			if (p.fix.every((v,k) => v === fixArr[k])) return p.key;
+		return 'custom';
+	}
+
+	// point the preset selector at whatever the four Fix checkboxes currently spell out
+	function syncPreset(i) {
+		let fixArr = DOFS.map(d => document.getElementById(`load_${i}_fix_${d}`).checked);
+		document.getElementById(`load_${i}_preset`).value = presetFromFix(fixArr);
+	}
+
+	// clear both fields of one component (their input/output roles just swapped)
+	function clearComponent(i, d) {
+		document.getElementById(`load_${i}_disp_${d}`).value = '';
+		document.getElementById(`load_${i}_load_${d}`).value = '';
+	}
+
+	// preset selector changed: stamp its Fix pattern onto the checkboxes
+	function applyPreset(i) {
 		setError(1);
-		type = document.getElementById('load_type_'+i).value;
-		if (type == 'pin' ) { //
-			document.getElementById(`load_${i}_1_row`).style.display = '';
-			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
-			document.getElementById(`load_${i}_1`).readOnly = false;
-			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
-			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
-
-			document.getElementById(`load_${i}_2_row`).style.display = '';
-			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
-			document.getElementById(`load_${i}_2`).readOnly = true;
-			document.getElementById(`load_${i}_2`).dataset.unit = 'force';
-			document.getElementById(`load_${i}_2_unit`).dataset.unit = 'force';
-			for (j=3;j<=4;j++)
-				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
-		} else if (type == 'fix' ) { //
-			document.getElementById(`load_${i}_1_row`).style.display = '';
-			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
-			document.getElementById(`load_${i}_1`).readOnly = false;
-			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
-			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
-
-			document.getElementById(`load_${i}_2_row`).style.display = '';
-			document.getElementById(`load_${i}_2_label`).innerHTML = 'F=';
-			document.getElementById(`load_${i}_2`).readOnly = true;
-			document.getElementById(`load_${i}_2`).dataset.unit = 'force';
-			document.getElementById(`load_${i}_2_unit`).dataset.unit = 'force';
-
-			document.getElementById(`load_${i}_3_row`).style.display = '';
-			document.getElementById(`load_${i}_3_label`).innerHTML = 'M=';
-			document.getElementById(`load_${i}_3`).readOnly = true;
-			document.getElementById(`load_${i}_3`).dataset.unit = 'torque';
-			document.getElementById(`load_${i}_3_unit`).dataset.unit = 'torque';
-			for (j=4;j<=4;j++)
-				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
-		} else if (type == 'force' || type == 'moment') {
-			document.getElementById(`load_${i}_1_row`).style.display = '';
-			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
-			document.getElementById(`load_${i}_1`).readOnly = false;
-			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
-			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
-
-			document.getElementById(`load_${i}_2_row`).style.display = '';
-			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'force' ? 'F=' : 'M=';
-			document.getElementById(`load_${i}_2`).readOnly = false;
-			document.getElementById(`load_${i}_2`).dataset.unit 	  = type == 'force' ? 'force' : 'torque';
-			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'force' ? 'force' : 'torque';
-			for (j=3;j<=4;j++)
-				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
-		} else if (type == 'displacement' || type == 'slope') {
-			document.getElementById(`load_${i}_1_row`).style.display = '';
-			document.getElementById(`load_${i}_1_label`).innerHTML = 'At x=';
-			document.getElementById(`load_${i}_1`).readOnly = false;
-			document.getElementById(`load_${i}_1`).dataset.unit = 'dimension';
-			document.getElementById(`load_${i}_1_unit`).dataset.unit = 'dimension';
-
-			document.getElementById(`load_${i}_2_row`).style.display = '';
-			document.getElementById(`load_${i}_2_label`).innerHTML = type == 'slope' ? 'slope=' : 'y=';
-			document.getElementById(`load_${i}_2`).readOnly = false;
-			document.getElementById(`load_${i}_2`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
-			document.getElementById(`load_${i}_2_unit`).dataset.unit = type == 'slope' ? 'slope' : 'deflection';
-
-
-			document.getElementById(`load_${i}_3_row`).style.display = '';
-			document.getElementById(`load_${i}_3_label`).innerHTML = type == 'slope' ? 'M=' : 'F=';
-			document.getElementById(`load_${i}_3`).readOnly = true;
-			document.getElementById(`load_${i}_3`).dataset.unit = type == 'slope' ? 'torque' : 'force';
-			document.getElementById(`load_${i}_3_unit`).dataset.unit = type == 'slope' ? 'torque' : 'force';
-			for (j=4;j<=4;j++)
-				document.getElementById(`load_${i}_${j}_row`).style.display = 'none';
+		let p = PRESETS.find(p => p.key == document.getElementById(`load_${i}_preset`).value);
+		if (p) {
+			for (let k=0;k<DOFS.length;k++) {
+				let cb = document.getElementById(`load_${i}_fix_${DOFS[k]}`);
+				if (cb.checked !== p.fix[k]) {   // this component's roles flip...
+					cb.checked = p.fix[k];
+					clearComponent(i, DOFS[k]);  // ...so drop the stale values
+				}
+			}
 		}
-		UNIT_change(); // draw the units
+		// 'custom' leaves the checkboxes alone
+		updateLoadRow(i);
+	}
+
+	// a Fix checkbox was toggled by hand: the Displacement and Load fields swap
+	// their input vs output roles, so both stale values are cleared.
+	function dofToggled(i, d) {
+		setError(1);
+		clearComponent(i, d);
+		syncPreset(i);
+		updateLoadRow(i);
+	}
+
+	// Fix checked  => Displacement is the input (prescribed); Load shows the reaction.
+	// Fix unchecked => Load is the input (applied);   Displacement shows the result.
+	function updateLoadRow(i) {
+		for (let d of DOFS) {
+			let fixed = document.getElementById(`load_${i}_fix_${d}`).checked;
+			document.getElementById(`load_${i}_disp_${d}`).readOnly = !fixed;
+			document.getElementById(`load_${i}_load_${d}`).readOnly =  fixed;
+		}
+	}
+
+	function refreshAllLoads() {
+		let loads = document.getElementById('loads');
+		for (let i=0;i<loads.children.length-1;i++)
+			updateLoadRow(loads.children[i].dataset.load_id);
 	}
 
 	function removeLoad(load_no) {
@@ -432,11 +511,12 @@
 		let loads_obj = [];
 
 		for(i=0; i<loads.children.length-1; i++) {
-			let x = loads.children[i].dataset.load_id;
+			let id = loads.children[i].dataset.load_id;
 			loads_obj.push({
-				where:  document.getElementById(`load_${x}_1`).value,
-				amount: document.getElementById(`load_${x}_2`).value,
-				type:   document.getElementById(`load_type_${x}`).selectedIndex
+				where: document.getElementById(`load_${id}_pos`).value,
+				fix:   DOFS.map(d => document.getElementById(`load_${id}_fix_${d}`).checked),
+				disp:  DOFS.map(d => document.getElementById(`load_${id}_disp_${d}`).value),
+				load:  DOFS.map(d => document.getElementById(`load_${id}_load_${d}`).value)
 			});
 		}
 
@@ -450,25 +530,13 @@
 		}
 	}
 
-	/*function populateMaterials() {
-		select = document.getElementById('material');
-
-		i=0;
-		for(matl in MATERIAL_DATA) {
-			i++;
-			opt = document.createElement('option');
-			opt.innerHTML = matl;
-			opt.value = matl;
-			select.appendChild(opt);
-		}
-	}*/
-
 	function selectMaterial() {
 		matl = document.getElementById('material_detail').value;
 		if (!matl) return;
 
 		if (matl != 'custom') {
 			setV('elastic_modulus', MATERIAL_DATA[matl]['Ef']);
+			setV('shear_modulus',   MATERIAL_DATA[matl]['G'] ? MATERIAL_DATA[matl]['G'] : '-');
 			setV('density', MATERIAL_DATA[matl]['density']);
 			setV('mass', MATERIAL_DATA[matl]['density']*getV('area')*getV('length'));
 			setV('Sf', MATERIAL_DATA[matl]['Sf'] ? MATERIAL_DATA[matl]['Sf'] : '-');
@@ -479,6 +547,7 @@
 		let custom = MATERIAL_selectBase('material');
 
 		document.getElementById('elastic_modulus').readOnly = !custom;
+		document.getElementById('shear_modulus').readOnly 	= !custom;
 		document.getElementById('Sf').readOnly 				= !custom;
 		document.getElementById('density').readOnly 		= !custom;
 	}
@@ -513,7 +582,9 @@
 		else return M._data[0][0];
 	}
 
-	function computeFE(E, I, order, poses, forces, moments, pinned, fixed, displs, slopes) {
+	// Bending finite-element solve (2 DOF/node: deflection q, slope theta).
+	// fixq / fixt are objects keyed by node id; presence => that DOF is held at 0.
+	function computeFE(E, I, order, poses, forces, moments, fixq, fixt, displs, slopes) {
 		numel = order.length-1;
 
 		numnode = (numel+1)*2;
@@ -528,11 +599,10 @@
 		for (i in moments){
 			F.subset(math.index(order.indexOf(parseInt(i))*2+1,0), moments[i]);
 		}
-		for (i in pinned){
+		for (i in fixq){
 			dofs_to_remove.push(order.indexOf(parseInt(i))*2);
 		}
-		for (i in fixed){
-			dofs_to_remove.push(order.indexOf(parseInt(i))*2);
+		for (i in fixt){
 			dofs_to_remove.push(order.indexOf(parseInt(i))*2+1);
 		}
 		for (i in displs){
@@ -599,9 +669,90 @@
 			channels.s.push(E*I*beamShapeFunctionDcurv(q_seg, zeta, dl));
 		}
 
-		//rxns = math.flatten(math.subset(math.multiply(K, fq), math.index(math.range(0, numnode-1))))._data;
+		return [channels, Fflat, Qflat];
+	}
 
-		return [channels, Fflat];
+	// Generic 1-DOF/node bar solve, used for both the axial (EX = E*A) and
+	// torsion (EX = G*J) problems. loads maps node id -> applied force/torque.
+	// prescribed maps node id -> imposed displacement/twist (0 = ordinary support).
+	// Returns [{x, d, f}, Fflat] sampled on the same grid as computeFE.
+	function computeFE1D(EX, order, poses, loads, prescribed) {
+		let n = order.length;
+		let chan = {x:[], d:[], f:[]};
+		let Qflat, elemForce, Fflat;
+		let presNodes = Object.keys(prescribed);
+
+		if (presNodes.length == 0 || !isFinite(EX)) {
+			// rigid-body (unconstrained) or undefined property: report nothing
+			Qflat = new Array(n).fill(0);
+			elemForce = new Array(n-1).fill(0);
+			Fflat = new Array(n).fill(0);
+		} else {
+			let K = math.matrix(math.zeros([n,n]));
+			let F = math.matrix(math.zeros([n,1]));
+			let Q = math.matrix(math.zeros([n,1]));
+			for (let node in loads)
+				F.subset(math.index(order.indexOf(parseInt(node)),0), loads[node]);
+			let remove = [];
+			for (let node of presNodes) {
+				let pi = order.indexOf(parseInt(node));
+				remove.push(pi);
+				Q.subset(math.index(pi,0), prescribed[node]); // imposed displacement (often 0)
+			}
+
+			for (let i=0;i<n-1;i++) {
+				let dl = poses[order[i+1]] - poses[order[i]];
+				let k = EX/dl;
+				let idx = math.index(math.range(i, i+2), math.range(i, i+2));
+				K.subset(idx, math.add(K.subset(idx), math.matrix([[k,-k],[-k,k]])));
+			}
+
+			let idx_u=[], idx_k=[];
+			for (let i=0;i<n;i++) (remove.includes(i)?idx_k:idx_u).push(i);
+
+			if (idx_u.length == 0) {
+				Qflat = new Array(n).fill(0);
+				elemForce = new Array(n-1).fill(0);
+				Fflat = math.flatten(F)._data;
+			} else {
+				let K1 = K.subset(math.index(idx_u, idx_u));
+				let K2 = K.subset(math.index(idx_u, idx_k));
+				let K3 = K.subset(math.index(idx_k, idx_u));
+				let K4 = K.subset(math.index(idx_k, idx_k));
+				let Fu = F.subset(math.index(idx_u, 0));
+				let Qk = Q.subset(math.index(idx_k, 0));
+				let Qu = math.multiply(math.inv(K1), math.subtract(Fu, math.multiply(K2, Qk)));
+				let Fk = math.add(math.multiply(K3, Qu), math.multiply(K4, Qk));
+				F.subset(math.index(idx_k,0), stripMatrix(Fk));
+				F.subset(math.index(idx_u,0), stripMatrix(Fu));
+				Q.subset(math.index(idx_k,0), stripMatrix(Qk));
+				Q.subset(math.index(idx_u,0), stripMatrix(Qu));
+				Qflat = math.flatten(Q)._data;
+				Fflat = math.flatten(F)._data;
+				elemForce = [];
+				for (let i=0;i<n-1;i++) {
+					let dl = poses[order[i+1]] - poses[order[i]];
+					elemForce.push(EX/dl*(Qflat[i+1]-Qflat[i]));
+				}
+			}
+		}
+
+		// sample onto the same zeta grid that computeFE produces
+		for (let i=0;i<n-1;i++) {
+			let dl = poses[order[i+1]] - poses[order[i]];
+			let d1 = Qflat[i], d2 = Qflat[i+1];
+			let force = elemForce[i];
+			for (let zeta=-1; zeta<1; zeta+=0.05) {
+				chan.x.push(poses[order[i]] + (zeta+1)/2*dl);
+				chan.d.push(d1 + (zeta+1)/2*(d2-d1));
+				chan.f.push(force);
+			}
+			chan.x.push(poses[order[i+1]]);
+			chan.d.push(d2);
+			chan.f.push(force);
+		}
+
+		return [chan, Fflat, Qflat];
 	}
 
 	function beamShapeFunction(arr, zeta, dl) {
@@ -625,10 +776,6 @@
 				(3*zeta-1)/dl,
 				-6*zeta/dl/dl,
 				(3*zeta+1)/dl];
-		/*Hfns = [(4*x-6*dl)/dl/dl/dl,
-				(6*x-4*dl)/dl/dl,
-				(-12*x+6*dl)/dl/dl/dl,
-				(6*x-2*dl)/dl/dl];*/
 		return math.dot(arr, Hfns);
 	}
 
@@ -637,10 +784,6 @@
 				3/4*dl*Math.pow(2/dl, 3),
 				-3/2*Math.pow(2/dl, 3),
 				3/4*dl*Math.pow(2/dl, 3)];
-		/*Hfns = [(4*x-6*dl)/dl/dl/dl,
-				(6*x-4*dl)/dl/dl,
-				(-12*x+6*dl)/dl/dl/dl,
-				(6*x-2*dl)/dl/dl];*/
 		return math.dot(arr, Hfns);
 	}
 
@@ -648,152 +791,108 @@
 		try{
 		selectShape();
 
-		L = getV('length');
+		let L = getV('length');
+		let E = getV('elastic_modulus');
+		let G = getV('shear_modulus');
+		let I = getV('moi');
+		let A = getV('area');
+		let Jp = getV('J');
 
-		order   = [0,   1]; // node ids, in order (sort later)
-		poses   = {0:0, 1:L}; // positions
-		forces  = {}; // maps node ids to values
-		moments = {}; // maps node ids to values
-		pinned  = {}; // if the node id is in the list, it's pinned
-		fixed   = {}; // if the node id is in the list, it's pinned
-		displs  = {};
-		slopes  = {};
-		displs_a = {};
-		slopes_a = {};
+		let order   = [0,   1];     // node ids, in order (sort later)
+		let poses   = {0:0, 1:L};   // positions
+		let a_force  = {};          // node -> axial force        (X, free)
+		let b_force  = {};          // node -> transverse force   (Y, free)
+		let b_moment = {};          // node -> bending moment     (theta, free)
+		let t_torque = {};          // node -> torque             (psi, free)
+		let pres_u = {}, pres_q = {}, pres_t = {}, pres_p = {}; // node -> prescribed displacement (fixed)
+		// per-DOF output map: node -> { fld: field id, rxn: report a reaction (true) or a displacement (false) }
+		let out_x = {}, out_y = {}, out_t = {}, out_p = {};
 
-		loads = document.getElementById('loads');
-		for(i=2; i<loads.children.length-1+2; i++) {
-			x = loads.children[i-2].dataset.load_id;
-			type = document.getElementById(`load_type_${x}`).value;
+		let loads = document.getElementById('loads');
+		for(let li=0; li<loads.children.length-1; li++) {
+			let id = loads.children[li].dataset.load_id;
+			let node = 2 + li;
 
-			order.push(i);
-			poses[i] = getV(`load_${x}_1`);
-			if (type == 'fix') {
-				fixed[i] = x;
-			} else if (type == 'pin') {
-				pinned[i] = x;
-			} else if (type == 'force') {
-				forces[i] = getV(`load_${x}_2`);
-			} else if (type == 'moment') {
-				moments[i] = getV(`load_${x}_2`);
-			} else if (type == 'displacement') {
-				displs[i] = getV(`load_${x}_2`);
-				displs_a[i] = x;
-			} else if (type == 'slope') {
-				slopes[i] = getV(`load_${x}_2`);
-				slopes_a[i] = x;
+			order.push(node);
+			poses[node] = getV(`load_${id}_pos`, 0);
+
+			if (document.getElementById(`load_${id}_fix_x`).checked) {
+				pres_u[node] = getV(`load_${id}_disp_x`, 0);
+				out_x[node]  = { fld:`load_${id}_load_x`, rxn:true };
+			} else {
+				a_force[node] = getV(`load_${id}_load_x`, 0);
+				out_x[node]   = { fld:`load_${id}_disp_x`, rxn:false };
+			}
+
+			if (document.getElementById(`load_${id}_fix_y`).checked) {
+				pres_q[node] = getV(`load_${id}_disp_y`, 0);
+				out_y[node]  = { fld:`load_${id}_load_y`, rxn:true };
+			} else {
+				b_force[node] = getV(`load_${id}_load_y`, 0);
+				out_y[node]   = { fld:`load_${id}_disp_y`, rxn:false };
+			}
+
+			if (document.getElementById(`load_${id}_fix_t`).checked) {
+				pres_t[node] = getV(`load_${id}_disp_t`, 0);
+				out_t[node]  = { fld:`load_${id}_load_t`, rxn:true };
+			} else {
+				b_moment[node] = getV(`load_${id}_load_t`, 0);
+				out_t[node]    = { fld:`load_${id}_disp_t`, rxn:false };
+			}
+
+			if (document.getElementById(`load_${id}_fix_p`).checked) {
+				pres_p[node] = getV(`load_${id}_disp_p`, 0);
+				out_p[node]  = { fld:`load_${id}_load_p`, rxn:true };
+			} else {
+				t_torque[node] = getV(`load_${id}_load_p`, 0);
+				out_p[node]    = { fld:`load_${id}_disp_p`, rxn:false };
 			}
 		}
 
 		order.sort(function(a, b){ return poses[a]-poses[b]});
 
 		// merge close nodes
-		for (i=0;i<order.length-1;i++) {
-			if (Math.abs(poses[order[i]] - poses[order[i+1]]) < L/100) {
-				oldnode = order[i];
-				newnode = order[i+1]
-				order.splice(i, 1);
+		let allMaps = [a_force, b_force, b_moment, t_torque,
+		               pres_u, pres_q, pres_t, pres_p, out_x, out_y, out_t, out_p];
+		for (let mi=0;mi<order.length-1;mi++) {
+			if (Math.abs(poses[order[mi]] - poses[order[mi+1]]) < L/100) {
+				let oldnode = order[mi];
+				let newnode = order[mi+1];
+				order.splice(mi, 1);
 				if (oldnode in poses) {
 					poses[newnode] = poses[oldnode];
 					delete poses[oldnode];
 				}
-				if (oldnode in forces) {
-					forces[newnode] = forces[oldnode];
-					delete forces[oldnode];
+				for (let m of allMaps) {
+					if (oldnode in m) {
+						m[newnode] = m[oldnode];
+						delete m[oldnode];
+					}
 				}
-				if (oldnode in moments) {
-					moments[newnode] = moments[oldnode];
-					delete moments[oldnode];
-				}
-				if (oldnode in pinned) {
-					pinned[newnode] = pinned[oldnode];
-					delete pinned[oldnode];
-				}
-				if (oldnode in fixed) {
-					fixed[newnode] = fixed[oldnode];
-					delete fixed[oldnode];
-				}
-				if (oldnode in displs) {
-					displs[newnode] = displs[oldnode];
-					displs_a[newnode] = displs_a[oldnode];
-					delete displs[oldnode];
-					delete displs_a[oldnode];
-				}
-				if (oldnode in slopes) {
-					slopes[newnode] = slopes[oldnode];
-					slopes_a[newnode] = slopes_a[oldnode];
-					delete slopes[oldnode];
-					delete slopes_a[oldnode];
-				}
+				mi--;
 			}
 		}
 
-		[channels, rxns] = computeFE(getV('moi'), getV('elastic_modulus'),
-			order, poses, forces, moments, pinned, fixed, displs, slopes);
+		let Fbend, Faxial, Ftors, Qbend, Qaxial, Qtors, bchan, achan, tchan;
+		[bchan, Fbend, Qbend]   = computeFE(E, I, order, poses, b_force, b_moment, {}, {}, pres_q, pres_t);
+		[achan, Faxial, Qaxial] = computeFE1D(E*A, order, poses, a_force, pres_u);
+		[tchan, Ftors, Qtors]   = computeFE1D(G*Jp, order, poses, t_torque, pres_p);
 
-		for (pin in pinned) {
-			noden = order.indexOf(parseInt(pin));
-			setV(`load_${pinned[pin]}_2`, rxns[noden*2]);
-		}
-		for (fix in fixed) {
-			noden = order.indexOf(parseInt(fix));
-			setV(`load_${fixed[fix]}_2`, rxns[noden*2]);
-			setV(`load_${fixed[fix]}_3`, rxns[noden*2+1]);
-		}
-		for (dis in displs_a) {
-			noden = order.indexOf(parseInt(dis));
-			setV(`load_${displs_a[dis]}_3`, rxns[noden*2]);
-		}
-		for (slo in slopes_a) {
-			noden = order.indexOf(parseInt(slo));
-			setV(`load_${slopes_a[slo]}_3`, rxns[noden*2+1]);
-		}
+		// unify all solved fields under one channels object (shared x grid)
+		channels = {
+			x: bchan.x, t: bchan.t, q: bchan.q, m: bchan.m, s: bchan.s,
+			u: achan.d, n: achan.f,
+			p: tchan.d, tq: tchan.f
+		};
 
-		// draw the plot
-		PLOT_drawLinePlot({
-			chartName: "chart",
-			axes: {
-				x: {
-					numTicks: 10,
-					boxEnds: false,
-					negativeHandling: 'posonly',
-					margin: 15
-				}, y: {
-					numTicks: 7,
-					boxEnds: true,
-					negativeHandling: 'symmetric',
-					margin: 5
-				}, z: {
-					syncWithY: true,
-					margin: 5
-				}
-			},
-			datasets: {
-				x: {
-					axis: 'x'
-				},
-				q: {
-					axis: 'y'
-				},
-				m: {
-					axis: 'z'
-				},
-				s: {
-					axis: 'z'
-				}				
-			},
-			queries: {
-				//INDEX: { places: 0 },
-				x: {},
-				t: {},
-				q: {},
-				m: {},
-				s: {}
-			}
-		},
-		channels,
-		plotClickHandler);
+		// report the computed quantity into each load: a reaction for fixed DOFs,
+		// the resulting nodal displacement for free DOFs
+		for (let node in out_x) { let nd=order.indexOf(parseInt(node)); if(nd>=0) setV(out_x[node].fld, out_x[node].rxn ? Faxial[nd]    : Qaxial[nd]);    }
+		for (let node in out_y) { let nd=order.indexOf(parseInt(node)); if(nd>=0) setV(out_y[node].fld, out_y[node].rxn ? Fbend[nd*2]   : Qbend[nd*2]);   }
+		for (let node in out_t) { let nd=order.indexOf(parseInt(node)); if(nd>=0) setV(out_t[node].fld, out_t[node].rxn ? Fbend[nd*2+1] : Qbend[nd*2+1]); }
+		for (let node in out_p) { let nd=order.indexOf(parseInt(node)); if(nd>=0) setV(out_p[node].fld, out_p[node].rxn ? Ftors[nd]     : Qtors[nd]);     }
 
+		drawPlot(getPlotMode());
 		drawBeam();
 
 		}catch(err){
@@ -804,6 +903,57 @@
 		setError(0);
 		if (EXP_dumpPersistence())
 			dumpDynamicPersistence();
+	}
+
+	function getPlotMode() {
+		for (let m of ['bending','axial','torsion'])
+			if (document.getElementById('plot_mode_'+m).checked) return m;
+		return 'bending';
+	}
+
+	function updatePlotLabels(mode) {
+		// only one set of axis titles is visible at a time
+		let visible = {
+			bending: ['chart_q_label','chart_m_label','chart_s_label','chart_zsep'],
+			axial:   ['chart_u_label','chart_n_label'],
+			torsion: ['chart_p_label','chart_tq_label']
+		};
+		let all = ['chart_q_label','chart_m_label','chart_s_label','chart_zsep',
+		           'chart_u_label','chart_n_label','chart_p_label','chart_tq_label'];
+		for (let id of all)
+			document.getElementById(id).style.display =
+				visible[mode].includes(id) ? '' : 'none';
+		UNIT_change();
+	}
+
+	function drawPlot(mode) {
+		// clear every curve so stale modes don't linger
+		for (let id of ['chart_q_line','chart_m_line','chart_s_line',
+		                 'chart_u_line','chart_n_line','chart_p_line','chart_tq_line'])
+			document.getElementById(id).setAttribute('points','');
+
+		let datasets;
+		if (mode == 'axial')
+			datasets = { x:{axis:'x'}, u:{axis:'y'}, n:{axis:'z'} };
+		else if (mode == 'torsion')
+			datasets = { x:{axis:'x'}, p:{axis:'y'}, tq:{axis:'z'} };
+		else
+			datasets = { x:{axis:'x'}, q:{axis:'y'}, m:{axis:'z'}, s:{axis:'z'} };
+
+		updatePlotLabels(mode);
+
+		PLOT_drawLinePlot({
+			chartName: "chart",
+			axes: {
+				x: { numTicks: 10, boxEnds: false, negativeHandling: 'posonly', margin: 15 },
+				y: { numTicks: 7,  boxEnds: true,  negativeHandling: 'symmetric', margin: 5 },
+				z: { syncWithY: true, margin: 5 }
+			},
+			datasets: datasets,
+			queries: { x: {}, t: {}, q: {}, m: {}, s: {} }
+		},
+		channels,
+		plotClickHandler);
 	}
 
 	function plotClickHandler(e) {
@@ -819,9 +969,58 @@
 		}
 
 		if (!isNaN(xq)) {
-			setV("query_stress_shear",     interp1D(channels.x, channels.s, xq)/getV('area'));
-			setV("query_stress_bend_top", -interp1D(channels.x, channels.m, xq)*getV('rmax')/getV('moi'));
-			setV("query_stress_bend_bot", +interp1D(channels.x, channels.m, xq)*getV('rmin')/getV('moi'));
+			let A = getV('area'), I = getV('moi'), Jp = getV('J');
+			let rmax = getV('rmax'), rmin = getV('rmin'), rt = getV('rtors');
+
+			let N   = interp1D(channels.x, channels.n,  xq);
+			let V   = interp1D(channels.x, channels.s,  xq);
+			let M   = interp1D(channels.x, channels.m,  xq);
+			let T   = interp1D(channels.x, channels.tq, xq);
+			let u   = interp1D(channels.x, channels.u,  xq);
+			let phi = interp1D(channels.x, channels.p,  xq);
+
+			// legacy bending-stress query fields
+			setV("query_stress_shear",     V/A);
+			setV("query_stress_bend_top", -M*rmax/I);
+			setV("query_stress_bend_bot", +M*rmin/I);
+
+			// combined-loading panel
+			setV('cs_N', N); setV('cs_T', T); setV('cs_u', u); setV('cs_phi', phi);
+
+			let sigma_axial = N/A;
+			let tau_tors    = T*rt/Jp;
+			let tau_shear   = V/A;
+
+			let matl = document.getElementById('material_detail').value;
+			let Sy = (matl && matl != 'custom' && MATERIAL_DATA[matl] && MATERIAL_DATA[matl]['Sy'])
+			         ? MATERIAL_DATA[matl]['Sy'] : NaN;
+
+			fillCombinedStressRow('top', sigma_axial - M*rmax/I, tau_tors,             Sy);
+			fillCombinedStressRow('bot', sigma_axial + M*rmin/I, tau_tors,             Sy);
+			fillCombinedStressRow('na',  sigma_axial,            tau_shear + tau_tors, Sy);
+
+			document.getElementById('combined_stress_panel').style.display = '';
+		}
+	}
+
+	function fillCombinedStressRow(prefix, sigma, tau, Sy) {
+		let c  = sigma/2;
+		let r  = Math.sqrt(c*c + tau*tau);
+		let s1 = c + r, s2 = c - r;
+		let vm = Math.sqrt(sigma*sigma + 3*tau*tau);
+		// stresses are reported to the nearest whole unit
+		setV(`cs_${prefix}_sx`,   sigma, 0);
+		setV(`cs_${prefix}_tau`,  tau,   0);
+		setV(`cs_${prefix}_s1`,   s1,    0);
+		setV(`cs_${prefix}_s2`,   s2,    0);
+		setV(`cs_${prefix}_tmax`, r,     0);
+		setV(`cs_${prefix}_vm`,   vm,    0);
+		let fos = document.getElementById(`cs_${prefix}_fos`);
+		if (isNaN(Sy)) {
+			fos.textContent = '—';
+		} else {
+			let f = Sy/vm;
+			fos.textContent = (!isFinite(f) || f > 999) ? '>999' : f.toFixed(3);
 		}
 	}
 
@@ -835,94 +1034,67 @@
 		xf = Math.max(x_axis.x1.baseVal.value, x_axis.x2.baseVal.value);
 		y0 = beam.y1.baseVal.value;
 		len = getV('length');
-		canv_geo = [x0, xf, y0];
 
-		loads = document.getElementById('loads');
+		const SVGNS = 'http://www.w3.org/2000/svg';
+		let loads = document.getElementById('loads');
 
-		for(i=0; i<loads.children.length-1; i++) {
-			x = loads.children[i].dataset.load_id;
-			type = document.getElementById(`load_type_${x}`).value;
+		function mk(tag, attrs, cls) {
+			let el = document.createElementNS(SVGNS, tag);
+			for (let a in attrs) el.setAttribute(a, attrs[a]);
+			if (cls) el.classList.add(cls);
+			return el;
+		}
 
+		for(let li=0; li<loads.children.length-1; li++) {
+			let id = loads.children[li].dataset.load_id;
+			let position = getV(`load_${id}_pos`);
+			if (isNaN(position)) continue;
+			let cp = x0 + (xf-x0)*position/len;
 
-			position = getV(`load_${x}_1`);
-			cp = x0 + (xf-x0)*position/len;
+			let fixed = {};
+			let val   = {};
+			for (let d of DOFS) {
+				fixed[d] = document.getElementById(`load_${id}_fix_${d}`).checked;
+				val[d]   = getV(`load_${id}_load_${d}`, 0); // applied load (free DOFs only)
+			}
 
-			if (type == 'fix') {
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				y2 = y0 + 20;
-				x1 = cp - 12;
-				x2 = cp + 12;
-				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', '#111');
-				shape.setAttribute('points', `${x2},${y0} ${x1},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
-			} else if (type == 'pin') {
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				y2 = y0 + 20;
-				x1 = cp - 10;
-				x2 = cp + 10;
-				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', '#111');
-				shape.setAttribute('points', `${cp},${y0} ${x1},${y2} ${x2},${y2}`);
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
-			} else if (type == 'force') {
-				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
+			// --- support symbol for any fixed DOFs ---
+			if (fixed.x || fixed.y || fixed.t || fixed.p) {
+				let y2 = y0 + 20, pts;
+				if (fixed.t)      pts = `${cp+12},${y0} ${cp-12},${y0} ${cp-12},${y2} ${cp+12},${y2}`;
+				else if (fixed.y) pts = `${cp},${y0} ${cp-10},${y2} ${cp+10},${y2}`;
+				else              pts = `${cp-6},${y0+4} ${cp+6},${y0+4} ${cp+6},${y0+14} ${cp-6},${y0+14} ${cp-6},${y0+4}`;
+				beam_items.append(mk('polyline', {points: pts, fill: '#111', cp: position}, 'beam-shape'));
 
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				y2 = y0 - 25*sgn;
-				shape.setAttribute('points', `${cp},${y0} ${cp},${y2}`);
-				shape.classList.add('beam-arrow');
-				shape.setAttribute('stroke', '#111');
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
+				let lbl = mk('text', {x: cp, y: y0+34, 'text-anchor':'middle', 'font-size':'11', fill:'#333'});
+				lbl.textContent = (fixed.x?'X':'') + (fixed.y?'Y':'') + (fixed.t?'θ':'') + (fixed.p?'ψ':'');
+				beam_items.append(lbl);
+			}
 
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				x1 = cp - 12*sgn;
-				x2 = cp + 12*sgn;
-				y1 = y0 - 25*sgn;
-				y2 = y0 - 45*sgn;
-				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
-				shape.setAttribute('points', `${cp},${y2} ${x1},${y1} ${x2},${y1}`);
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
-			} else if (type == 'moment') {
-				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
-
-				shape = document.createElementNS('http://www.w3.org/2000/svg','circle');
-				shape.classList.add('beam-shape');
-				shape.setAttribute('fill', sgn>0 ? '#1a1' : '#d22');
-				shape.setAttribute('cx', cp);
-				shape.setAttribute('cy', y0);
-				shape.setAttribute('r', 12);
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
-			} else if (type == 'slope') {
-				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				x1 = cp + 14*sgn;
-				y1 = y0 - 14;
-				x2 = cp - 14*sgn;
-				y2 = y0 + 14;
-				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
-				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
-				shape.classList.add('beam-prescribed');
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
-			} else if (type == 'displacement') {
-				sgn = getV(`load_${x}_2`) < 0 ? -1 : +1;
-				shape = document.createElementNS('http://www.w3.org/2000/svg','polyline');
-				x1 = cp;
-				y1 = y0 - 14;
-				x2 = cp;
-				y2 = y0 + 14;
-				shape.setAttribute('points', `${x1},${y1} ${x2},${y2}`);
-				shape.setAttribute('stroke', sgn>0 ? '#1a1' : '#d22');
-				shape.classList.add('beam-prescribed');
-				shape.setAttribute('cp', position);
-				beam_items.append(shape);
+			// --- applied-load arrows for free, non-zero DOFs ---
+			if (!fixed.y && val.y) {
+				let sgn = val.y < 0 ? -1 : 1;
+				beam_items.append(mk('polyline', {points:`${cp},${y0} ${cp},${y0-25*sgn}`, stroke:'#111', cp:position}, 'beam-arrow'));
+				beam_items.append(mk('polyline', {points:`${cp},${y0-45*sgn} ${cp-12*sgn},${y0-25*sgn} ${cp+12*sgn},${y0-25*sgn}`,
+					fill: sgn>0?'#1a1':'#d22', cp:position}, 'beam-shape'));
+			}
+			if (!fixed.x && val.x) {
+				let sgn = val.x < 0 ? -1 : 1;
+				beam_items.append(mk('polyline', {points:`${cp-30*sgn},${y0} ${cp},${y0}`, stroke:sgn>0?'#1a1':'#d22', cp:position}, 'beam-arrow'));
+				beam_items.append(mk('polyline', {points:`${cp},${y0} ${cp-11*sgn},${y0-6} ${cp-11*sgn},${y0+6}`,
+					fill: sgn>0?'#1a1':'#d22', cp:position}, 'beam-shape'));
+			}
+			if (!fixed.t && val.t) {
+				let sgn = val.t < 0 ? -1 : 1;
+				beam_items.append(mk('circle', {cx:cp, cy:y0, r:12, fill:sgn>0?'#1a1':'#d22', cp:position}, 'beam-shape'));
+			}
+			if (!fixed.p && val.p) {
+				let sgn = val.p < 0 ? -1 : 1;
+				beam_items.append(mk('path', {d:`M ${cp+14},${y0-5} A 15 15 0 1 ${sgn>0?1:0} ${cp+14},${y0+5}`,
+					fill:'none', stroke:sgn>0?'#1a1':'#d22', 'stroke-width':3, cp:position}, 'beam-shape'));
+				let hy = y0 + 5*sgn;
+				beam_items.append(mk('polyline', {points:`${cp+14},${hy} ${cp+8},${hy-6*sgn} ${cp+21},${hy-6*sgn}`,
+					fill:sgn>0?'#1a1':'#d22', cp:position}, 'beam-shape'));
 			}
 		}
 	}
@@ -931,7 +1103,6 @@
 <html>
 
 <!-- Make sure to call your init function on document load -->
-<!-- You can copy the topbar template here -->
 <body onload="init()">
 <div id="topbar">
 	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
@@ -950,7 +1121,7 @@
 	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
 	<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
 	<a id="download_frame" hidden></a>
-</div>	
+</div>
 
 <svg id="walkthrough_overlay" onclick="WALK_nextStep()" >
 	<path id="walkthrough_frame" ></path>
@@ -958,8 +1129,7 @@
 	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
 </svg>
 
-<!-- From here go nuts, do whatever works for you. Use the container to keep stuff from spilling under topbar. I'll point out patterns to pay attention to. -->
-	<div style="width: 275px; float: left;" class="container">
+	<div style="width: 340px; float: left;" class="container">
 		<div class="even">
 			<table>
 				<tr>
@@ -969,7 +1139,7 @@
 				</tr>
 			</table>
 		</div>
-			
+
 		<div class="odd" id="user_input_material">
 			<label class="bold rowlabel">Material</label>
 			<select id="material_base" onchange="selectMaterialBase(); compute();">
@@ -982,6 +1152,10 @@
 				<tr>
 					<th class='rowlabel'>Flexural Modulus</th>
 					<td><input id='elastic_modulus' data-unit='elastic_modulus' value=69 /></td>
+					<td class='unit' data-unit='elastic_modulus'></td>
+				</tr><tr>
+					<th class='rowlabel'>Shear Modulus<span class="ttt">Shear modulus G, used for the torsion solve.</span></th>
+					<td><input id='shear_modulus' data-unit='elastic_modulus' value=26 /></td>
 					<td class='unit' data-unit='elastic_modulus'></td>
 				</tr><tr>
 					<th class='rowlabel'>Flexural Strength</th>
@@ -1034,6 +1208,14 @@
 					<th class='rowlabel'>Bottom Height<span class="ttt">Distance from neutral axis to bottom of section</span></th>
 					<td><input id='rmin' data-unit='dimension' readonly /></td>
 					<td class='unit' data-unit='dimension'></td>
+				</tr><tr>
+					<th class='rowlabel' id='J_label'>Torsion Const. J <span class="ttt">Saint-Venant torsion constant. Exact for round sections; * marks thin-wall / open-section approximations, which are unconservative if warping is restrained at constraints.</span></th>
+					<td><input id='J' data-unit='moi' readonly /></td>
+					<td class='unit' data-unit='moi'></td>
+				</tr><tr>
+					<th class='rowlabel'>Torsion Radius<span class="ttt">Distance (or wall thickness, for open sections) used to convert torque to peak shear stress: tau = T*r/J.</span></th>
+					<td><input id='rtors' data-unit='dimension' readonly /></td>
+					<td class='unit' data-unit='dimension'></td>
 				</tr>
 			</table><table id="table_section_input">
 				<tr id='section_1_row'>
@@ -1058,13 +1240,16 @@
 				</tr>
 			</table>
 		</div>
-		<div class="even" id='loads' data-current_load_number=0><center class=""><button id='addLoad_btn' onclick='addLoad()'>Add Load</button><input class="dropdown" type="checkbox" id="toggle_tips"><label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label><div class="dropdown">
-      <p>Moments are positive counter-clockwise.</p>
-      <p>Click on the chart to query points. </p>
-      <p>Click on the beam elements to query the corresponding points.</p>
+		<div class="even" id='loads' data-current_load_number=0><center class=""><button id='addLoad_btn' onclick='addLoad(); compute();'>Add Load</button><input class="dropdown" type="checkbox" id="toggle_tips"><label class="dropdown" for="toggle_tips" id="toggle_tips_label">Show Tips</label><div class="dropdown">
+      <p>Every entry handles four components: <b>X</b> lateral (axial), <b>Y</b> vertical (transverse), <b>θ</b> bending, <b>ψ</b> torsion.</p>
+      <p>Each component has a <b>Displacement</b> field and a <b>Load</b> field — one is your input, the other is computed and reported back.</p>
+      <p>Leave <b>Fix</b> unchecked to enter an applied force/moment in <b>Load</b>; the resulting displacement is reported. Check <b>Fix</b> to instead prescribe a displacement (blank or 0 = an ordinary support); the reaction is reported in <b>Load</b>.</p>
+      <p>The preset selector just stamps a common Fix pattern onto the checkboxes; toggle any box by hand and it switches to Custom.</p>
+      <p>The axial and torsion solves only run when at least one component of that kind is Fixed somewhere; otherwise they report zero.</p>
+      <p>Moments/torques are positive counter-clockwise; axial force is positive in tension.</p>
+      <p>Click on the chart to query points. Click on the beam elements to query the corresponding points.</p>
       <p>Right click on the chart near a local extrema to latch on and find the local extrema.</p>
-      <p>Moments are positive-counterclockwise.</p>
-      <p>Bending/shear extrema are at points of interest (constraints/loads).</p>
+      <p>Torsion of non-round sections (marked * on J) uses Saint-Venant approximations.</p>
       <p>The flexural strength and mass properties are for your usage/reference only- they aren't used in calculations.</p>
     </div></center></div> <!-- MAKE SURE NO SPACES! NO DEAD CHLDREN! -->
 	</div>
@@ -1093,7 +1278,42 @@
 	.load {
 		border-top: 2px solid #333 !important;
 	}
+
+	#plot_tabs {
+		margin: 4px 2px 6px 70px;
+		font-weight: bold;
+	}
+
+	#plot_tabs label {
+		margin-right: 16px;
+		cursor: pointer;
+	}
+
+	#loads .narrow {
+		width: 46px;
+	}
+
+	#loads small {
+		color: #666;
+		font-weight: normal;
+	}
+
+	#cs_table {
+		table-layout: fixed;
+		width: 560px;
+	}
+
+	#cs_table th, #cs_table td {
+		text-align: center;
+		padding: 2px 4px;
+	}
 </style>
+
+<div id="plot_tabs">
+	<label><input type="radio" name="plot_mode" id="plot_mode_bending" value="bending" checked onchange="compute()"> Bending</label>
+	<label><input type="radio" name="plot_mode" id="plot_mode_axial"   value="axial"   onchange="compute()"> Axial</label>
+	<label><input type="radio" name="plot_mode" id="plot_mode_torsion" value="torsion" onchange="compute()"> Torsion</label>
+</div>
 
 <svg version="1.2" class="plot" id='chart' aria-labelledby="title" role="img" style="height:600px; width:700px;">
 	<rect class="plot-background" id="chart_background" x=70 y=20 width=555 height=430 />
@@ -1119,10 +1339,14 @@
 	  <text x="325" y=485 class="plot-titlelabel unit" id="chart_x_label" data-unit='dimension' >Position []</text>
 
 	  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="chart_q_label" data-unit='deflection' fill="#0074d9">Deflection []</text>
+	  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="chart_u_label" data-unit='deflection' fill="#0074d9" style="display:none;">Axial Deflection []</text>
+	  <text x=-240 y=15 class="plot-titlelabel unit" transform="rotate(270)" id="chart_p_label" data-unit='slope' fill="#0074d9" style="display:none;">Twist Angle []</text>
 
 	  <text x=-120 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_m_label" data-unit='torque' fill="#d91200">Bending Moment []</text>
-	  <text x=-240 y=700 class="plot-titlelabel" transform="rotate(270)" fill="#111">/</text>
+	  <text x=-240 y=700 class="plot-titlelabel" transform="rotate(270)" id="chart_zsep" fill="#111">/</text>
 	  <text x=-320 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_s_label" data-unit='force' fill="#c48900">Shear Force []</text>
+	  <text x=-240 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_n_label" data-unit='force' fill="#c48900" style="display:none;">Axial Force []</text>
+	  <text x=-240 y=700 class="plot-titlelabel unit" transform="rotate(270)" id="chart_tq_label" data-unit='torque' fill="#d91200" style="display:none;">Torque []</text>
 	</g>
 
 	<g class="plot-axlabels" id='chart_x_axlabels'></g>
@@ -1132,27 +1356,13 @@
 	<g>
 		<line class="plot-querybar" id="chart_querybar" x1=100 x2=100 y1=15 y2=555 opacity=0></line>
 	</g>
-	<polyline
-		id='chart_q_line'
-		fill='none'
-		stroke='#0074d9'
-		stroke-width=2
-		points="
-		"/>
-	<polyline
-		id='chart_m_line'
-		fill='none'
-		stroke='#d91200'
-		stroke-width=2
-		points="
-		"/>
-	<polyline
-		id='chart_s_line'
-		fill='none'
-		stroke='#c48900'
-		stroke-width=2
-		points="
-		"/>
+	<polyline id='chart_q_line'  fill='none' stroke='#0074d9' stroke-width=2 points="" />
+	<polyline id='chart_m_line'  fill='none' stroke='#d91200' stroke-width=2 points="" />
+	<polyline id='chart_s_line'  fill='none' stroke='#c48900' stroke-width=2 points="" />
+	<polyline id='chart_u_line'  fill='none' stroke='#0074d9' stroke-width=2 points="" />
+	<polyline id='chart_n_line'  fill='none' stroke='#c48900' stroke-width=2 points="" />
+	<polyline id='chart_p_line'  fill='none' stroke='#0074d9' stroke-width=2 points="" />
+	<polyline id='chart_tq_line' fill='none' stroke='#d91200' stroke-width=2 points="" />
 
 	<rect id="chart_query_area" x=0 y=0 width=700 height=460 opacity=0 fill="#fff">
 </svg>
@@ -1185,6 +1395,69 @@
 				<th class="rowlabel">Shear Stress @ Center</th>
 				<td><input id="query_stress_shear" data-unit='stress' readonly /></td>
 				<td class="unit" data-unit='stress'></td>
+			</tr>
+		</table>
+	</div>
+
+	<div class="output-plot" id="combined_stress_panel" style='display:none;'>
+		<label class="bold rowlabel">Combined Loading at Queried Position</label>
+		<table>
+			<tr>
+				<th class="rowlabel">Axial Force</th>
+				<td><input id="cs_N" data-unit='force' readonly /></td>
+				<td class="unit" data-unit='force'></td>
+				<th class="rowlabel">Axial Deflection</th>
+				<td><input id="cs_u" data-unit='deflection' readonly /></td>
+				<td class="unit" data-unit='deflection'></td>
+			</tr><tr>
+				<th class="rowlabel">Torque</th>
+				<td><input id="cs_T" data-unit='torque' readonly /></td>
+				<td class="unit" data-unit='torque'></td>
+				<th class="rowlabel">Twist Angle</th>
+				<td><input id="cs_phi" data-unit='slope' readonly /></td>
+				<td class="unit" data-unit='slope'></td>
+			</tr>
+		</table>
+		<table id="cs_table">
+			<tr>
+				<th class="collabel">Point</th>
+				<th class="collabel">&sigma; normal</th>
+				<th class="collabel">&tau; shear</th>
+				<th class="collabel">&sigma;<sub>1</sub></th>
+				<th class="collabel">&sigma;<sub>2</sub></th>
+				<th class="collabel">&tau;<sub>max</sub></th>
+				<th class="collabel">von Mises</th>
+				<th class="collabel">FoS (S<sub>y</sub>)</th>
+			</tr>
+			<tr>
+				<th class="rowlabel">Top fiber<span class="ttt">Axial stress plus bending stress at the top fiber; shear is torsion only.</span></th>
+				<td data-unit='stress' id="cs_top_sx"></td>
+				<td data-unit='stress' id="cs_top_tau"></td>
+				<td data-unit='stress' id="cs_top_s1"></td>
+				<td data-unit='stress' id="cs_top_s2"></td>
+				<td data-unit='stress' id="cs_top_tmax"></td>
+				<td data-unit='stress' id="cs_top_vm"></td>
+				<td id="cs_top_fos"></td>
+			</tr><tr>
+				<th class="rowlabel">Bottom fiber<span class="ttt">Axial stress plus bending stress at the bottom fiber; shear is torsion only.</span></th>
+				<td data-unit='stress' id="cs_bot_sx"></td>
+				<td data-unit='stress' id="cs_bot_tau"></td>
+				<td data-unit='stress' id="cs_bot_s1"></td>
+				<td data-unit='stress' id="cs_bot_s2"></td>
+				<td data-unit='stress' id="cs_bot_tmax"></td>
+				<td data-unit='stress' id="cs_bot_vm"></td>
+				<td id="cs_bot_fos"></td>
+			</tr><tr>
+				<th class="rowlabel">Neutral axis<span class="ttt">Bending stress is zero here; shear combines transverse shear (V/A average) and torsion.</span></th>
+				<td data-unit='stress' id="cs_na_sx"></td>
+				<td data-unit='stress' id="cs_na_tau"></td>
+				<td data-unit='stress' id="cs_na_s1"></td>
+				<td data-unit='stress' id="cs_na_s2"></td>
+				<td data-unit='stress' id="cs_na_tmax"></td>
+				<td data-unit='stress' id="cs_na_vm"></td>
+				<td id="cs_na_fos"></td>
+			</tr><tr>
+				<td colspan=8 class="unit" data-unit='stress' style="text-align:right; font-style:italic;">stresses in []</td>
 			</tr>
 		</table>
 	</div>

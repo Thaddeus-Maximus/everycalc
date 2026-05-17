@@ -2,7 +2,7 @@
  * EveryCalc general purpose library
  */
 
-VERSION = 0.6;
+VERSION = 1.0;
 
 function EC_onload() {
 	document.getElementById('topbar_version').innerHTML = VERSION;
