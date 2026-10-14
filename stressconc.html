@@ -9,6 +9,7 @@
 <script type="text/javascript" src="js/units.js"></script>
 <script type="text/javascript" src="js/export.js"></script>
 <script type="text/javascript" src="js/walkthrough.js"></script>
+<script type="text/javascript" src="js/materials.js"></script>
 
 <!-- Export library requires this script tag -->
 <script id="EXP_inputs_frame"></script>
@@ -22,7 +23,7 @@ UNIT_MAP = {
 	'stress':    ['MPa', 'psi'],
 };
 WALK_STEPS = [{
-		poi: 'case_sel',
+		poi: 'case_btn',
 		desc: 'Pick the stress raiser geometry and how it is loaded.',
 		valign: 'bottom'
 	},{
@@ -499,6 +500,8 @@ const CASES = {
 			need(g.D > 0 && g.r > 0, 'Enter positive D and r.');
 			let rd = g.r / g.D;
 			rangeWarn(warn, 'r/D', rd, 0.005, 0.04);
+			if (g.D > 6.5 * 0.0254)
+				warn.push('D > 6.5 in: Roark suggests using the K<sub>tB</sub> value for r/D = 0.0208 on large shafts.');
 			let KtB = poly([1.426, 0.1643, -0.0019], 0.1 / rd);
 			return {Kt: Math.max(1.6, KtB), nom: 32 * g.M / (Math.PI * g.D ** 3)};
 		}
@@ -556,8 +559,23 @@ function init() {
 		groups[c.group].appendChild(opt);
 	}
 	sel.value = 'f2b';
+	CASEPICK_build();
+
+	// Material selects: the detail list holds every material until persistence is
+	// restored, so a saved detail value can always be applied
+	MATERIAL_populateSelect('matl');
+	document.getElementById('matl_base').value = 'Steel';
+	MATERIAL_selectBase('matl');
+	UNIT_change();
+	selectMaterial();
+	let det = document.getElementById('matl_detail');
+	for (let name in MATERIAL_DATA)
+		if (![...det.options].some(o => o.value == name))
+			det.add(new Option(name, name));
+	document.addEventListener('keydown', function(e) { if (e.key == 'Escape') CASEPICK_close(); });
 
 	EXP_onload();
+	MATERIAL_selectBase('matl');
 	UNIT_change();
 
 	EC_setOnInput(function(e) { setError(1); compute(); });
@@ -605,14 +623,13 @@ function compute() {
 		document.getElementById('lbl_max').innerHTML = peakNormal ? 'Peak Stress σ<sub>max</sub> = K<sub>t</sub>·nom' : 'Peak Shear Stress τ<sub>max</sub> = K<sub>t</sub>·τ<sub>nom</sub>';
 		document.getElementById('lbl_fat').innerHTML = peakNormal ? 'Fatigue Peak K<sub>f</sub>·nom' : 'Fatigue Peak K<sub>f</sub>·τ<sub>nom</sub>';
 
-		// Yield safety factor (distortion energy: shear yield = Sy/√3)
-		let Sy = getV('Sy', NaN);
-		if (isFinite(Sy) && Sy > 0) {
-			let allow = peakNormal ? Sy : Sy / SQ(3);
-			setV('out_sf', allow / Math.abs(smax), 2);
-		} else {
-			setV('out_sf', '—');
-		}
+		// Safety factors. Shear peaks use distortion energy (allowable = S/√3).
+		let fatPeak = (typeof res.smaxOverride !== 'undefined') ? res.smaxOverride : Kf * res.nom;
+		let shearAdj = peakNormal ? 1 : 1 / SQ(3);
+		let Se = getV('Se', NaN) * getV('kmarin', 1);
+		setFOS('out_fos_y',  getV('Sy', NaN) * shearAdj, smax);
+		setFOS('out_fos_u',  getV('Su', NaN) * shearAdj, smax);
+		setFOS('out_fos_f',  Se * shearAdj, fatPeak);
 
 		let wbox = document.getElementById('warnings');
 		wbox.innerHTML = warn.map(w => '⚠ ' + w).join('<br>');
@@ -623,11 +640,29 @@ function compute() {
 		EXP_dumpPersistence();
 	} catch(err) {
 		console.log(err);
-		for (let id of ['out_kt', 'out_kf', 'out_nom', 'out_max', 'out_fat', 'out_sf'])
+		for (let id of ['out_kt', 'out_kf', 'out_nom', 'out_max', 'out_fat', 'out_fos_y', 'out_fos_u', 'out_fos_f'])
 			document.getElementById(id).value = '';
 		document.getElementById('warnings').style.display = 'none';
 		setError(2, err);
 	}
+}
+
+function setFOS(id, allow, stress) {
+	let el = document.getElementById(id);
+	let ok = isFinite(allow) && allow > 0;
+	setV(id, ok ? allow / Math.abs(stress) : '—', 2);
+	el.classList.toggle('error', ok && allow / Math.abs(stress) < 1);
+}
+
+// Fill strengths from the material library (skipped for Custom, so user values stick)
+function selectMaterial() {
+	if (document.getElementById('matl_base').value == 'custom') return;
+	let m = MATERIAL_DATA[document.getElementById('matl_detail').value];
+	if (!m) return;
+	let fill = (id, v) => setV(id, typeof v === 'undefined' ? '' : v);
+	fill('Sy', m.Sy !== undefined ? m.Sy : m.St);
+	fill('Su', m.UTS !== undefined ? m.UTS : m.St);
+	fill('Se', m.Se);
 }
 
 function updateLayout(c) {
@@ -645,6 +680,7 @@ function updateLayout(c) {
 	document.getElementById('lbl_M').innerHTML = c.load == 'Mt' ? 'Transverse Moment <i>M</i>' : 'Bending Moment <i>M</i>';
 	document.getElementById('lbl_sig1').innerHTML = c.load == 'sig12' ? 'Remote Stress σ<sub>1</sub>' : 'Remote Stress σ';
 
+	document.getElementById('case_btn_name').textContent = c.name;
 	document.getElementById('case_nom').innerHTML = c.nom;
 	document.getElementById('case_rng').innerHTML = 'Valid for: ' + c.rng;
 	drawSketch(c);
@@ -760,18 +796,51 @@ const SKETCHES = {
 		<text x="80" y="160" class="sk-note">keyseat D/4 wide × D/8 deep</text>`,
 };
 
+// Arrow markers live once in #sk_defs (in the body) and are shared by every sketch
+function sketchMarkup(c) {
+	return SKETCHES[c.fig]() + loadGlyphs(c.load);
+}
+
 function drawSketch(c) {
-	document.getElementById('sketch').innerHTML = `
-		<defs>
-			<marker id="sk_arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-				<path d="M0,0 L10,5 L0,10 Z" fill="#06c"/></marker>
-			<marker id="sk_arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-				<path d="M0,0 L10,5 L0,10 Z" fill="#b00"/></marker>
-			<marker id="sk_arrL2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-				<path d="M0,0 L10,5 L0,10 Z" fill="#c60"/></marker>
-		</defs>
-		${SKETCHES[c.fig]()}
-		${loadGlyphs(c.load)}`;
+	document.getElementById('sketch').innerHTML = sketchMarkup(c);
+}
+
+/* ---------------- Case picker popup ---------------- */
+
+function CASEPICK_build() {
+	let html = '';
+	let group = null;
+	for (let id in CASES) {
+		let c = CASES[id];
+		if (c.group != group) {
+			if (group !== null) html += '</div>';
+			group = c.group;
+			html += `<div class="casepick_group">${group}</div><div class="casepick_grid">`;
+		}
+		html += `<div class="casecard" id="casecard_${id}" onclick="CASEPICK_choose('${id}');">
+			<svg viewBox="0 0 320 180">${sketchMarkup(c)}</svg>
+			<div>${c.name}</div></div>`;
+	}
+	document.getElementById('casepick_body').innerHTML = html + '</div>';
+}
+
+function CASEPICK_open() {
+	let cur = document.getElementById('case_sel').value;
+	for (let card of document.getElementsByClassName('casecard'))
+		card.classList.toggle('current', card.id == 'casecard_' + cur);
+	document.getElementById('casepick').style.display = 'flex';
+	document.getElementById('casecard_' + cur).scrollIntoView({block: 'nearest'});
+}
+
+function CASEPICK_close() {
+	document.getElementById('casepick').style.display = 'none';
+}
+
+function CASEPICK_choose(id) {
+	document.getElementById('case_sel').value = id;
+	CASEPICK_close();
+	setError(1);
+	compute();
 }
 </script>
 
@@ -783,7 +852,19 @@ function drawSketch(c) {
 .sk-load { stroke: #b00; stroke-width: 2; }
 .sk-load2 { stroke: #c60; stroke-width: 2; }
 .sk-loadtxt { fill: #b00; font: bold 14px serif; }
-#case_sel { width: 420px; }
+#case_btn { width: 420px; box-sizing: border-box; padding: 3px 6px; background: #fff; border: 1px solid #888; border-radius: 3px; display: flex; justify-content: space-between; }
+#case_btn:hover { border-color: #06c; }
+#casepick { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; }
+#casepick_box { background: #f4f4f4; width: min(1100px, 95vw); max-height: 88vh; display: flex; flex-direction: column; border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+#casepick_head { display: flex; justify-content: space-between; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #ccc; }
+#casepick_body { overflow-y: auto; padding: 0 12px 12px; }
+.casepick_group { font-weight: bold; margin: 12px 0 6px; }
+.casepick_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.casecard { background: #fff; border: 2px solid #ddd; border-radius: 4px; padding: 4px; cursor: pointer; font-size: 0.8em; text-align: center; }
+.casecard svg { width: 100%; height: auto; display: block; }
+.casecard:hover { border-color: #06c; }
+.casecard.current { border-color: #b00; }
+@media print { #casepick { display: none !important; } }
 .casenote { max-width: 320px; font-size: 0.85em; padding: 4px; }
 #warnings { max-width: 420px; font-size: 0.85em; padding: 4px; }
 </style>
@@ -795,7 +876,7 @@ function drawSketch(c) {
 	<div class="topbar-la" id="topbar_version"></div>
 	<div class="topbar-la" id="topbar_filename"></div>
 	<div class="topbar-la" id="topbar_unit">
-		<select id="unit_select" onchange="UNIT_change(); compute();">
+		<select id="unit_select" onchange="UNIT_change(); selectMaterial(); compute();">
 			<option value=0>Metric</option>
 			<option value=1 selected>Imperial</option>
 		</select>
@@ -822,7 +903,10 @@ function drawSketch(c) {
 			<table>
 				<tr>
 					<th class="rowlabel">Case</th>
-					<td colspan=2><select id="case_sel" onchange="setError(1); compute();"></select></td>
+					<td colspan=2>
+						<div id="case_btn" class="selectable" onclick="CASEPICK_open();"><span id="case_btn_name"></span><span>▾</span></div>
+						<select id="case_sel" style="display: none;" onchange="setError(1); compute();"></select>
+					</td>
 				</tr>
 			</table>
 			<table id="dim_inputs">
@@ -849,9 +933,21 @@ function drawSketch(c) {
 				<tr><th class="rowlabel">Notch Sensitivity <i>q</i>
 					<span class="ttt">0 to 1. K<sub>f</sub> = 1 + q(K<sub>t</sub> − 1). Use 1 (default) for brittle materials or when unsure; ductile metals with large radii approach 1, small radii and soft materials are lower. See Peterson/Neuber charts.</span></th>
 					<td><input id="q" value="1"></td><td></td></tr>
+				<tr><th class="rowlabel">Material</th>
+					<td colspan=2><select id="matl_base" style="width: 100%;" onchange="MATERIAL_selectBase('matl'); selectMaterial(); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Grade</th>
+					<td colspan=2><select id="matl_detail" style="width: 100%;" onchange="selectMaterial(); compute();"></select></td></tr>
 				<tr><th class="rowlabel">Yield Strength <i>S<sub>y</sub></i>
-					<span class="ttt">Optional. Used for a static safety factor against the peak (K<sub>t</sub>) stress. Shear peaks are compared against S<sub>y</sub>/√3. Note: ductile parts under static load usually redistribute locally and K<sub>t</sub> is often ignored for static strength.</span></th>
+					<span class="ttt">Filled from the material library; edit freely (pick Custom to keep your own values when switching units). For plastics without a listed yield, tensile strength is used.</span></th>
 					<td><input id="Sy" data-unit="stress" value=""></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Ultimate Strength <i>S<sub>u</sub></i></th>
+					<td><input id="Su" data-unit="stress" value=""></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Endurance Limit <i>S<sub>e</sub>'</i>
+					<span class="ttt">Uncorrected rotating-beam endurance limit (steels: 0.5·S<sub>u</sub>; aluminums: fatigue strength at 5×10⁸ cycles). Blank = no fatigue check.</span></th>
+					<td><input id="Se" data-unit="stress" value=""></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Marin Factor <i>k</i>
+					<span class="ttt">Product of endurance-limit modifying factors k<sub>a</sub>·k<sub>b</sub>·k<sub>c</sub>·k<sub>d</sub>·k<sub>e</sub> (surface, size, load, temperature, reliability). S<sub>e</sub> = k·S<sub>e</sub>'. Typical machined steel shaft ≈ 0.6–0.8. Default 1.</span></th>
+					<td><input id="kmarin" value="1"></td><td></td></tr>
 			</table>
 		</div>
 
@@ -870,7 +966,15 @@ function drawSketch(c) {
 				<tr><th class="rowlabel" id="lbl_nom">Nominal Stress</th><td><input id="out_nom" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
 				<tr><th class="rowlabel" id="lbl_max">Peak Stress</th><td><input id="out_max" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
 				<tr><th class="rowlabel" id="lbl_fat">Fatigue Peak</th><td><input id="out_fat" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
-				<tr><th class="rowlabel">Yield Safety Factor</th><td><input id="out_sf" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Yield FOS
+					<span class="ttt">S<sub>y</sub> / peak (K<sub>t</sub>) stress. Conservative for ductile metals under static load, which yield locally and redistribute; for those, compare S<sub>y</sub> to the nominal stress too.</span></th>
+					<td><input id="out_fos_y" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Ultimate FOS
+					<span class="ttt">S<sub>u</sub> / peak (K<sub>t</sub>) stress. Most relevant for brittle materials (cast iron, many plastics), where K<sub>t</sub> applies fully to static loads.</span></th>
+					<td><input id="out_fos_u" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Fatigue FOS
+					<span class="ttt">k·S<sub>e</sub>' / (K<sub>f</sub>·nominal) for a fully reversed load of the entered amplitude. For mean + alternating loads use Goodman with these numbers.</span></th>
+					<td><input id="out_fos_f" readonly></td><td></td></tr>
 			</table>
 			<div id="warnings" class="warning" style="display: none;"></div>
 			<div class="casenote">Source: Roark's Formulas for Stress &amp; Strain, 7th ed., Table 6-1 (after Peterson). Linear-elastic K<sub>t</sub>; curve fits are only valid within the stated ranges.</div>
@@ -878,5 +982,25 @@ function drawSketch(c) {
 
 	</div>
 </div>
+
+<!-- Case picker popup -->
+<div id="casepick" onclick="if (event.target === this) CASEPICK_close();">
+	<div id="casepick_box">
+		<div id="casepick_head">Select a Case<span class="selectable" onclick="CASEPICK_close();">✕</span></div>
+		<div id="casepick_body"></div>
+	</div>
+</div>
+
+<!-- Shared arrow markers for all sketches -->
+<svg width="0" height="0" style="position: absolute;">
+	<defs id="sk_defs">
+		<marker id="sk_arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+			<path d="M0,0 L10,5 L0,10 Z" fill="#06c"/></marker>
+		<marker id="sk_arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+			<path d="M0,0 L10,5 L0,10 Z" fill="#b00"/></marker>
+		<marker id="sk_arrL2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+			<path d="M0,0 L10,5 L0,10 Z" fill="#c60"/></marker>
+	</defs>
+</svg>
 </body>
 </html>
