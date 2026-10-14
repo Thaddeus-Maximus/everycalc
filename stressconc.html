@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<link rel="stylesheet" href="include/style.css">
+
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame"></script>
+
+<script type="text/javascript">
+EXP_FN_BASE = 'stressconc';
+UNIT_MAP = {
+	'dimension': ['mm', 'in'],
+	'force':     ['N', 'lbf'],
+	'moment':    ['N-m', 'in-lbf'],
+	'stress':    ['MPa', 'psi'],
+};
+WALK_STEPS = [{
+		poi: 'case_sel',
+		desc: 'Pick the stress raiser geometry and how it is loaded.',
+		valign: 'bottom'
+	},{
+		poi: 'dim_inputs',
+		desc: 'Enter the geometry. Only the dimensions relevant to the selected case are shown; the sketch shows what each one means.',
+		valign: 'bottom'
+	},{
+		poi: 'load_inputs',
+		desc: 'Enter the applied load. Notch sensitivity q and yield strength are optional.',
+		valign: 'bottom'
+	},{
+		poi: 'sketch',
+		desc: 'Sketch of the selected case (not to scale), with the nominal stress definition and the validity range of the curve fit.',
+		valign: 'bottom',
+		halign: 'right'
+	},{
+		poi: 'outputs',
+		desc: 'Kt, nominal stress, and peak stress. Out-of-range geometry is flagged in orange, because the curve fits can extrapolate badly.',
+		valign: 'bottom',
+		halign: 'right'
+	}];
+
+/*
+	Theoretical stress concentration factors, Roark's Formulas for Stress & Strain
+	(7th ed.), Table 6-1, which is largely taken from Peterson's Stress Concentration Factors.
+
+	Many cases use Kt = C1 + C2·x + C3·x² + C4·x³ with Ci = a + b·√(h/r) + c·(h/r),
+	split into two h/r ranges. HR_SETS stores [[a,b,c] for C1..C4] for each range.
+*/
+
+const SQ = Math.sqrt;
+
+function poly(cs, x) {
+	let s = 0;
+	for (let i = cs.length - 1; i >= 0; i--) s = s * x + cs[i];
+	return s;
+}
+
+// Evaluate coefficients of the form a + b·√v + c·v
+function coefRoot(set, v) {
+	return set.map(([a, b, c]) => a + b * SQ(v) + c * v);
+}
+// Evaluate coefficients of the form a + b·v + c·v²
+function coefSq(set, v) {
+	return set.map(([a, b, c]) => a + b * v + c * v * v);
+}
+
+// Two-range h/r curve fit. ranges: [lo, split, hi]
+function ktHR(hr, x, setLo, setHi, ranges, warn, form) {
+	let f = form || coefRoot;
+	if (hr < ranges[0] || hr > ranges[2])
+		warn.push(`h/r = ${hr.toFixed(3)} is outside the fitted range ${ranges[0]} – ${ranges[2]}.`);
+	return poly(f(hr < ranges[1] ? setLo : setHi, hr), x);
+}
+
+function rangeWarn(warn, name, v, lo, hi) {
+	if (v < lo || v > hi)
+		warn.push(`${name} = ${v.toFixed(3)} is outside the fitted range ${lo} – ${hi}.`);
+}
+
+function need(cond, msg) { if (!cond) throw msg; }
+
+// Standard checks for a bar whose width/diameter steps from D down to d
+function stepGeom(g, single) {
+	need(g.D > 0 && g.d > 0 && g.r > 0, 'Enter positive D, d and r.');
+	need(g.d < g.D, 'd must be smaller than D.');
+	let h = single ? (g.D - g.d) : (g.D - g.d) / 2;
+	return {h: h, hr: h / g.r, x: single ? h / g.D : 2 * h / g.D};
+}
+
+/*
+	Case table. Each case:
+	  group, name, fig (sketch key), load ('P','M','T','m','sig','sig12')
+	  dims: [[key, label], ...]  (keys: D d di h r t a b)
+	  nom:  text definition of nominal stress
+	  rng:  text description of the fit's validity range
+	  calc(g, warn) → {Kt, nom, shear}   (shear: nominal is a shear stress)
+*/
+const CASES = {
+	// ---------------- I. Notches and grooves ----------------
+	n1a: {
+		group: 'Notches & Grooves',
+		name: 'U/elliptical edge notch, semi-infinite plate — tension',
+		fig: 'semiinf', load: 'sig',
+		dims: [['h', 'Notch Depth <i>h</i>'], ['r', 'Notch Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = σ (remote stress)',
+		rng: '1 ≤ h/r ≤ 361',
+		calc(g, warn) {
+			need(g.h > 0 && g.r > 0, 'Enter positive h and r.');
+			rangeWarn(warn, 'h/r', g.h / g.r, 1, 361);
+			return {Kt: 0.855 + 2.21 * SQ(g.h / g.r), nom: g.sig};
+		}
+	},
+	n2a: {
+		group: 'Notches & Grooves',
+		name: 'Opposite U-notches, flat bar — axial tension',
+		fig: 'notch2', load: 'P',
+		dims: [['D', 'Full Width <i>D</i>'], ['d', 'Net Width <i>d</i>'], ['r', 'Notch Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / (t·d)',
+		rng: '0.1 ≤ h/r ≤ 50, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[0.955, 2.169, -0.081], [-1.557, -4.046, 1.032], [4.013, 0.424, -0.748], [-2.461, 1.538, -0.236]],
+				[[1.037, 1.991, 0.002], [-1.886, -2.181, -0.048], [0.649, 1.086, 0.142], [1.218, -0.922, -0.086]],
+				[0.1, 2, 50], warn);
+			return {Kt: Kt, nom: g.P / (g.t * g.d)};
+		}
+	},
+	n2b: {
+		group: 'Notches & Grooves',
+		name: 'Opposite U-notches, flat bar — in-plane bending',
+		fig: 'notch2', load: 'M',
+		dims: [['D', 'Full Width <i>D</i>'], ['d', 'Net Width <i>d</i>'], ['r', 'Notch Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = 6M / (t·d²)',
+		rng: '0.1 ≤ h/r ≤ 50, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[1.024, 2.092, -0.051], [-0.630, -7.194, 1.288], [2.117, 8.574, -2.160], [-1.420, -3.494, 0.932]],
+				[[1.113, 1.957, 0], [-2.579, -4.017, -0.013], [4.100, 3.922, 0.083], [-1.528, -1.893, -0.066]],
+				[0.1, 2, 50], warn);
+			return {Kt: Kt, nom: 6 * g.M / (g.t * g.d * g.d)};
+		}
+	},
+	n2c: {
+		group: 'Notches & Grooves',
+		name: 'Opposite U-notches, flat bar — transverse (out-of-plane) bending',
+		fig: 'notch2', load: 'Mt',
+		dims: [['D', 'Full Width <i>D</i>'], ['d', 'Net Width <i>d</i>'], ['r', 'Notch Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = 6M / (t²·d)',
+		rng: '0.1 ≤ h/r ≤ 5, h/t large',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let set = [[1.041, 0.839, 0.014], [-1.239, -1.663, 0.118], [3.370, -0.758, 0.434], [-2.162, 1.582, -0.606]];
+			let Kt = ktHR(s.hr, s.x, set, set, [0.1, 5, 5], warn);
+			return {Kt: Kt, nom: 6 * g.M / (g.t * g.t * g.d)};
+		}
+	},
+	n3a: {
+		group: 'Notches & Grooves',
+		name: 'Single U-notch on one edge, flat bar — axial tension',
+		fig: 'notch1', load: 'P',
+		dims: [['D', 'Full Width <i>D</i>'], ['d', 'Net Width <i>d</i>'], ['r', 'Notch Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / (t·d)',
+		rng: '0.5 ≤ h/r ≤ 20, h = D−d',
+		calc(g, warn) {
+			let s = stepGeom(g, true);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[0.907, 2.125, 0.023], [0.710, -11.289, 1.708], [-0.672, 18.754, -4.046], [0.175, -9.759, 2.365]],
+				[[0.953, 2.136, -0.005], [-3.255, -6.281, 0.068], [8.203, 6.893, 0.064], [-4.851, -2.793, -0.128]],
+				[0.5, 2, 20], warn);
+			return {Kt: Kt, nom: g.P / (g.t * g.d)};
+		}
+	},
+	n3b: {
+		group: 'Notches & Grooves',
+		name: 'Single U-notch on one edge, flat bar — in-plane bending',
+		fig: 'notch1', load: 'M',
+		dims: [['D', 'Full Width <i>D</i>'], ['d', 'Net Width <i>d</i>'], ['r', 'Notch Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = 6M / (t·d²)',
+		rng: '0.5 ≤ h/r ≤ 20, h = D−d',
+		calc(g, warn) {
+			let s = stepGeom(g, true);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[1.795, 1.481, -0.211], [-3.544, -3.677, 0.578], [5.459, 3.691, -0.565], [-2.678, -1.531, 0.205]],
+				[[2.966, 0.502, -0.009], [-6.475, -1.126, 0.019], [8.023, 1.253, -0.020], [-3.572, -0.634, 0.010]],
+				[0.5, 2, 20], warn, coefSq);
+			return {Kt: Kt, nom: 6 * g.M / (g.t * g.d * g.d)};
+		}
+	},
+	n7a: {
+		group: 'Notches & Grooves',
+		name: 'U-groove in round shaft — axial tension',
+		fig: 'groove', load: 'P',
+		dims: [['D', 'Shaft Diam. <i>D</i>'], ['d', 'Groove Root Diam. <i>d</i>'], ['r', 'Groove Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = 4P / (π·d²)',
+		rng: '0.1 ≤ h/r ≤ 50, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let Kt = ktHR(s.hr, s.x,
+				[[0.89, 2.208, -0.094], [-0.923, -6.678, 1.638], [2.893, 6.448, -2.516], [-1.912, -1.944, 0.963]],
+				[[1.037, 1.967, 0.002], [-2.679, -2.980, -0.053], [3.090, 2.124, 0.165], [-0.424, -1.153, -0.106]],
+				[0.1, 2, 50], warn);
+			return {Kt: Kt, nom: 4 * g.P / (Math.PI * g.d * g.d)};
+		}
+	},
+	n7b: {
+		group: 'Notches & Grooves',
+		name: 'U-groove in round shaft — bending',
+		fig: 'groove', load: 'M',
+		dims: [['D', 'Shaft Diam. <i>D</i>'], ['d', 'Groove Root Diam. <i>d</i>'], ['r', 'Groove Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = 32M / (π·d³)',
+		rng: '0.25 ≤ h/r ≤ 50, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let Kt = ktHR(s.hr, s.x,
+				[[0.594, 2.958, -0.520], [0.422, -10.545, 2.692], [0.501, 14.375, -4.486], [-0.613, -6.573, 2.177]],
+				[[0.965, 1.926, 0], [-2.773, -4.414, -0.017], [4.785, 4.681, 0.096], [-1.995, -2.241, -0.074]],
+				[0.25, 2, 50], warn);
+			return {Kt: Kt, nom: 32 * g.M / (Math.PI * g.d ** 3)};
+		}
+	},
+	n7c: {
+		group: 'Notches & Grooves',
+		name: 'U-groove in round shaft — torsion',
+		fig: 'groove', load: 'T',
+		dims: [['D', 'Shaft Diam. <i>D</i>'], ['d', 'Groove Root Diam. <i>d</i>'], ['r', 'Groove Radius <i>r</i>']],
+		nom: 'τ<sub>nom</sub> = 16T / (π·d³)',
+		rng: '0.25 ≤ h/r ≤ 50, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let Kt = ktHR(s.hr, s.x,
+				[[0.966, 1.056, -0.022], [-0.192, -4.037, 0.674], [0.808, 5.321, -1.231], [-0.567, -2.364, 0.566]],
+				[[1.089, 0.924, 0.018], [-1.504, -2.141, -0.047], [2.486, 2.289, 0.091], [-1.056, -1.104, -0.059]],
+				[0.25, 2, 50], warn);
+			return {Kt: Kt, nom: 16 * g.T / (Math.PI * g.d ** 3), shear: true};
+		}
+	},
+
+	// ---------------- II. Holes ----------------
+	h1a: {
+		group: 'Holes',
+		name: 'Circular hole, infinite plate — uniaxial/biaxial stress',
+		fig: 'hole_inf', load: 'sig12',
+		dims: [],
+		nom: 'σ<sub>nom</sub> = σ<sub>1</sub>; K<sub>t</sub> = 3 − σ<sub>2</sub>/σ<sub>1</sub>',
+		rng: '−1 ≤ σ₂/σ₁ ≤ 1 (σ₂ = −σ₁ is pure shear, Kt = 4)',
+		calc(g, warn) {
+			need(g.sig1 != 0, 'Enter a nonzero σ₁.');
+			let ratio = g.sig2 / g.sig1;
+			rangeWarn(warn, 'σ₂/σ₁', ratio, -1, 1);
+			return {Kt: 3 - ratio, nom: g.sig1};
+		}
+	},
+	h2a: {
+		group: 'Holes',
+		name: 'Central circular hole, finite-width plate — axial tension',
+		fig: 'hole_fin', load: 'P',
+		dims: [['D', 'Plate Width <i>D</i>'], ['d', 'Hole Diam. <i>d</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / [t·(D − d)]  (net section)',
+		rng: '0 ≤ d/D ≤ 1',
+		calc(g, warn) {
+			need(g.D > 0 && g.d > 0 && g.t > 0, 'Enter positive D, d and t.');
+			need(g.d < g.D, 'Hole diameter must be smaller than plate width.');
+			let x = g.d / g.D;
+			return {Kt: poly([3.000, -3.140, 3.667, -1.527], x), nom: g.P / (g.t * (g.D - g.d))};
+		}
+	},
+	h2b: {
+		group: 'Holes',
+		name: 'Central circular hole, finite-width plate — in-plane bending',
+		fig: 'hole_fin', load: 'M',
+		dims: [['D', 'Plate Width <i>D</i>'], ['d', 'Hole Diam. <i>d</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = 6M·d / [(D³ − d³)·t]  (bending stress at hole edge, net section); K<sub>t</sub> = 2',
+		rng: 'Any d/D. Plate-edge stress 6M·D/[(D³−d³)t] governs when d < D/2.',
+		calc(g, warn) {
+			need(g.D > 0 && g.d > 0 && g.t > 0, 'Enter positive D, d and t.');
+			need(g.d < g.D, 'Hole diameter must be smaller than plate width.');
+			let nomA = 6 * g.M * g.d / ((g.D ** 3 - g.d ** 3) * g.t);
+			let edge = 6 * g.M * g.D / ((g.D ** 3 - g.d ** 3) * g.t);
+			if (Math.abs(edge) > Math.abs(2 * nomA))
+				warn.push('Stress at the plate edge exceeds the hole-edge stress; the plate edge governs. Peak stress below is the plate-edge value.');
+			return {Kt: 2, nom: nomA, smaxOverride: Math.abs(edge) > Math.abs(2 * nomA) ? edge : undefined};
+		}
+	},
+	h6a: {
+		group: 'Holes',
+		name: 'Elliptical hole, infinite plate — uniaxial/biaxial stress',
+		fig: 'ellipse_inf', load: 'sig12',
+		dims: [['a', 'Semi-axis ⟂ to σ₁ <i>a</i>'], ['b', 'Semi-axis ∥ to σ₁ <i>b</i>']],
+		nom: 'σ<sub>nom</sub> = σ<sub>1</sub>; K<sub>t</sub> = 1 + 2a/b − σ<sub>2</sub>/σ<sub>1</sub>',
+		rng: 'a/b < 10; with σ₂ ≠ 0: 0.25 ≤ a/b ≤ 4, −1 ≤ σ₂/σ₁ ≤ 1',
+		calc(g, warn) {
+			need(g.a > 0 && g.b > 0, 'Enter positive a and b.');
+			need(g.sig1 != 0, 'Enter a nonzero σ₁.');
+			let ab = g.a / g.b, ratio = g.sig2 / g.sig1;
+			if (ratio != 0) {
+				rangeWarn(warn, 'a/b', ab, 0.25, 4);
+				rangeWarn(warn, 'σ₂/σ₁', ratio, -1, 1);
+			} else rangeWarn(warn, 'a/b', ab, 0, 10);
+			return {Kt: 1 + 2 * ab - ratio, nom: g.sig1};
+		}
+	},
+	h7a: {
+		group: 'Holes',
+		name: 'Central elliptical hole, finite-width plate — axial tension',
+		fig: 'ellipse_fin', load: 'P',
+		dims: [['D', 'Plate Width <i>D</i>'], ['a', 'Semi-axis ⟂ to load <i>a</i>'], ['b', 'Semi-axis ∥ to load <i>b</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / [t·(D − 2a)]  (net section)',
+		rng: '1 ≤ a/b ≤ 8',
+		calc(g, warn) {
+			need(g.D > 0 && g.a > 0 && g.b > 0 && g.t > 0, 'Enter positive D, a, b and t.');
+			need(2 * g.a < g.D, 'Hole width 2a must be smaller than plate width.');
+			let ab = g.a / g.b;
+			rangeWarn(warn, 'a/b', ab, 1, 8);
+			let C = coefRoot([[1.109, -0.188, 2.086], [-0.486, 0.213, -2.588], [3.816, -5.510, 4.638], [-2.438, 5.485, -4.126]], ab);
+			return {Kt: poly(C, 2 * g.a / g.D), nom: g.P / (g.t * (g.D - 2 * g.a))};
+		}
+	},
+	h11: {
+		group: 'Holes',
+		name: 'Rectangular hole w/ rounded corners, infinite plate — tension',
+		fig: 'rect_hole', load: 'sig',
+		dims: [['a', 'Half-length ∥ to load <i>a</i>'], ['b', 'Half-length ⟂ to load <i>b</i>'], ['r', 'Corner Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = σ (remote stress)',
+		rng: '0.05 ≤ r/2a ≤ 0.5, 0.2 ≤ a/b ≤ 1',
+		calc(g, warn) {
+			need(g.a > 0 && g.b > 0 && g.r > 0, 'Enter positive a, b and r.');
+			let s = g.r / (2 * g.a), ab = g.a / g.b;
+			rangeWarn(warn, 'r/2a', s, 0.05, 0.5);
+			rangeWarn(warn, 'a/b', ab, 0.2, 1);
+			let C = coefRoot([[14.815, -22.308, 16.298], [-11.201, -13.789, 19.200], [0.2020, 54.620, -54.748], [3.232, -32.530, 30.964]], s);
+			return {Kt: poly(C, ab), nom: g.sig};
+		}
+	},
+	h15a: {
+		group: 'Holes',
+		name: 'Transverse hole through round bar or tube — axial tension',
+		fig: 'xhole', load: 'P',
+		dims: [['D', 'Outer Diam. <i>D</i>'], ['di', 'Bore Diam. <i>d<sub>i</sub></i> (0 = solid)'], ['d', 'Cross-Hole Diam. <i>2r</i>']],
+		nom: 'σ<sub>nom</sub> = 4P / [π·(D² − d<sub>i</sub>²)]  (gross section)',
+		rng: 'd_i/D ≤ 0.9, 2r/D ≤ 0.45',
+		calc(g, warn) {
+			let q = xholeGeom(g);
+			rangeWarn(warn, 'd_i/D', q, 0, 0.9);
+			rangeWarn(warn, '2r/D', g.d / g.D, 0, 0.45);
+			let C = [3.000, poly([0.427, -6.770, 22.698, -16.670], q), poly([11.357, 15.665, -60.929, 41.501], q)];
+			return {Kt: poly(C, g.d / g.D), nom: 4 * g.P / (Math.PI * (g.D ** 2 - g.di ** 2))};
+		}
+	},
+	h15b: {
+		group: 'Holes',
+		name: 'Transverse hole through round bar or tube — bending',
+		fig: 'xhole', load: 'M',
+		dims: [['D', 'Outer Diam. <i>D</i>'], ['di', 'Bore Diam. <i>d<sub>i</sub></i> (0 = solid)'], ['d', 'Cross-Hole Diam. <i>2r</i>']],
+		nom: 'σ<sub>nom</sub> = 32M·D / [π·(D⁴ − d<sub>i</sub>⁴)]  (gross section)',
+		rng: 'd_i/D ≤ 0.9, 2r/D ≤ 0.4',
+		calc(g, warn) {
+			let q = xholeGeom(g);
+			rangeWarn(warn, 'd_i/D', q, 0, 0.9);
+			rangeWarn(warn, '2r/D', g.d / g.D, 0, 0.4);
+			let C = [3.000, poly([-6.250, -0.585, 3.115], q), poly([41.000, -1.071, -6.746], q), poly([-45.000, 1.389, 13.889], q)];
+			return {Kt: poly(C, g.d / g.D), nom: 32 * g.M * g.D / (Math.PI * (g.D ** 4 - g.di ** 4))};
+		}
+	},
+	h15c: {
+		group: 'Holes',
+		name: 'Transverse hole through round bar or tube — torsion',
+		fig: 'xhole', load: 'T',
+		dims: [['D', 'Outer Diam. <i>D</i>'], ['di', 'Bore Diam. <i>d<sub>i</sub></i> (0 = solid)'], ['d', 'Cross-Hole Diam. <i>2r</i>']],
+		nom: 'τ<sub>nom</sub> = 16T·D / [π·(D⁴ − d<sub>i</sub>⁴)]; K<sub>t</sub> = σ<sub>max</sub>/τ<sub>nom</sub> (peak is a <b>normal</b> stress inside the hole; τ<sub>max</sub> = ½K<sub>t</sub>τ<sub>nom</sub>)',
+		rng: 'd_i/D ≤ 0.8, 2r/D ≤ 0.4',
+		calc(g, warn) {
+			let q = xholeGeom(g);
+			rangeWarn(warn, 'd_i/D', q, 0, 0.8);
+			rangeWarn(warn, '2r/D', g.d / g.D, 0, 0.4);
+			let C = [4.000, poly([-6.055, 3.184, -3.461], q), poly([32.764, -30.121, 39.887], q), -38.330 + 51.542 * SQ(q) - 27.483 * q];
+			return {Kt: poly(C, g.d / g.D), nom: 16 * g.T * g.D / (Math.PI * (g.D ** 4 - g.di ** 4)), shear: true, normalPeak: true};
+		}
+	},
+	h16: {
+		group: 'Holes',
+		name: 'Pin-loaded lug (close-fitting pin) — tension',
+		fig: 'lug', load: 'P',
+		dims: [['D', 'Lug Width <i>D</i>'], ['d', 'Pin/Hole Diam. <i>d</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / [(D − d)·t]  (net section). Lug end length L ≥ D assumed.',
+		rng: '0.15 ≤ d/D ≤ 0.75, L/D ≥ 1',
+		calc(g, warn) {
+			need(g.D > 0 && g.d > 0 && g.t > 0, 'Enter positive D, d and t.');
+			need(g.d < g.D, 'Hole diameter must be smaller than lug width.');
+			let x = g.d / g.D;
+			rangeWarn(warn, 'd/D', x, 0.15, 0.75);
+			return {Kt: poly([12.882, -52.714, 89.762, -51.667], x), nom: g.P / ((g.D - g.d) * g.t)};
+		}
+	},
+
+	// ---------------- III. Fillets ----------------
+	f1a: {
+		group: 'Shoulder Fillets',
+		name: 'Stepped flat bar, shoulder fillets — axial tension',
+		fig: 'step', load: 'P',
+		dims: [['D', 'Large Width <i>D</i>'], ['d', 'Small Width <i>d</i>'], ['r', 'Fillet Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = P / (t·d). Assumes a long shoulder, L/D > 5.5 − 1.89(r/d − 0.15).',
+		rng: '0.1 ≤ h/r ≤ 20, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[1.006, 1.008, -0.044], [-0.115, -0.584, 0.315], [0.245, -1.006, -0.257], [-0.135, 0.582, -0.017]],
+				[[1.020, 1.009, -0.048], [-0.065, -0.165, -0.007], [-3.459, 1.266, -0.016], [3.505, -2.109, 0.069]],
+				[0.1, 2, 20], warn);
+			return {Kt: Kt, nom: g.P / (g.t * g.d)};
+		}
+	},
+	f1b: {
+		group: 'Shoulder Fillets',
+		name: 'Stepped flat bar, shoulder fillets — in-plane bending',
+		fig: 'step', load: 'M',
+		dims: [['D', 'Large Width <i>D</i>'], ['d', 'Small Width <i>d</i>'], ['r', 'Fillet Radius <i>r</i>'], ['t', 'Thickness <i>t</i>']],
+		nom: 'σ<sub>nom</sub> = 6M / (t·d²). Assumes a long shoulder, L/D > 2.0 − 2.05(r/d − 0.025).',
+		rng: '0.1 ≤ h/r ≤ 20, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			need(g.t > 0, 'Enter a positive thickness.');
+			let Kt = ktHR(s.hr, s.x,
+				[[1.006, 0.967, 0.013], [-0.270, -2.372, 0.708], [0.662, 1.157, -0.908], [-0.405, 0.249, -0.200]],
+				[[1.058, 1.002, -0.038], [-3.652, 1.639, -0.436], [6.170, -5.687, 1.175], [-2.558, 3.046, -0.701]],
+				[0.1, 2, 20], warn);
+			return {Kt: Kt, nom: 6 * g.M / (g.t * g.d * g.d)};
+		}
+	},
+	f2a: {
+		group: 'Shoulder Fillets',
+		name: 'Stepped round shaft, shoulder fillet — axial tension',
+		fig: 'shaftstep', load: 'P',
+		dims: [['D', 'Large Diam. <i>D</i>'], ['d', 'Small Diam. <i>d</i>'], ['r', 'Fillet Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = 4P / (π·d²)',
+		rng: '0.1 ≤ h/r ≤ 20, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let Kt = ktHR(s.hr, s.x,
+				[[0.926, 1.157, -0.099], [0.012, -3.036, 0.961], [-0.302, 3.977, -1.744], [0.365, -2.098, 0.878]],
+				[[1.200, 0.860, -0.022], [-1.805, -0.346, -0.038], [2.198, -0.486, 0.165], [-0.593, -0.028, -0.106]],
+				[0.1, 2, 20], warn);
+			return {Kt: Kt, nom: 4 * g.P / (Math.PI * g.d * g.d)};
+		}
+	},
+	f2b: {
+		group: 'Shoulder Fillets',
+		name: 'Stepped round shaft, shoulder fillet — bending',
+		fig: 'shaftstep', load: 'M',
+		dims: [['D', 'Large Diam. <i>D</i>'], ['d', 'Small Diam. <i>d</i>'], ['r', 'Fillet Radius <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = 32M / (π·d³)',
+		rng: '0.1 ≤ h/r ≤ 20, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let Kt = ktHR(s.hr, s.x,
+				[[0.947, 1.206, -0.131], [0.022, -3.405, 0.915], [0.869, 1.777, -0.555], [-0.810, 0.422, -0.260]],
+				[[1.232, 0.832, -0.008], [-3.813, 0.968, -0.260], [7.423, -4.868, 0.869], [-3.839, 3.070, -0.600]],
+				[0.1, 2, 20], warn);
+			return {Kt: Kt, nom: 32 * g.M / (Math.PI * g.d ** 3)};
+		}
+	},
+	f2c: {
+		group: 'Shoulder Fillets',
+		name: 'Stepped round shaft, shoulder fillet — torsion',
+		fig: 'shaftstep', load: 'T',
+		dims: [['D', 'Large Diam. <i>D</i>'], ['d', 'Small Diam. <i>d</i>'], ['r', 'Fillet Radius <i>r</i>']],
+		nom: 'τ<sub>nom</sub> = 16T / (π·d³)',
+		rng: '0.25 ≤ h/r ≤ 4, h = (D−d)/2',
+		calc(g, warn) {
+			let s = stepGeom(g);
+			let set = [[0.905, 0.783, -0.075], [-0.437, -1.969, 0.553], [1.557, 1.073, -0.578], [-1.061, 0.171, 0.086]];
+			let Kt = ktHR(s.hr, s.x, set, set, [0.25, 4, 4], warn);
+			return {Kt: Kt, nom: 16 * g.T / (Math.PI * g.d ** 3), shear: true};
+		}
+	},
+
+	// ---------------- IV. Miscellaneous ----------------
+	m1a: {
+		group: 'Keyseats',
+		name: 'Shaft keyseat (end-milled, semicircular end) — bending',
+		fig: 'keyseat', load: 'M',
+		dims: [['D', 'Shaft Diam. <i>D</i>'], ['r', 'Keyseat Bottom Fillet <i>r</i>']],
+		nom: 'σ<sub>nom</sub> = 32M / (π·D³). Standard keyseat: width D/4, depth D/8. Takes the larger of K<sub>tA</sub> = 1.6 (surface) and K<sub>tB</sub> (end of keyseat).',
+		rng: '0.005 ≤ r/D ≤ 0.04; for D > 6.5 in use r/D = 0.0208',
+		calc(g, warn) {
+			need(g.D > 0 && g.r > 0, 'Enter positive D and r.');
+			let rd = g.r / g.D;
+			rangeWarn(warn, 'r/D', rd, 0.005, 0.04);
+			let KtB = poly([1.426, 0.1643, -0.0019], 0.1 / rd);
+			return {Kt: Math.max(1.6, KtB), nom: 32 * g.M / (Math.PI * g.D ** 3)};
+		}
+	},
+	m1b: {
+		group: 'Keyseats',
+		name: 'Shaft keyseat (end-milled, semicircular end) — torsion',
+		fig: 'keyseat', load: 'T',
+		dims: [['D', 'Shaft Diam. <i>D</i>'], ['r', 'Keyseat Bottom Fillet <i>r</i>']],
+		nom: 'τ<sub>nom</sub> = 16T / (π·D³); K<sub>t</sub> = σ<sub>max</sub>/τ<sub>nom</sub> (peak is a <b>normal</b> stress). Larger of K<sub>tA</sub> ≈ 3.4 (surface) and K<sub>tB</sub> (fillet).',
+		rng: '0.005 ≤ r/D ≤ 0.07',
+		calc(g, warn) {
+			need(g.D > 0 && g.r > 0, 'Enter positive D and r.');
+			let rd = g.r / g.D;
+			rangeWarn(warn, 'r/D', rd, 0.005, 0.07);
+			let KtB = poly([1.953, 0.1434, -0.0021], 0.1 / rd);
+			return {Kt: Math.max(3.4, KtB), nom: 16 * g.T / (Math.PI * g.D ** 3), shear: true, normalPeak: true};
+		}
+	},
+};
+
+function xholeGeom(g) {
+	need(g.D > 0 && g.d > 0, 'Enter positive D and cross-hole diameter.');
+	need(g.di >= 0 && g.di < g.D, 'Bore must be smaller than the outer diameter.');
+	need(g.d < g.D, 'Cross-hole must be smaller than the outer diameter.');
+	return g.di / g.D;
+}
+
+const DIM_KEYS  = ['D', 'd', 'di', 'h', 'r', 't', 'a', 'b'];
+const LOAD_ROWS = {
+	P:     ['P'],
+	M:     ['M'],
+	Mt:    ['M'],
+	T:     ['T'],
+	sig:   ['sig1'],
+	sig12: ['sig1', 'sig2'],
+};
+
+function init() {
+	EC_onload();
+
+	// Populate the case select before restoring persistence
+	let sel = document.getElementById('case_sel');
+	let groups = {};
+	for (let id in CASES) {
+		let c = CASES[id];
+		if (!groups[c.group]) {
+			groups[c.group] = document.createElement('optgroup');
+			groups[c.group].label = c.group;
+			sel.appendChild(groups[c.group]);
+		}
+		let opt = document.createElement('option');
+		opt.value = id;
+		opt.textContent = c.name;
+		groups[c.group].appendChild(opt);
+	}
+	sel.value = 'f2b';
+
+	EXP_onload();
+	UNIT_change();
+
+	EC_setOnInput(function(e) { setError(1); compute(); });
+	EC_setOnKeyUp();
+
+	compute();
+	WALK_onload();
+}
+
+function compute() {
+	let c = CASES[document.getElementById('case_sel').value];
+	updateLayout(c);
+	try {
+		let g = {};
+		for (let k of DIM_KEYS) g[k] = getV(k, NaN);
+		g.di = getV('di', 0);
+		for (let k of ['P', 'M', 'T', 'sig1']) g[k] = getV(k, NaN);
+		g.sig2 = getV('sig2', 0);
+		g.sig = g.sig1;
+
+		let loadKeys = LOAD_ROWS[c.load];
+		for (let k of loadKeys) if (k != 'sig2') need(isFinite(g[k]), 'Enter the applied load.');
+
+		let warn = [];
+		let res = c.calc(g, warn);
+		need(isFinite(res.Kt) && isFinite(res.nom), 'Could not compute; check the inputs.');
+		if (res.Kt < 1 && c.load != 'sig12')
+			throw 'Kt < 1: the curve fit has been extrapolated too far outside its valid range. ' + warn.join(' ');
+
+		let q = getV('q', 1);
+		need(q >= 0 && q <= 1, 'Notch sensitivity q must be between 0 and 1.');
+		let Kf = 1 + q * (res.Kt - 1);
+
+		let smax = (typeof res.smaxOverride !== 'undefined') ? res.smaxOverride : res.Kt * res.nom;
+
+		setV('out_kt', res.Kt, 3);
+		setV('out_kf', Kf, 3);
+		setV('out_nom', res.nom);
+		setV('out_max', smax);
+		setV('out_fat', (typeof res.smaxOverride !== 'undefined') ? res.smaxOverride : Kf * res.nom);
+
+		// Labels for shear vs normal stress outputs
+		let peakNormal = !res.shear || res.normalPeak;
+		document.getElementById('lbl_nom').innerHTML = res.shear ? 'Nominal Shear Stress τ<sub>nom</sub>' : 'Nominal Stress σ<sub>nom</sub>';
+		document.getElementById('lbl_max').innerHTML = peakNormal ? 'Peak Stress σ<sub>max</sub> = K<sub>t</sub>·nom' : 'Peak Shear Stress τ<sub>max</sub> = K<sub>t</sub>·τ<sub>nom</sub>';
+		document.getElementById('lbl_fat').innerHTML = peakNormal ? 'Fatigue Peak K<sub>f</sub>·nom' : 'Fatigue Peak K<sub>f</sub>·τ<sub>nom</sub>';
+
+		// Yield safety factor (distortion energy: shear yield = Sy/√3)
+		let Sy = getV('Sy', NaN);
+		if (isFinite(Sy) && Sy > 0) {
+			let allow = peakNormal ? Sy : Sy / SQ(3);
+			setV('out_sf', allow / Math.abs(smax), 2);
+		} else {
+			setV('out_sf', '—');
+		}
+
+		let wbox = document.getElementById('warnings');
+		wbox.innerHTML = warn.map(w => '⚠ ' + w).join('<br>');
+		wbox.style.display = warn.length ? '' : 'none';
+		document.getElementById('out_kt').classList.toggle('warning', warn.length > 0);
+
+		setError(0);
+		EXP_dumpPersistence();
+	} catch(err) {
+		console.log(err);
+		for (let id of ['out_kt', 'out_kf', 'out_nom', 'out_max', 'out_fat', 'out_sf'])
+			document.getElementById(id).value = '';
+		document.getElementById('warnings').style.display = 'none';
+		setError(2, err);
+	}
+}
+
+function updateLayout(c) {
+	for (let k of DIM_KEYS)
+		document.getElementById('row_' + k).style.display = 'none';
+	for (let [k, label] of c.dims) {
+		document.getElementById('row_' + k).style.display = '';
+		document.getElementById('lbl_' + k).innerHTML = label;
+	}
+	document.getElementById('dims_none').style.display = c.dims.length ? 'none' : '';
+
+	let rows = LOAD_ROWS[c.load];
+	for (let k of ['P', 'M', 'T', 'sig1', 'sig2'])
+		document.getElementById('row_' + k).style.display = rows.includes(k) ? '' : 'none';
+	document.getElementById('lbl_M').innerHTML = c.load == 'Mt' ? 'Transverse Moment <i>M</i>' : 'Bending Moment <i>M</i>';
+	document.getElementById('lbl_sig1').innerHTML = c.load == 'sig12' ? 'Remote Stress σ<sub>1</sub>' : 'Remote Stress σ';
+
+	document.getElementById('case_nom').innerHTML = c.nom;
+	document.getElementById('case_rng').innerHTML = 'Valid for: ' + c.rng;
+	drawSketch(c);
+}
+
+/* ---------------- Sketches (schematic, not to scale) ---------------- */
+
+const SK_OUTLINE = 'fill="#ddd" stroke="#222" stroke-width="1.5"';
+
+function dimV(x, y1, y2, label, lx) {
+	return `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="sk-dim" marker-start="url(#sk_arr)" marker-end="url(#sk_arr)"/>
+		<text x="${lx !== undefined ? lx : x + 5}" y="${(y1 + y2) / 2 + 5}" class="sk-lbl">${label}</text>`;
+}
+function dimH(y, x1, x2, label) {
+	return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" class="sk-dim" marker-start="url(#sk_arr)" marker-end="url(#sk_arr)"/>
+		<text x="${(x1 + x2) / 2 - 5}" y="${y - 5}" class="sk-lbl">${label}</text>`;
+}
+function leader(x1, y1, x2, y2, label) {
+	return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="sk-dim" marker-end="url(#sk_arr)"/>
+		<text x="${x1 + 3}" y="${y1 - 3}" class="sk-lbl">${label}</text>`;
+}
+function centerline(y) {
+	return `<line x1="30" y1="${y}" x2="290" y2="${y}" stroke="#888" stroke-dasharray="12 4 3 4"/>`;
+}
+
+function loadGlyphs(load) {
+	let s = '';
+	if (load == 'P') {
+		s += `<line x1="38" y1="90" x2="6" y2="90" class="sk-load" marker-end="url(#sk_arrL)"/><text x="8" y="82" class="sk-loadtxt">P</text>`;
+		s += `<line x1="282" y1="90" x2="314" y2="90" class="sk-load" marker-end="url(#sk_arrL)"/><text x="302" y="82" class="sk-loadtxt">P</text>`;
+	} else if (load == 'sig' || load == 'sig12') {
+		for (let y of [50, 90, 130]) {
+			s += `<line x1="38" y1="${y}" x2="14" y2="${y}" class="sk-load" marker-end="url(#sk_arrL)"/>`;
+			s += `<line x1="282" y1="${y}" x2="306" y2="${y}" class="sk-load" marker-end="url(#sk_arrL)"/>`;
+		}
+		s += `<text x="2" y="40" class="sk-loadtxt">σ${load == 'sig12' ? '₁' : ''}</text>`;
+		if (load == 'sig12') {
+			for (let x of [110, 160, 210]) {
+				s += `<line x1="${x}" y1="18" x2="${x}" y2="2" class="sk-load2" marker-end="url(#sk_arrL2)"/>`;
+				s += `<line x1="${x}" y1="162" x2="${x}" y2="178" class="sk-load2" marker-end="url(#sk_arrL2)"/>`;
+			}
+			s += `<text x="222" y="14" class="sk-loadtxt" fill="#c60">σ₂</text>`;
+		}
+	} else if (load == 'M') {
+		s += `<path d="M30,50 A40,40 0 0 0 30,130" class="sk-load" fill="none" marker-end="url(#sk_arrL)"/><text x="2" y="95" class="sk-loadtxt">M</text>`;
+		s += `<path d="M290,50 A40,40 0 0 1 290,130" class="sk-load" fill="none" marker-end="url(#sk_arrL)"/><text x="304" y="95" class="sk-loadtxt">M</text>`;
+	} else if (load == 'Mt') {
+		s += `<text x="2" y="95" class="sk-loadtxt">M ⊙</text><text x="290" y="95" class="sk-loadtxt">⊗ M</text>`;
+		s += `<text x="80" y="176" class="sk-note">moment bends the plate out of plane</text>`;
+	} else if (load == 'T') {
+		s += `<path d="M22,124 A8,34 0 1 1 30,90" class="sk-load" fill="none" marker-end="url(#sk_arrL)"/><text x="2" y="40" class="sk-loadtxt">T</text>`;
+		s += `<path d="M298,56 A8,34 0 1 1 290,90" class="sk-load" fill="none" marker-end="url(#sk_arrL)"/><text x="306" y="40" class="sk-loadtxt">T</text>`;
+	}
+	return s;
+}
+
+const SKETCHES = {
+	semiinf: () => `<path d="M40,30 H145 V75 A15,15 0 0 0 175,75 V30 H280 V160 H40 Z" ${SK_OUTLINE}/>
+		<path d="M40,160 Q100,150 160,160 T280,160" stroke="#ddd" stroke-width="4" fill="none"/>
+		${dimV(200, 30, 90, 'h')} ${leader(215, 110, 172, 84, 'r')}
+		<text x="60" y="150" class="sk-note">plate extends far below</text>`,
+	notch2: () => `<path d="M40,40 H145 V55 A15,15 0 0 0 175,55 V40 H280 V140 H175 V125 A15,15 0 0 0 145,125 V140 H40 Z" ${SK_OUTLINE}/>
+		${dimV(70, 40, 140, 'D')} ${dimV(160, 70, 110, 'd')} ${leader(210, 30, 174, 60, 'r')}
+		<text x="200" y="160" class="sk-note">thickness t into page</text>`,
+	notch1: () => `<path d="M40,40 H145 V65 A15,15 0 0 0 175,65 V40 H280 V140 H40 Z" ${SK_OUTLINE}/>
+		${dimV(70, 40, 140, 'D')} ${dimV(160, 80, 140, 'd')} ${leader(210, 30, 174, 70, 'r')}
+		<text x="200" y="160" class="sk-note">thickness t into page</text>`,
+	groove: () => `<path d="M40,40 H145 V55 A15,15 0 0 0 175,55 V40 H280 V140 H175 V125 A15,15 0 0 0 145,125 V140 H40 Z" ${SK_OUTLINE}/>
+		${centerline(90)} ${dimV(70, 40, 140, '⌀D')} ${dimV(160, 70, 110, '⌀d')} ${leader(210, 30, 174, 60, 'r')}
+		<text x="200" y="160" class="sk-note">round shaft, side view</text>`,
+	hole_inf: () => `<rect x="40" y="25" width="240" height="130" ${SK_OUTLINE}/>
+		<circle cx="160" cy="90" r="22" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		<text x="155" y="64" class="sk-lbl">A</text><text x="186" y="95" class="sk-lbl" fill="#888">B</text>
+		<text x="58" y="148" class="sk-note">infinite plate; A = top/bottom of hole</text>`,
+	hole_fin: () => `<rect x="40" y="40" width="240" height="100" ${SK_OUTLINE}/>
+		<circle cx="160" cy="90" r="25" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${dimV(70, 40, 140, 'D')} ${dimH(90, 135, 185, 'd')}
+		<text x="200" y="160" class="sk-note">thickness t into page</text>`,
+	ellipse_inf: () => `<rect x="40" y="25" width="240" height="130" ${SK_OUTLINE}/>
+		<ellipse cx="160" cy="90" rx="12" ry="40" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${dimV(185, 50, 90, 'a')} ${dimH(44, 160, 172, 'b')}
+		<line x1="160" y1="38" x2="160" y2="50" stroke="#888" stroke-dasharray="2 2"/>`,
+	ellipse_fin: () => `<rect x="40" y="40" width="240" height="100" ${SK_OUTLINE}/>
+		<ellipse cx="160" cy="90" rx="12" ry="30" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${dimV(70, 40, 140, 'D')} ${dimV(185, 60, 90, 'a')} ${dimH(32, 160, 172, 'b')}
+		<line x1="160" y1="34" x2="160" y2="60" stroke="#888" stroke-dasharray="2 2"/>`,
+	rect_hole: () => `<rect x="40" y="25" width="240" height="130" ${SK_OUTLINE}/>
+		<rect x="135" y="50" width="50" height="80" rx="10" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${dimH(145, 135, 185, '2a')} ${dimV(205, 50, 130, '2b')} ${leader(110, 40, 138, 53, 'r')}`,
+	xhole: () => `<rect x="40" y="50" width="240" height="80" ${SK_OUTLINE}/>
+		<line x1="40" y1="72" x2="280" y2="72" stroke="#555" stroke-dasharray="5 3"/>
+		<line x1="40" y1="108" x2="280" y2="108" stroke="#555" stroke-dasharray="5 3"/>
+		<circle cx="160" cy="90" r="15" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${centerline(90)} ${dimV(70, 50, 130, '⌀D')} ${dimV(105, 72, 108, 'dᵢ')} ${dimH(40, 145, 175, '2r')}
+		<line x1="145" y1="44" x2="145" y2="75" stroke="#888" stroke-dasharray="2 2"/>
+		<line x1="175" y1="44" x2="175" y2="75" stroke="#888" stroke-dasharray="2 2"/>
+		<text x="120" y="150" class="sk-note">dashed = bore (tube)</text>`,
+	lug: () => `<path d="M40,40 H230 A50,50 0 0 1 230,140 H40 Z" ${SK_OUTLINE}/>
+		<circle cx="230" cy="90" r="22" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		<circle cx="230" cy="90" r="20" fill="#bbb" stroke="#555"/>
+		${dimV(70, 40, 140, 'D')} ${dimV(200, 68, 112, 'd', 182)}
+		<text x="100" y="160" class="sk-note">pin pulls right, lug body left; L ≥ D</text>`,
+	step: () => `<path d="M40,40 H150 A20,20 0 0 0 170,60 H280 V120 H170 A20,20 0 0 0 150,140 H40 Z" ${SK_OUTLINE}/>
+		${dimV(80, 40, 140, 'D')} ${dimV(230, 60, 120, 'd')} ${leader(195, 30, 166, 47, 'r')}
+		<text x="200" y="160" class="sk-note">thickness t into page</text>`,
+	shaftstep: () => `<path d="M40,40 H150 A20,20 0 0 0 170,60 H280 V120 H170 A20,20 0 0 0 150,140 H40 Z" ${SK_OUTLINE}/>
+		${centerline(90)} ${dimV(80, 40, 140, '⌀D')} ${dimV(230, 60, 120, '⌀d')} ${leader(195, 30, 166, 47, 'r')}
+		<text x="200" y="160" class="sk-note">round shaft, side view</text>`,
+	keyseat: () => `<rect x="40" y="40" width="240" height="100" ${SK_OUTLINE}/>
+		<path d="M40,40 V52 H170 A12.5,12.5 0 0 0 170,40" fill="#fff" stroke="#222" stroke-width="1.5"/>
+		${centerline(90)} ${dimV(70, 40, 140, '⌀D')} ${leader(205, 25, 176, 50, 'r (B)')}
+		<text x="100" y="35" class="sk-lbl">A</text>
+		<text x="80" y="160" class="sk-note">keyseat D/4 wide × D/8 deep</text>`,
+};
+
+function drawSketch(c) {
+	document.getElementById('sketch').innerHTML = `
+		<defs>
+			<marker id="sk_arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+				<path d="M0,0 L10,5 L0,10 Z" fill="#06c"/></marker>
+			<marker id="sk_arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+				<path d="M0,0 L10,5 L0,10 Z" fill="#b00"/></marker>
+			<marker id="sk_arrL2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+				<path d="M0,0 L10,5 L0,10 Z" fill="#c60"/></marker>
+		</defs>
+		${SKETCHES[c.fig]()}
+		${loadGlyphs(c.load)}`;
+}
+</script>
+
+<style>
+#sketch { width: 320px; height: 180px; background: #fff; }
+.sk-dim  { stroke: #06c; stroke-width: 1; }
+.sk-lbl  { fill: #06c; font: italic 14px serif; }
+.sk-note { fill: #666; font: 11px sans-serif; }
+.sk-load { stroke: #b00; stroke-width: 2; }
+.sk-load2 { stroke: #c60; stroke-width: 2; }
+.sk-loadtxt { fill: #b00; font: bold 14px serif; }
+#case_sel { width: 420px; }
+.casenote { max-width: 320px; font-size: 0.85em; padding: 4px; }
+#warnings { max-width: 420px; font-size: 0.85em; padding: 4px; }
+</style>
+
+<html>
+<body onload="init()">
+<div id="topbar">
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id="topbar_version"></div>
+	<div class="topbar-la" id="topbar_filename"></div>
+	<div class="topbar-la" id="topbar_unit">
+		<select id="unit_select" onchange="UNIT_change(); compute();">
+			<option value=0>Metric</option>
+			<option value=1 selected>Imperial</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Stress Concentrations</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class="ttt"></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+	<a id="download_frame" hidden></a>
+</div>
+
+<svg id="walkthrough_overlay" onclick="WALK_nextStep()">
+	<path id="walkthrough_frame"></path>
+	<text id="walkthrough_text"></text>
+	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+</svg>
+
+<div style="float: left;" class="container">
+	<div style="display: table-row;">
+
+		<!-- Inputs -->
+		<div class="odd" style="display: table-cell; vertical-align: top;">
+			<table>
+				<tr>
+					<th class="rowlabel">Case</th>
+					<td colspan=2><select id="case_sel" onchange="setError(1); compute();"></select></td>
+				</tr>
+			</table>
+			<table id="dim_inputs">
+				<tr><td class="collabel" colspan=3>Geometry</td></tr>
+				<tr id="dims_none"><td colspan=3><i>No dimensions needed; K<sub>t</sub> depends only on the stress ratio.</i></td></tr>
+				<tr id="row_D"><th class="rowlabel" id="lbl_D">D</th><td><input id="D" data-unit="dimension" value="1.5"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_d"><th class="rowlabel" id="lbl_d">d</th><td><input id="d" data-unit="dimension" value="1"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_di"><th class="rowlabel" id="lbl_di">di</th><td><input id="di" data-unit="dimension" value="0"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_h"><th class="rowlabel" id="lbl_h">h</th><td><input id="h" data-unit="dimension" value="0.25"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_r"><th class="rowlabel" id="lbl_r">r</th><td><input id="r" data-unit="dimension" value="0.1"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_t"><th class="rowlabel" id="lbl_t">t</th><td><input id="t" data-unit="dimension" value="0.25"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_a"><th class="rowlabel" id="lbl_a">a</th><td><input id="a" data-unit="dimension" value="0.25"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr id="row_b"><th class="rowlabel" id="lbl_b">b</th><td><input id="b" data-unit="dimension" value="0.125"></td><td class="unit" data-unit="dimension"></td></tr>
+			</table>
+			<table id="load_inputs">
+				<tr><td class="collabel" colspan=3>Loading &amp; Material</td></tr>
+				<tr id="row_P"><th class="rowlabel">Axial Force <i>P</i></th><td><input id="P" data-unit="force" value="1000"></td><td class="unit" data-unit="force"></td></tr>
+				<tr id="row_M"><th class="rowlabel" id="lbl_M">Bending Moment <i>M</i></th><td><input id="M" data-unit="moment" value="1000"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr id="row_T"><th class="rowlabel">Torque <i>T</i></th><td><input id="T" data-unit="moment" value="1000"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr id="row_sig1"><th class="rowlabel" id="lbl_sig1">Remote Stress σ<sub>1</sub></th><td><input id="sig1" data-unit="stress" value="10000"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr id="row_sig2"><th class="rowlabel">Remote Stress σ<sub>2</sub>
+					<span class="ttt">Stress perpendicular to σ₁ (positive = tension). Leave 0 or blank for uniaxial.</span></th>
+					<td><input id="sig2" data-unit="stress" value="0"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Notch Sensitivity <i>q</i>
+					<span class="ttt">0 to 1. K<sub>f</sub> = 1 + q(K<sub>t</sub> − 1). Use 1 (default) for brittle materials or when unsure; ductile metals with large radii approach 1, small radii and soft materials are lower. See Peterson/Neuber charts.</span></th>
+					<td><input id="q" value="1"></td><td></td></tr>
+				<tr><th class="rowlabel">Yield Strength <i>S<sub>y</sub></i>
+					<span class="ttt">Optional. Used for a static safety factor against the peak (K<sub>t</sub>) stress. Shear peaks are compared against S<sub>y</sub>/√3. Note: ductile parts under static load usually redistribute locally and K<sub>t</sub> is often ignored for static strength.</span></th>
+					<td><input id="Sy" data-unit="stress" value=""></td><td class="unit" data-unit="stress"></td></tr>
+			</table>
+		</div>
+
+		<!-- Sketch -->
+		<div class="output" style="display: table-cell; vertical-align: top;">
+			<svg id="sketch" viewBox="0 0 320 180"></svg>
+			<div class="casenote" id="case_nom"></div>
+			<div class="casenote" id="case_rng"></div>
+		</div>
+
+		<!-- Outputs -->
+		<div class="output" style="display: table-cell; vertical-align: top;">
+			<table id="outputs">
+				<tr><th class="rowlabel">Stress Concentration K<sub>t</sub></th><td><input id="out_kt" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Fatigue Factor K<sub>f</sub></th><td><input id="out_kf" readonly></td><td></td></tr>
+				<tr><th class="rowlabel" id="lbl_nom">Nominal Stress</th><td><input id="out_nom" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel" id="lbl_max">Peak Stress</th><td><input id="out_max" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel" id="lbl_fat">Fatigue Peak</th><td><input id="out_fat" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Yield Safety Factor</th><td><input id="out_sf" readonly></td><td></td></tr>
+			</table>
+			<div id="warnings" class="warning" style="display: none;"></div>
+			<div class="casenote">Source: Roark's Formulas for Stress &amp; Strain, 7th ed., Table 6-1 (after Peterson). Linear-elastic K<sub>t</sub>; curve fits are only valid within the stated ranges.</div>
+		</div>
+
+	</div>
+</div>
+</body>
+</html>
