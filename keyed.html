@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<link rel="stylesheet" href="include/style.css">
+
+<script type="text/javascript" src="js/eclib.js"></script>
+<script type="text/javascript" src="js/units.js"></script>
+<script type="text/javascript" src="js/export.js"></script>
+<script type="text/javascript" src="js/walkthrough.js"></script>
+<script type="text/javascript" src="js/materials.js"></script>
+
+<!-- Export library requires this script tag -->
+<script id="EXP_inputs_frame"></script>
+
+<script type="text/javascript">
+EXP_FN_BASE = 'keyed';
+UNIT_MAP = {
+	'dimension': ['mm', 'in'],
+	'force':     ['N', 'lbf'],
+	'moment':    ['N-m', 'in-lbf'],
+	'stress':    ['MPa', 'psi'],
+};
+WALK_STEPS = [{
+		poi: 'geom_inputs',
+		desc: 'Enter the shaft diameter and key length. Pick a key standard to size the key automatically, or Custom to enter your own key and seat dimensions.',
+		valign: 'bottom'
+	},{
+		poi: 'load_inputs',
+		desc: 'Enter the loads. Torque splits into steady (mean) and alternating parts; bending on a rotating shaft is alternating.',
+		valign: 'bottom'
+	},{
+		poi: 'matl_inputs',
+		desc: 'Pick key, shaft and hub materials. Strengths fill from the material library and can be edited (choose Custom to keep your own).',
+		valign: 'top'
+	},{
+		poi: 'xsection',
+		desc: 'To-scale cross-section of the shaft, key and hub.',
+		valign: 'bottom'
+	},{
+		poi: 'outputs',
+		desc: 'Key shear and bearing checks, shaft fatigue and yield at the keyseat, and the minimum key length for your target safety factor. Anything below 1 turns red.',
+		valign: 'bottom',
+		halign: 'right'
+	}];
+
+const SQ = Math.sqrt;
+const IN = 0.0254, MM = 0.001;
+
+/*
+	Standard parallel keys.
+	ANSI B17.1 (inch): [max shaft dia, key width, rectangular key height]; square keys have h = w.
+	Seat depths are taken as h/2 in the shaft and h/2 in the hub. Shaft range starts over 5/16".
+*/
+const ANSI_KEYS = [
+	[7/16, 3/32, null], [9/16, 1/8, 3/32], [7/8, 3/16, 1/8], [1.25, 1/4, 3/16],
+	[1.375, 5/16, 1/4], [1.75, 3/8, 1/4], [2.25, 1/2, 3/8], [2.75, 5/8, 7/16],
+	[3.25, 3/4, 1/2], [3.75, 7/8, 5/8], [4.5, 1, 3/4], [5.5, 1.25, 7/8], [6.5, 1.5, 1],
+];
+const ANSI_MIN = 5/16;
+// DIN 6885-1 / ISO 773 (mm): [max shaft dia, b, h, t1 shaft depth, t2 hub depth]. Range starts over 6 mm.
+const DIN_KEYS = [
+	[8, 2, 2, 1.2, 1.0], [10, 3, 3, 1.8, 1.4], [12, 4, 4, 2.5, 1.8], [17, 5, 5, 3.0, 2.3],
+	[22, 6, 6, 3.5, 2.8], [30, 8, 7, 4.0, 3.3], [38, 10, 8, 5.0, 3.3], [44, 12, 8, 5.0, 3.3],
+	[50, 14, 9, 5.5, 3.8], [58, 16, 10, 6.0, 4.3], [65, 18, 11, 7.0, 4.4], [75, 20, 12, 7.5, 4.9],
+	[85, 22, 14, 9.0, 5.4], [95, 25, 14, 9.0, 5.4], [110, 28, 16, 10.0, 6.4], [130, 32, 18, 11.0, 7.4],
+	[150, 36, 20, 12.0, 8.4], [170, 40, 22, 13.0, 9.4],
+];
+const DIN_MIN = 6;
+
+// Returns {w, h, t1, t2, name} in meters for the chosen standard, or throws
+function standardKey(std, D) {
+	if (std == 'din') {
+		let dmm = D / MM;
+		let row = DIN_KEYS.find(r => dmm <= r[0]);
+		if (dmm <= DIN_MIN || !row) throw `DIN 6885 covers shafts over ${DIN_MIN} mm up to 170 mm.`;
+		return {w: row[1] * MM, h: row[2] * MM, t1: row[3] * MM, t2: row[4] * MM, name: `DIN 6885 ${row[1]}×${row[2]}`};
+	}
+	let din = D / IN;
+	let row = ANSI_KEYS.find(r => din <= r[0]);
+	if (din <= ANSI_MIN || !row) throw 'ANSI B17.1 covers shafts over 5/16" up to 6 1/2".';
+	let w = row[1], h = (std == 'ansi_rect') ? row[2] : row[1];
+	if (h === null) throw 'No rectangular key is listed for this shaft size; use a square key.';
+	return {w: w * IN, h: h * IN, t1: h / 2 * IN, t2: h / 2 * IN, name: `ANSI ${frac(w)}" × ${frac(h)}"`};
+}
+
+function frac(x) {
+	let whole = Math.floor(x + 1e-9), rem = x - whole;
+	if (rem < 1e-6) return `${whole}`;
+	let den = 64, num = Math.round(rem * 64);
+	while (num % 2 == 0) { num /= 2; den /= 2; }
+	return (whole ? whole + ' ' : '') + `${num}/${den}`;
+}
+
+/*
+	Keyseat stress concentration in the shaft (nominal stresses on the full diameter D).
+	End-milled (profile) keyseat, bending: Roark 7th ed. Table 6-1 IV.1a (K_tB, end of keyseat),
+	floored at K_tA = 1.6 at the surface. Torsion: Shigley Table 7-1 K_ts = 3.0 (shear basis).
+	Sled-runner keyseat: Shigley Table 7-1 K_t = 1.7; K_ts is not tabulated, so the end-mill
+	value of 3.0 is used conservatively.
+*/
+function keyseatKt(type, D, r, warn) {
+	if (type == 'sled') return {Kt: 1.7, Kts: 3.0};
+	let rd = r / D;
+	if (rd < 0.005 || rd > 0.04)
+		warn.push(`Keyseat fillet r/D = ${rd.toFixed(4)} is outside Roark's fitted range 0.005 – 0.04.`);
+	let x = 0.1 / rd;
+	return {Kt: Math.max(1.6, 1.426 + 0.1643 * x - 0.0019 * x * x), Kts: 3.0};
+}
+
+/*
+	Notch sensitivity for steels from the Neuber constant (Shigley eqs. 6-35a/b),
+	Sut in kpsi, √a in √in, r in inches. Valid for 50 ≤ Sut ≤ 250 kpsi.
+*/
+function neuberQ(Sut, r, torsion) {
+	let s = Sut / 6894.76e3;
+	if (torsion) s += 20;
+	let sqa = 0.246 - 3.08e-3 * s + 1.51e-5 * s * s - 2.67e-8 * s * s * s;
+	return 1 / (1 + sqa / SQ(r / IN));
+}
+
+/* ---------------- Materials ---------------- */
+
+const MATLS = ['key', 'shaft', 'hub'];
+const MATL_DEFAULTS = {key: '1018 Cold-Drawn Steel', shaft: '1045 Cold-Drawn Steel', hub: '1045 Hot-Rolled Steel'};
+
+function matlSetup(p) {
+	MATERIAL_populateSelect(p);
+	document.getElementById(p + '_base').value = 'Steel';
+	MATERIAL_selectBase(p);
+	let det = document.getElementById(p + '_detail');
+	det.value = MATL_DEFAULTS[p];
+	selectMaterial(p);
+	// Hold every material in the detail list until persistence is restored
+	for (let name in MATERIAL_DATA)
+		if (![...det.options].some(o => o.value == name))
+			det.add(new Option(name, name));
+}
+
+// Fill strengths from the library (skipped for Custom so user values stick)
+function selectMaterial(p) {
+	if (document.getElementById(p + '_base').value == 'custom') return;
+	let m = MATERIAL_DATA[document.getElementById(p + '_detail').value];
+	if (!m) return;
+	let fill = (id, v) => { if (document.getElementById(id)) setV(id, typeof v === 'undefined' ? '' : v); };
+	fill(p + '_Sy', m.Sy !== undefined ? m.Sy : m.St);
+	fill(p + '_Su', m.UTS !== undefined ? m.UTS : m.St);
+	fill(p + '_Se', m.Se);
+}
+
+function init() {
+	EC_onload();
+	UNIT_change();
+	for (let p of MATLS) matlSetup(p);
+
+	EXP_onload();
+	for (let p of MATLS) MATERIAL_selectBase(p);
+	UNIT_change();
+
+	EC_setOnInput(function(e) { setError(1); compute(); });
+	EC_setOnKeyUp();
+
+	compute();
+	WALK_onload();
+}
+
+function unitsChanged() {
+	UNIT_change();
+	for (let p of MATLS) selectMaterial(p);
+	compute();
+}
+
+/* ---------------- Compute ---------------- */
+
+const OUT_IDS = ['out_F', 'out_Fkey', 'out_Leff', 'out_tau', 'out_fos_shear', 'out_sb_shaft', 'out_fos_bs',
+	'out_sb_hub', 'out_fos_bh', 'out_Lmin', 'out_r', 'out_Kt', 'out_Kts', 'out_q', 'out_qs', 'out_Kf', 'out_Kfs',
+	'out_sa', 'out_sm', 'out_fos_fat', 'out_fos_yld', 'out_fos_min', 'out_gov'];
+
+function compute() {
+	try {
+		let warn = [];
+		let D = getV('D', NaN);
+		need(D > 0, 'Enter a positive shaft diameter.');
+
+		// --- Key geometry ---
+		let std = document.getElementById('key_std').value;
+		let custom = (std == 'custom');
+		for (let id of ['w', 'h', 't1', 't2'])
+			document.getElementById(id).readOnly = !custom;
+		let key;
+		if (custom) {
+			key = {w: getV('w', NaN), h: getV('h', NaN), t1: getV('t1', NaN), t2: getV('t2', NaN), name: 'Custom'};
+		} else {
+			key = standardKey(std, D);
+			setV('w', key.w); setV('h', key.h); setV('t1', key.t1); setV('t2', key.t2);
+		}
+		document.getElementById('key_name').textContent = key.name;
+		let {w, h, t1, t2} = key;
+		need(w > 0 && h > 0 && t1 > 0 && t2 > 0, 'Enter positive key width, height and seat depths.');
+		need(w < D, 'Key width must be smaller than the shaft diameter.');
+		need(t1 < h, 'Shaft seat depth t₁ must be less than key height h.');
+		need(t1 < D / 2, 'Shaft seat depth is too deep.');
+		let hubContact = h - t1;
+		if (hubContact > t2 * 1.001)
+			warn.push('Key stands taller above the shaft (h − t₁) than the hub keyway depth t₂; it will not fit.');
+
+		let L = getV('L', NaN);
+		need(L > 0, 'Enter a positive key length.');
+		let roundEnds = document.getElementById('key_ends').value == 'round';
+		let Leff = roundEnds ? L - w : L;
+		need(Leff > 0, 'Round-ended key must be longer than its width.');
+		if (L > 1.5 * D)
+			warn.push('Key length exceeds 1.5·D. Torsional wind-up makes the load concentrate at the torque-input end, so extra length adds little.');
+
+		let nkeys = parseInt(document.getElementById('nkeys').value);
+		let share = (nkeys == 2) ? 1.5 : 1;  // DIN 6892: two keys at 180° carry 1.5× (load factor 0.75)
+
+		// --- Loads ---
+		let Tm = getV('Tm', 0), Ta = getV('Ta', 0), Mm = getV('Mm', 0), Ma = getV('Ma', 0);
+		let Tmax = Math.abs(Tm) + Math.abs(Ta);
+		let Mmax = Math.abs(Mm) + Math.abs(Ma);
+		need(Tmax > 0 || Mmax > 0, 'Enter a torque and/or bending moment.');
+
+		// --- Materials ---
+		let Sy_k = getV('key_Sy', NaN), Sy_s = getV('shaft_Sy', NaN), Sy_h = getV('hub_Sy', NaN);
+		let Su_s = getV('shaft_Su', NaN), Se_s = getV('shaft_Se', NaN) * getV('kmarin', 1);
+		need(Sy_k > 0 && Sy_s > 0 && Sy_h > 0, 'Enter yield strengths for key, shaft and hub.');
+
+		// --- Key: shear and bearing ---
+		let F = 2 * Tmax / D;
+		let Fk = F / share;
+		let tau = Fk / (w * Leff);
+		let sb_s = Fk / (t1 * Leff);
+		let sb_h = Fk / (hubContact * Leff);
+		let fos_shear = 0.577 * Sy_k / tau;
+		let Sb_s = Math.min(Sy_k, Sy_s), Sb_h = Math.min(Sy_k, Sy_h);
+		let fos_bs = Sb_s / sb_s;
+		let fos_bh = Sb_h / sb_h;
+
+		// Minimum length for the target FOS
+		let nT = getV('n_target', 2);
+		let LeffMin = nT * Fk * Math.max(1 / (0.577 * Sy_k * w), 1 / (Sb_s * t1), 1 / (Sb_h * hubContact));
+		let Lmin = LeffMin + (roundEnds ? w : 0);
+
+		// --- Shaft at keyseat ---
+		let r = getV('r', NaN);
+		if (!(r > 0)) r = 0.02 * D;
+		let ksType = document.getElementById('ks_type').value;
+		let {Kt, Kts} = keyseatKt(ksType, D, r, warn);
+
+		let steel = ['Steel', 'Stainless'].includes(document.getElementById('shaft_base').value);
+		let q = getV('q', NaN), qs = getV('qs', NaN);
+		let qNote = '';
+		if (!(q >= 0)) {
+			if (steel && Su_s > 0) {
+				q = neuberQ(Su_s, r, false);
+				let ks = Su_s / 6894.76e3;
+				if (ks < 50 || ks > 250) warn.push('Notch sensitivity (Neuber) fit is for steels with 50 – 250 kpsi ultimate strength.');
+			} else { q = 1; qNote = ' (non-steel: q = 1)'; }
+		}
+		if (!(qs >= 0)) qs = (steel && Su_s > 0) ? neuberQ(Su_s, r, true) : 1;
+		need(q <= 1 && qs <= 1, 'Notch sensitivity must be between 0 and 1.');
+		let Kf = 1 + q * (Kt - 1), Kfs = 1 + qs * (Kts - 1);
+
+		let c32 = 32 / (Math.PI * D ** 3), c16 = 16 / (Math.PI * D ** 3);
+		let sa = SQ((Kf * c32 * Ma) ** 2 + 3 * (Kfs * c16 * Ta) ** 2);
+		let sm = SQ((Kf * c32 * Mm) ** 2 + 3 * (Kfs * c16 * Tm) ** 2);
+		let fos_yld = Sy_s / (sa + sm);  // first-cycle yield (Shigley eq. 7-16, conservative)
+		let fos_fat = NaN;
+		if (Se_s > 0 && Su_s > 0) {
+			let inv = sa / Se_s + sm / Su_s;   // modified Goodman
+			fos_fat = inv > 0 ? 1 / inv : Infinity;
+		}
+
+		// --- Outputs ---
+		setV('out_F', F); setV('out_Fkey', Fk); setV('out_Leff', Leff);
+		setV('out_tau', tau); setFOS('out_fos_shear', fos_shear);
+		setV('out_sb_shaft', sb_s); setFOS('out_fos_bs', fos_bs);
+		setV('out_sb_hub', sb_h); setFOS('out_fos_bh', fos_bh);
+		setV('out_Lmin', Lmin);
+		setV('out_r', r);
+		setV('out_Kt', Kt, 3); setV('out_Kts', Kts, 3);
+		setV('out_q', q, 3); setV('out_qs', qs, 3);
+		setV('out_Kf', Kf, 3); setV('out_Kfs', Kfs, 3);
+		setV('out_sa', sa); setV('out_sm', sm);
+		setFOS('out_fos_fat', fos_fat);
+		setFOS('out_fos_yld', fos_yld);
+		document.getElementById('q_note').textContent = qNote;
+
+		let checks = [['key shear', fos_shear], ['bearing, shaft side', fos_bs], ['bearing, hub side', fos_bh],
+			['shaft yield', fos_yld], ['shaft fatigue', fos_fat]].filter(c => isFinite(c[1]));
+		let gov = checks.reduce((a, b) => b[1] < a[1] ? b : a);
+		setFOS('out_fos_min', gov[1]);
+		document.getElementById('out_gov').value = gov[0];
+		if (Lmin > L)
+			warn.push(`Key is shorter than the ${fmt(Lmin, 'dimension')} needed for FOS ${nT} on the key.`);
+
+		let wbox = document.getElementById('warnings');
+		wbox.innerHTML = warn.map(x => '⚠ ' + x).join('<br>');
+		wbox.style.display = warn.length ? '' : 'none';
+
+		drawSection(D, w, h, t1, t2, nkeys);
+		drawKeyTop(L, w, roundEnds);
+
+		setError(0);
+		EXP_dumpPersistence();
+	} catch(err) {
+		console.log(err);
+		for (let id of OUT_IDS) document.getElementById(id).value = '';
+		document.getElementById('warnings').style.display = 'none';
+		setError(2, err);
+	}
+}
+
+function need(cond, msg) { if (!cond) throw msg; }
+
+function fmt(v, unit) {
+	let u = UNIT_MAP[unit][UNIT_sys];
+	return convertTo(v, u).toPrecision(3) + ' ' + u;
+}
+
+function setFOS(id, v) {
+	let el = document.getElementById(id);
+	if (!isFinite(v)) { setV(id, v === Infinity ? '∞' : '—'); el.classList.remove('error'); return; }
+	setV(id, v, 2);
+	el.classList.toggle('error', v < 1);
+}
+
+/* ---------------- Drawings ---------------- */
+
+// To-scale cross-section: shaft radius drawn at 95 px
+function drawSection(D, w, h, t1, t2, nkeys) {
+	let R = 95, s = R / (D / 2), cx = 150, cy = 150;
+	let W = w / 2 * s, yc = SQ(Math.max(R * R - W * W, 0));
+	let yb = R - t1 * s, yk = yb + h * s, yh = R + t2 * s;
+	let RH = Math.max(140, yh + 12);
+	let P = (x, y) => `${(cx + x).toFixed(2)},${(cy - y).toFixed(2)}`;
+
+	// one keyseat at angle 0 (top), optional second at 180°
+	let rot = nkeys == 2 ? [0, 180] : [0];
+	let shaftPath = `M${P(-W, yc)} A${R},${R} 0 ${nkeys == 2 ? 0 : 1} 0 ${nkeys == 2 ? P(-W, -yc) : P(W, yc)}`;
+	if (nkeys == 2)
+		shaftPath = `M${P(-W, yc)} A${R},${R} 0 0 0 ${P(-W, -yc)} L${P(-W, -yb)} L${P(W, -yb)} L${P(W, -yc)} A${R},${R} 0 0 0 ${P(W, yc)} L${P(W, yb)} L${P(-W, yb)} Z`;
+	else
+		shaftPath += ` L${P(W, yb)} L${P(-W, yb)} Z`;
+
+	let hubInner = (nkeys == 2)
+		? `M${P(-W, yc)} A${R},${R} 0 0 0 ${P(-W, -yc)} L${P(-W, -yh)} L${P(W, -yh)} L${P(W, -yc)} A${R},${R} 0 0 0 ${P(W, yc)} L${P(W, yh)} L${P(-W, yh)} Z`
+		: `M${P(-W, yc)} A${R},${R} 0 1 0 ${P(W, yc)} L${P(W, yh)} L${P(-W, yh)} Z`;
+	let hubPath = `M${cx - RH},${cy} A${RH},${RH} 0 1 0 ${cx + RH},${cy} A${RH},${RH} 0 1 0 ${cx - RH},${cy} Z ` + hubInner;
+
+	let keys = rot.map(a => `<rect x="${cx - W}" y="${cy - yk}" width="${2 * W}" height="${h * s}" class="ks-key" transform="rotate(${a} ${cx} ${cy})"/>`).join('');
+
+	let dx = cx + W + 14;
+	let svg = `
+		<path d="${hubPath}" class="ks-hub" fill-rule="evenodd"/>
+		<path d="${shaftPath}" class="ks-shaft"/>
+		${keys}
+		<line x1="${cx - R}" y1="${cy}" x2="${cx + R}" y2="${cy}" class="ks-dim" marker-start="url(#ks_arr)" marker-end="url(#ks_arr)"/>
+		<text x="${cx - 12}" y="${cy - 6}" class="ks-lbl">⌀D</text>
+		<line x1="${cx + W}" y1="${cy - R}" x2="${dx + 4}" y2="${cy - R}" class="ks-ext"/>
+		<line x1="${dx}" y1="${cy - R}" x2="${dx}" y2="${cy - yb}" class="ks-dim" marker-end="url(#ks_arr)"/>
+		<text x="${dx + 4}" y="${cy - (R + yb) / 2 + 12}" class="ks-lbl">t₁</text>
+		<line x1="${dx}" y1="${cy - R}" x2="${dx}" y2="${cy - yh}" class="ks-dim" marker-end="url(#ks_arr)"/>
+		<text x="${dx + 4}" y="${cy - (R + yh) / 2 + 5}" class="ks-lbl">t₂</text>
+		<text x="${cx - W - 4}" y="${cy - (yb + yk) / 2 + 5}" class="ks-lbl" text-anchor="end">key</text>
+		<text x="${cx - RH + 6}" y="${cy + 4}" class="ks-note">hub</text>
+		<text x="${cx - 18}" y="${cy + 60}" class="ks-note">shaft</text>`;
+	document.getElementById('xsection').innerHTML = svg;
+	fitView('xsection');
+}
+
+// Shrink-wrap an SVG's viewBox around everything drawn in it so nothing gets clipped
+function fitView(id, pad = 8) {
+	let el = document.getElementById(id), b;
+	try { b = el.getBBox(); } catch(e) { return; }
+	if (!b.width || !b.height) return;
+	el.setAttribute('viewBox', `${b.x - pad} ${b.y - pad} ${b.width + 2 * pad} ${b.height + 2 * pad}`);
+}
+
+function drawKeyTop(L, w, roundEnds) {
+	// fixed layout inside the 300x80 viewBox: caption, key (≤ 30 px tall), dimension line, label
+	let s = Math.min(270 / L, 30 / w), lw = L * s, ww = w * s, x0 = 150 - lw / 2, y0 = 18;
+	document.getElementById('keytop').innerHTML = `
+		<rect x="${x0}" y="${y0}" width="${lw}" height="${ww}" rx="${roundEnds ? ww / 2 : 0}" class="ks-key"/>
+		<line x1="${x0}" y1="${y0 + ww + 8}" x2="${x0 + lw}" y2="${y0 + ww + 8}" class="ks-dim" marker-start="url(#ks_arr)" marker-end="url(#ks_arr)"/>
+		<text x="150" y="${y0 + ww + 22}" class="ks-lbl" text-anchor="middle">L</text>
+		<text x="150" y="12" class="ks-note" text-anchor="middle">key, top view (${roundEnds ? 'round ends, L_eff = L − w' : 'square ends, L_eff = L'})</text>`;
+}
+</script>
+
+<style>
+#xsection { width: 300px; height: 300px; background: #fff; }
+#keytop { width: 300px; height: 80px; background: #fff; }
+.ks-hub   { fill: #cfd8e3; stroke: #222; stroke-width: 1.2; }
+.ks-shaft { fill: #bbb; stroke: #222; stroke-width: 1.2; }
+.ks-key   { fill: #e8a33d; stroke: #222; stroke-width: 1.2; }
+.ks-dim   { stroke: #06c; stroke-width: 1; }
+.ks-ext   { stroke: #06c; stroke-width: 0.6; stroke-dasharray: 2 2; }
+.ks-lbl   { fill: #06c; font: italic 14px serif; }
+.ks-note  { fill: #444; font: 11px sans-serif; }
+.sect td.collabel { font-weight: bold; }
+#warnings { max-width: 360px; font-size: 0.85em; padding: 4px; }
+.casenote { max-width: 300px; font-size: 0.8em; padding: 4px; }
+select.full { width: 100%; }
+</style>
+
+<html>
+<body onload="init()">
+<div id="topbar">
+	<div class="topbar-la selectable" onclick="window.location='./'">EveryCalc</div>
+	<div class="topbar-la" id="topbar_version"></div>
+	<div class="topbar-la" id="topbar_filename"></div>
+	<div class="topbar-la" id="topbar_unit">
+		<select id="unit_select" onchange="unitsChanged();">
+			<option value=0>Metric</option>
+			<option value=1 selected>Imperial</option>
+		</select>
+	</div>
+	<div class="topbar-ctr" id="topbar_title">Keyed Shaft Connection</div>
+	<div class="topbar-ra selectable" id="topbar_status"><span></span><span class="ttt"></span></div>
+	<div class="topbar-ra selectable" onclick="downloadPage();" id="download">Export HTML</div>
+	<div class="topbar-ra selectable" onclick="printPage();">Print</div>
+	<div class="topbar-ra selectable" onclick="WALK_enable();">Tutorial</div>
+	<a id="download_frame" hidden></a>
+</div>
+
+<svg id="walkthrough_overlay" onclick="WALK_nextStep()">
+	<path id="walkthrough_frame"></path>
+	<text id="walkthrough_text"></text>
+	<text id="walkthrough_skip_button" onclick="WALK_disable();">Skip Tutorial</text>
+</svg>
+
+<div style="float: left;" class="container">
+	<div style="display: table-row;">
+
+		<!-- Inputs -->
+		<div class="odd" style="display: table-cell; vertical-align: top;">
+			<table id="geom_inputs" class="sect">
+				<tr><td class="collabel" colspan=3>Shaft &amp; Key</td></tr>
+				<tr><th class="rowlabel">Shaft Diam. <i>D</i></th><td><input id="D" data-unit="dimension" value="1"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Key Standard</th>
+					<td colspan=2><select id="key_std" class="full" onchange="setError(1); compute();">
+						<option value="ansi_sq" selected>ANSI B17.1 square</option>
+						<option value="ansi_rect">ANSI B17.1 rectangular</option>
+						<option value="din">DIN 6885 / ISO 773</option>
+						<option value="custom">Custom</option>
+					</select></td></tr>
+				<tr><th class="rowlabel">Key Size</th><td colspan=2 id="key_name"></td></tr>
+				<tr><th class="rowlabel">Key Width <i>w</i></th><td><input id="w" data-unit="dimension"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Key Height <i>h</i></th><td><input id="h" data-unit="dimension"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Shaft Seat Depth <i>t<sub>1</sub></i>
+					<span class="ttt">Keyseat depth in the shaft, measured from the shaft's outer diameter. ANSI keys use h/2; DIN values are from DIN 6885.</span></th>
+					<td><input id="t1" data-unit="dimension"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Hub Seat Depth <i>t<sub>2</sub></i>
+					<span class="ttt">Keyway depth in the hub, measured from the shaft's outer diameter.</span></th>
+					<td><input id="t2" data-unit="dimension"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Key Length <i>L</i></th><td><input id="L" data-unit="dimension" value="1"></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Key Ends</th>
+					<td colspan=2><select id="key_ends" class="full" onchange="setError(1); compute();">
+						<option value="square" selected>Square (form B)</option>
+						<option value="round">Round (form A)</option>
+					</select></td></tr>
+				<tr><th class="rowlabel">Number of Keys
+					<span class="ttt">Two keys at 180° share load unevenly due to fit tolerances. Following DIN 6892, they're taken to carry 1.5× one key, not 2×.</span></th>
+					<td colspan=2><select id="nkeys" class="full" onchange="setError(1); compute();">
+						<option value="1" selected>1</option>
+						<option value="2">2 at 180°</option>
+					</select></td></tr>
+				<tr><th class="rowlabel">Keyseat Type</th>
+					<td colspan=2><select id="ks_type" class="full" onchange="setError(1); compute();">
+						<option value="endmill" selected>End-milled (profile)</option>
+						<option value="sled">Sled-runner</option>
+					</select></td></tr>
+				<tr><th class="rowlabel">Keyseat Fillet <i>r</i>
+					<span class="ttt">Radius at the bottom corners of the shaft keyseat. Blank = 0.02·D (a typical value; Shigley).</span></th>
+					<td><input id="r" data-unit="dimension" value=""></td><td class="unit" data-unit="dimension"></td></tr>
+			</table>
+			<table id="load_inputs" class="sect">
+				<tr><td class="collabel" colspan=3>Loads</td></tr>
+				<tr><th class="rowlabel">Torque, Mean <i>T<sub>m</sub></i></th><td><input id="Tm" data-unit="moment" value="1000"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr><th class="rowlabel">Torque, Alternating <i>T<sub>a</sub></i>
+					<span class="ttt">Amplitude of torque fluctuation. Peak torque Tm + Ta is used for the static key checks.</span></th>
+					<td><input id="Ta" data-unit="moment" value="0"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr><th class="rowlabel">Bending, Alternating <i>M<sub>a</sub></i>
+					<span class="ttt">Bending moment at the keyseat. On a rotating shaft, a steady bending load is fully reversed, so enter it here.</span></th>
+					<td><input id="Ma" data-unit="moment" value="0"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr><th class="rowlabel">Bending, Mean <i>M<sub>m</sub></i></th><td><input id="Mm" data-unit="moment" value="0"></td><td class="unit" data-unit="moment"></td></tr>
+				<tr><th class="rowlabel">Target FOS</th><td><input id="n_target" value="2"></td><td></td></tr>
+			</table>
+			<table id="matl_inputs" class="sect">
+				<tr><td class="collabel" colspan=3>Materials</td></tr>
+				<tr><th class="rowlabel">Key Material</th>
+					<td colspan=2><select id="key_base" class="full" onchange="MATERIAL_selectBase('key'); selectMaterial('key'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Key Grade</th>
+					<td colspan=2><select id="key_detail" class="full" onchange="selectMaterial('key'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Key <i>S<sub>y</sub></i></th><td><input id="key_Sy" data-unit="stress"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Shaft Material</th>
+					<td colspan=2><select id="shaft_base" class="full" onchange="MATERIAL_selectBase('shaft'); selectMaterial('shaft'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Shaft Grade</th>
+					<td colspan=2><select id="shaft_detail" class="full" onchange="selectMaterial('shaft'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Shaft <i>S<sub>y</sub></i></th><td><input id="shaft_Sy" data-unit="stress"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Shaft <i>S<sub>u</sub></i></th><td><input id="shaft_Su" data-unit="stress"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Shaft <i>S<sub>e</sub>'</i>
+					<span class="ttt">Uncorrected endurance limit. Blank = no fatigue check.</span></th>
+					<td><input id="shaft_Se" data-unit="stress"></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">Marin Factor <i>k</i>
+					<span class="ttt">Product k<sub>a</sub>·k<sub>b</sub>·k<sub>c</sub>·k<sub>d</sub>·k<sub>e</sub> of the endurance-limit modifiers (surface, size, load, temperature, reliability). Machined steel shafts are typically 0.6–0.8.</span></th>
+					<td><input id="kmarin" value="0.7"></td><td></td></tr>
+				<tr><th class="rowlabel">Notch Sens. <i>q</i> / <i>q<sub>s</sub></i>
+					<span class="ttt">Bending / torsion notch sensitivity. Blank = computed from the Neuber constant for steels (Shigley eq. 6-35); 1 for other materials.</span></th>
+					<td><input id="q" class="narrow" style="width: 40px;" placeholder="auto"> <input id="qs" class="narrow" style="width: 40px;" placeholder="auto"></td><td></td></tr>
+				<tr><th class="rowlabel">Hub Material</th>
+					<td colspan=2><select id="hub_base" class="full" onchange="MATERIAL_selectBase('hub'); selectMaterial('hub'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Hub Grade</th>
+					<td colspan=2><select id="hub_detail" class="full" onchange="selectMaterial('hub'); compute();"></select></td></tr>
+				<tr><th class="rowlabel">Hub <i>S<sub>y</sub></i></th><td><input id="hub_Sy" data-unit="stress"></td><td class="unit" data-unit="stress"></td></tr>
+			</table>
+		</div>
+
+		<!-- Drawings -->
+		<div class="output" style="display: table-cell; vertical-align: top;">
+			<svg width="0" height="0" style="position: absolute;"><defs>
+				<marker id="ks_arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 Z" fill="#06c"/></marker>
+			</defs></svg>
+			<svg id="xsection" viewBox="0 0 300 300"></svg><br>
+			<svg id="keytop" viewBox="0 0 300 80"></svg>
+			<div class="casenote">
+				Key shear τ = F/(w·L<sub>eff</sub>), allowable 0.577·S<sub>y</sub>.
+				Bearing σ = F/(contact height·L<sub>eff</sub>), allowable S<sub>y</sub> of the weaker part; contact height is t<sub>1</sub> on the shaft side and h − t<sub>1</sub> on the hub side.
+				F = 2T/D at the shaft surface.
+				Shaft: nominal stresses on full D, von Mises with K<sub>f</sub>, modified Goodman (Shigley ch. 7).
+				Keyseat K<sub>t</sub>: Roark Table 6-1 (end-milled, bending), Shigley Table 7-1 (K<sub>ts</sub> = 3.0; sled-runner K<sub>t</sub> = 1.7).
+			</div>
+		</div>
+
+		<!-- Outputs -->
+		<div class="output" style="display: table-cell; vertical-align: top;">
+			<table id="outputs" class="sect">
+				<tr><td class="collabel" colspan=3>Key</td></tr>
+				<tr><th class="rowlabel">Force at Shaft Surface <i>F</i></th><td><input id="out_F" data-unit="force" readonly></td><td class="unit" data-unit="force"></td></tr>
+				<tr><th class="rowlabel">Force per Key</th><td><input id="out_Fkey" data-unit="force" readonly></td><td class="unit" data-unit="force"></td></tr>
+				<tr><th class="rowlabel">Effective Length <i>L<sub>eff</sub></i></th><td><input id="out_Leff" data-unit="dimension" readonly></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">Key Shear Stress τ</th><td><input id="out_tau" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">FOS, Key Shear</th><td><input id="out_fos_shear" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Bearing, Shaft Side</th><td><input id="out_sb_shaft" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">FOS, Bearing Shaft Side</th><td><input id="out_fos_bs" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Bearing, Hub Side</th><td><input id="out_sb_hub" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">FOS, Bearing Hub Side</th><td><input id="out_fos_bh" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Min. Key Length for Target FOS
+					<span class="ttt">Shortest key whose shear and bearing checks all meet the target FOS. Doesn't include the shaft checks, which don't depend on key length.</span></th>
+					<td><input id="out_Lmin" data-unit="dimension" readonly></td><td class="unit" data-unit="dimension"></td></tr>
+
+				<tr><td class="collabel" colspan=3>Shaft at Keyseat</td></tr>
+				<tr><th class="rowlabel">Fillet Radius Used <i>r</i></th><td><input id="out_r" data-unit="dimension" readonly></td><td class="unit" data-unit="dimension"></td></tr>
+				<tr><th class="rowlabel">K<sub>t</sub> / K<sub>ts</sub></th><td><input id="out_Kt" readonly class="narrow" style="width: 45px;"> <input id="out_Kts" readonly class="narrow" style="width: 45px;"></td><td></td></tr>
+				<tr><th class="rowlabel">q / q<sub>s</sub><span id="q_note"></span></th><td><input id="out_q" readonly class="narrow" style="width: 45px;"> <input id="out_qs" readonly class="narrow" style="width: 45px;"></td><td></td></tr>
+				<tr><th class="rowlabel">K<sub>f</sub> / K<sub>fs</sub></th><td><input id="out_Kf" readonly class="narrow" style="width: 45px;"> <input id="out_Kfs" readonly class="narrow" style="width: 45px;"></td><td></td></tr>
+				<tr><th class="rowlabel">von Mises σ'<sub>a</sub></th><td><input id="out_sa" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">von Mises σ'<sub>m</sub></th><td><input id="out_sm" data-unit="stress" readonly></td><td class="unit" data-unit="stress"></td></tr>
+				<tr><th class="rowlabel">FOS, Fatigue (Goodman)</th><td><input id="out_fos_fat" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">FOS, First-Cycle Yield
+					<span class="ttt">S<sub>y</sub> / (σ'<sub>a</sub> + σ'<sub>m</sub>), using K<sub>f</sub> (Shigley eq. 7-16).</span></th>
+					<td><input id="out_fos_yld" readonly></td><td></td></tr>
+
+				<tr><td class="collabel" colspan=3>Overall</td></tr>
+				<tr><th class="rowlabel">Minimum FOS</th><td><input id="out_fos_min" readonly></td><td></td></tr>
+				<tr><th class="rowlabel">Governed By</th><td colspan=2><input id="out_gov" readonly style="width: 150px;"></td></tr>
+			</table>
+			<div id="warnings" class="warning" style="display: none;"></div>
+		</div>
+
+	</div>
+</div>
+</body>
+</html>

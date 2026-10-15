@@ -60,7 +60,8 @@ Engineering calculator suite built as standalone, exportable HTML files. No buil
 | `beltsize.html` | Belt Sizing & Strength | belts |
 | `beamcalc.html` | Beam Deflection & Stress | plots, math (MathJS FEA) |
 | `transstrength.html` | Transmission Strength | materials |
-| `stressconc.html` | Stress Concentrations (Roark Table 6-1 Kt) | *(none)* |
+| `stressconc.html` | Stress Concentrations (Roark Table 6-1 Kt) | materials |
+| `keyed.html` | Keyed Shaft Connection (key shear/bearing, shaft fatigue) | materials |
 | `oring.html` | O-Ring Calculator | orings |
 | `fit_tolerance.html` | ISO Fit & Tolerance | isofits |
 | `cutopt.html` | 1-D Cut Optimizer | *(none)* |
